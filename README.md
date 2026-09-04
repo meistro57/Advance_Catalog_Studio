@@ -268,6 +268,51 @@ Advance_Catalog_Studio/
 └── inspect_schema.py
 ```
 
+## Planned features
+
+The long-term goal is to make catalog editing resemble the hardware being configured—not the SQL schema hiding underneath it.
+
+### Graphical bolt-set builder
+
+A visual assembly editor is planned for adjusting complete bolt sets without manually tracing `SetOfBolts`, `SetNutsBolts`, `SetBolts`, and `ScrewNew` records.
+
+Planned capabilities include:
+
+- an exploded bolt-stack view showing the bolt head, connected parts, nut, and each washer;
+- clear control over component order, side, orientation, and assembly position;
+- live grip-stack and available-length feedback;
+- direct selection of bolt, nut, washer, grade, material, and set type;
+- warnings for missing components, impossible combinations, and broken diameter links;
+- a database-change preview before the adjusted set is committed.
+
+The aim is simple: select and adjust the physical bolt assembly on screen, then let Catalog Studio maintain the related database records.
+
+### Anchor configuration that makes sense
+
+Anchor catalogs need a purpose-built interface rather than a generic form containing dozens of disconnected fields. The planned anchor configurator will organise data around the actual anchor and its installation geometry.
+
+Planned views include:
+
+- a labelled anchor diagram with diameter, overall length, thread length, embedment, top distance, and other relevant dimensions;
+- logical sections for anchor identity, material and strength, geometry, holes, nuts, washers, and installation rules;
+- hardware-stack previews showing which nut and washer records are attached;
+- guided configuration for supported anchor families instead of direct foreign-key entry;
+- immediate relationship and completeness checks;
+- a final "what Advance Steel will receive" preview before saving.
+
+### Catalog intelligence and comparison
+
+Later releases may also add:
+
+- a visual relationship map for any selected catalog component;
+- full-catalog health checks and repair suggestions;
+- side-by-side comparison of two catalog databases;
+- reusable manufacturer/standard templates;
+- change history, export reports, and reversible editing sessions;
+- additional Advance Steel versions as their schema differences are verified.
+
+These are planned features, not claims about the current release. Development will remain driven by verified Advance Steel behaviour and real catalog test cases.
+
 ## Safety and limitations
 
 - Never point the tool at your live Advance Steel installation databases.
