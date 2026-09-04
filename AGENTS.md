@@ -191,7 +191,7 @@ endpoint (`anchor_id` = an `AnchorsName.ID`, `def_id` = an
 samples, classified from `AnchorsDefinition` fields:
 - plain rod (HiltiHY200 adhesive, US Threaded);
 - hex head at the rod bottom (`HeadDiameter`/`HeadHeight`/`NumberOfHeadEdges`);
-- J-hook below the rod (`HookRadius`).
+- L-shaped 90° hook below the rod (`HookRadius` bend + `DistanceA` tail).
 
 **Assumed and flagged to the user** (module docstring of `anchor_sets.py`
 owns the interpretation; none of it is verified against a live Advance Steel
@@ -228,11 +228,13 @@ documented in the `fabrication.py` module docstring (verified against
 `US_Hooked_Anchors`). Conventions shared with the anchor viewer — overall rod
 length, thread at the top, concrete plane from `TopDistance`, hook drawn from
 `HookRadius` — are repeated on the sheet itself, and a prominent
-"NTS — USE WRITTEN DIMENSIONS" note is always shown. Hooks/legs/offsets that
-exist only as ambiguous catalog fields (`DistanceA/F/E/O/C`, `BottomDistance`)
-are reported in the fabrication table with their source-column labels but are
-NEVER drawn as geometry. Values without a numeric source (coating, thread
-designation) are shown as absent rather than inferred.
+"NTS — USE WRITTEN DIMENSIONS" note is always shown. `DistanceA` is
+interpreted as the L-hook horizontal tail (it equals the part-name tail token
+across every sample diameter) and is drawn; the remaining distance fields
+(`DistanceF/E/O/C`, `BottomDistance`) are reported in the fabrication table
+with their source-column labels but are NEVER drawn as geometry. Values
+without a numeric source (coating, thread designation) are shown as absent
+rather than inferred.
 
 Dimension formatting rules (tested in `tests/test_fabrication.py`): metric
 display preserves source precision (trailing zeros trimmed); imperial display

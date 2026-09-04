@@ -177,8 +177,9 @@ def test_elevation_svg_contains_dimensions_and_hook():
     assert "L = 6" in svg
     assert "thread = 3" in svg
     assert "top projection = 1" in svg
-    # hook drawn as an arc path + radius label (25 mm rounds to ~1 in)
+    # L-shaped hook: bend-radius and horizontal-tail labels (tail = DistanceA)
     assert "hook R = " in svg
+    assert "leg A = 1 1/2" in svg
     assert "\u2248" in svg
     # hardware letters reference the fabrication table
     assert ">A</text>" in svg and ">B</text>" in svg

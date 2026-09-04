@@ -30,9 +30,13 @@ The sheet never estimates a missing fabrication dimension: fields above are
 the only ones drawn or printed numerically. If a required value is missing or
 conflicting, validation flags it and the sheet is marked DRAFT / INCOMPLETE.
 
-NOTE - like the viewers, the sheet draws the hook from HookRadius as a
-schematic J-bend and treats AnchorsDefinition.Length as the overall rod
-length. Those conventions are flagged on the sheet and in anchor_sets.py.
+NOTE - like the viewers, the sheet draws hooked anchors as a 90-degree
+L-shaped hook: the rod end turns through a quarter-round bend of radius
+HookRadius and continues as a horizontal tail whose length is the
+AnchorsDefinition.DistanceA value (observed to equal the third token of the
+part name, e.g. "Hooked Anchor 1/2x6x1-1/2"). AnchorsDefinition.Length is
+treated as the overall rod length. Those conventions are flagged on the
+sheet and in anchor_sets.py.
 """
 
 import html
@@ -325,20 +329,29 @@ def generate_elevation_svg(view: dict, mode: str = "imperial", draw_h: int = 500
     term = geo.get("termination") or {"kind": "plain"}
     head_h = float(term.get("height") or 0) if term.get("kind") == "head" else 0.0
     hook_r = float(term.get("hook_radius") or 0) if term.get("kind") == "hook" else 0.0
-    hook_stub = 0.0
-
+    hook_leg = 0.0
+    if hook_r:
+        for d in geo.get("distances") or []:
+            if d.get("field") == "DistanceA":
+                hook_leg = float(d.get("value_mm") or 0)
+                break
     # vertical extent of the drawn content (mm)
-    ymin_mm = -(hook_r * 1.6 + rod_r) if hook_r else -head_h * 0.0  # hook hangs below rod
-    ymax_mm = L
-    if ymin_mm == 0 and not head_h:
+    if hook_r:
+        # L-hook: quarter-round bend dips one radius below the rod end.
+        ymin_mm = -(hook_r + rod_r)
+    elif head_h:
+        ymin_mm = 0.0  # head sits at the very bottom
+    else:
         ymin_mm = -rod_r  # small clearance below a plain end
+    ymax_mm = L
 
     # horizontal half-extent (mm)
     comp_half = 0.0
     for part in view.get("components") or []:
         w = float(part.get("width") or part.get("diameter") or 0)
         comp_half = max(comp_half, w / 2 if w else (dia * 1.1))
-    half_w = max(rod_r * 1.2, comp_half, (rod_r + 2 * hook_r) if hook_r else 0)
+    hook_reach = (hook_r + hook_leg + rod_r) if hook_r else 0.0
+    half_w = max(rod_r * 1.2, comp_half, hook_reach)
     conc_half = half_w * 1.9 if view.get("concrete_y") is not None else half_w
 
     scale = min(max((draw_h - 150) / max((ymax_mm - ymin_mm) or 1, 1), 0.8), 5.0)
@@ -400,16 +413,21 @@ def generate_elevation_svg(view: dict, mode: str = "imperial", draw_h: int = 500
         add(f'<rect x="{px_x(-hw / 2)}" y="{px_y(head_h)}" width="{hw * scale}" '
             f'height="{head_h * scale}" fill="#dbe2ea" stroke="#1e293b" stroke-width="1.4"/>')
     elif term.get("kind") == "hook" and hook_r > 0:
-        # schematic J: 180 deg bend below the rod end plus short upward stub
+        # L-hook: quarter-round bend (radius R) turning down-to-right from the
+        # rod end, then a horizontal tail of length hook_leg (DistanceA).
         R = hook_r
-        y_end = px_y(0)
-        add(f'<path d="M {x_center} {y_end} A {R * scale} {R * scale} 0 0 1 {px_x(2 * R)} {y_end}" '
-            f'fill="none" stroke="#1e293b" stroke-width="{rod_r * 2 * scale}" '
-            f'stroke-linecap="round"/>')
-        hook_stub = min(R * 0.8, 12.0)
-        add(f'<line x1="{px_x(2 * R)}" y1="{y_end}" x2="{px_x(2 * R)}" '
-            f'y2="{px_y(-hook_stub)}" stroke="#1e293b" stroke-width="{rod_r * 2 * scale}" '
-            f'stroke-linecap="round"/>')
+        pts = [(0.0, 0.0)]
+        for k in range(0, 21):
+            theta = math.pi + (math.pi / 2) * k / 20  # pi -> 3pi/2
+            pts.append((R * (1 + math.cos(theta)), R * math.sin(theta)))
+        tip_x = R + hook_leg
+        pts.append((tip_x, -R))
+        path = " ".join(
+            f"L {px_x(x)} {px_y(y)}" if i else f"M {px_x(x)} {px_y(y)}"
+            for i, (x, y) in enumerate(pts)
+        )
+        add(f'<path d="{path}" fill="none" stroke="#1e293b" '
+            f'stroke-width="{rod_r * 2 * scale}" stroke-linecap="round"/>')
 
     # ---- hardware parts (outlined boxes) -----------------------------------
     for part in view.get("components") or []:
@@ -461,13 +479,17 @@ def generate_elevation_svg(view: dict, mode: str = "imperial", draw_h: int = 500
         dim_line(t_bot, t_top, f"thread = {dim_text(t_top - t_bot)}", x_off=26)
     if conc_y is not None and 0 < float(conc_y) < L:
         dim_line(float(conc_y), L, f"top projection = {dim_text(L - float(conc_y))}", x_off=52)
-    # hook radius (labelled under the rod, to the right of the bend)
+    # hook labels: bend radius near the bend, leg length under the tail
     if hook_r > 0:
-        hy = px_y(-hook_r * 0.4)
-        add(f'<line x1="{px_x(rod_r)}" y1="{hy}" x2="{px_x(2 * hook_r)}" y2="{hy}" '
-            f'stroke="#1e293b" stroke-width="0.9"/>')
-        add(f'<text x="{px_x(2 * hook_r) + label_gap}" y="{hy + 3}" font-size="11" '
-            f'fill="#1e293b">hook R = {dim_text(hook_r)}</text>')
+        hy = px_y(-hook_r * 0.75)
+        add(f'<text x="{px_x(hook_r * 0.5)}" y="{hy + 3}" font-size="11" fill="#1e293b" '
+            f'text-anchor="middle">hook R = {dim_text(hook_r)}</text>')
+        if hook_leg > 0:
+            ly = px_y(-hook_r - rod_r - 4)
+            add(f'<line x1="{px_x(hook_r)}" y1="{ly}" x2="{px_x(hook_r + hook_leg)}" y2="{ly}" '
+                f'stroke="#1e293b" stroke-width="0.9"/>')
+            add(f'<text x="{px_x(hook_r + hook_leg / 2)}" y="{ly + 3}" font-size="11" '
+                f'fill="#1e293b" text-anchor="middle">leg A = {dim_text(hook_leg)}</text>')
 
     # diameter callout under the rod
     d_y = px_y(ymin_mm) + 22

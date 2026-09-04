@@ -20,7 +20,9 @@ be corrected once verified, and flagged to the user as notes:
   Position magnitude, whose meaning is not yet confirmed).
 - Components with Position < 0 are stacked at the bottom (embedded) end;
   components with Position >= 0 or unknown sit at the top (thread) end.
-- Bottom terminations: HookRadius > 0 -> a schematic J-hook below the rod;
+- Bottom terminations: HookRadius > 0 -> a schematic 90-degree L-hook
+  (quarter-round bend of radius HookRadius plus a horizontal tail whose length
+  is AnchorsDefinition.DistanceA, observed to equal the part-name tail token);
   HeadDiameter > 0 -> a polygonal head at the rod bottom; otherwise the rod
   end is plain.
 No SQL is ever written by this module.

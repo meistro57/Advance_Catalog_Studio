@@ -222,23 +222,32 @@ function threadRings(yFrom, yTo, r, group) {
     }
 }
 
-function buildHook(radius, tubeR, group) {
-    // Schematic J: 180 deg bend below the rod end plus a short upward stub.
+function hookLegFromGeometry(v) {
+    for (const d of (v.geometry.distances) || []) {
+        if (d.field === 'DistanceA') return Number(d.value_mm) || 0;
+    }
+    return 0;
+}
+
+function buildHook(radius, tubeR, legMm, group) {
+    // Schematic 90-degree L-hook in the x/y plane: the rod end (0,0) turns
+    // downward through a quarter-round bend of `radius` and continues as a
+    // horizontal tail of `legMm` (AnchorsDefinition.DistanceA).
     const R = Math.max(radius, tubeR * 2);
     const pts = [];
-    for (let i = 0; i <= 24; i++) {
-        const a = (i / 24) * Math.PI;
-        pts.push(new THREE.Vector3(R - R * Math.cos(a), -R * Math.sin(a), 0));
+    const start = new THREE.Vector3(0, 0, 0);
+    for (let i = 0; i <= 20; i++) {
+        const theta = Math.PI + (Math.PI / 2) * (i / 20);
+        pts.push(new THREE.Vector3(R * (1 + Math.cos(theta)), R * Math.sin(theta), 0));
     }
-    const stubLen = Math.min(R * 0.8, tubeR * 8);
-    pts.push(new THREE.Vector3(2 * R, 0, 0), new THREE.Vector3(2 * R, stubLen, 0));
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const geo = new THREE.TubeGeometry(curve, 64, tubeR, 12, false);
+    pts.push(new THREE.Vector3(R + legMm, -R, 0));
+    const curve = new THREE.CatmullRomCurve3([start, ...pts]);
+    const geo = new THREE.TubeGeometry(curve, 80, tubeR, 12, false);
     const mat = new THREE.MeshStandardMaterial({
         color: COLORS.rod, metalness: 0.5, roughness: 0.4,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { kind: 'termination', label: 'Hook bend (schematic)' };
+    mesh.userData = { kind: 'termination', label: 'L-hook (schematic)' };
     group.add(mesh);
     return mesh;
 }
@@ -307,8 +316,8 @@ function buildModel(v) {
         lowestY = 0;
     } else if (term.kind === 'hook') {
         const hookR = Number(term.hook_radius) || dia * 2;
-        buildHook(hookR, rodR, assemblyGroup);
-        lowestY = -hookR * 1.4;
+        buildHook(hookR, rodR, hookLegFromGeometry(v), assemblyGroup);
+        lowestY = -(hookR + rodR);
     }
 
     // hardware components (top + embedded end)
@@ -393,7 +402,7 @@ function termText(term) {
         const sides = Math.min(Math.max(term.corners || 6, 3), 12);
         return `Head ${fin(term.width)} w \u00d7 ${fin(term.height)} h, ${sides}-sided`;
     }
-    if (term.kind === 'hook') return `Hook bend, radius ${fin(term.hook_radius)} in (schematic)`;
+    if (term.kind === 'hook') return `Hook: 90\u00b0 L-bend, radius ${fin(term.hook_radius)} in (schematic)`;
     return 'Plain (rod) end';
 }
 
@@ -553,11 +562,25 @@ function renderTable(v) {
 
 /* ------------------------------------------------------------------ framing */
 
+function hookReachMm() {
+    if (!view || !view.ok) return 0;
+    const term = view.geometry.termination || {};
+    if (term.kind !== 'hook') return 0;
+    return Number(term.hook_radius) + hookLegFromGeometry(view) + view.anchor.diameter;
+}
+
 function currentBounds() {
-    let minY = 1e9, maxY = -1e9;
+    let minY = -8;
+    let maxY = 0;
     if (view && view.ok) {
-        minY = -8;
         maxY = Number(view.geometry.length_mm) + 6;
+        const term = view.geometry.termination || {};
+        if (term.kind === 'hook') {
+            const r = Number(term.hook_radius) || 0;
+            minY = Math.min(minY, -(r + view.anchor.diameter / 2 + 6));
+        } else if (term.kind === 'head') {
+            minY = Math.min(minY, -4);
+        }
     }
     for (const pm of partMeshes) {
         const b = pm.mesh.userData.targetBottom != null ? pm.mesh.userData.targetBottom : pm.bottom;
@@ -571,7 +594,7 @@ function frameScene() {
     if (!view || !view.ok || !renderer) return;
     const { minY, maxY } = currentBounds();
     const dia = Number(view.anchor.diameter) || 10;
-    const width = Math.max(dia * 5, 110) + DIM_RIGHT_MARGIN;
+    const width = Math.max(dia * 5, 110, hookReachMm() * 2.2) + DIM_RIGHT_MARGIN;
     const centerY = (minY + maxY) / 2;
     controls.target.set(0, centerY, 0);
     const aspect = camera.aspect || 1;
