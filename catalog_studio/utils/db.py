@@ -326,6 +326,10 @@ def run_script(database: str, statements: list):
 
 def guess_catalog_type(database: str) -> str:
     tables = set(list_tables(database))
+    # Shear-stud catalogs (issue #4) reuse SetBolts for the stud records, so
+    # the connector shape must be checked BEFORE the generic SetBolts check.
+    if "ConnectorStandard" in tables or "ConnectorDiameters" in tables:
+        return "shear stud"
     if "AnchorsDefinition" in tables:
         return "anchor"
     if "SetBolts" in tables:
