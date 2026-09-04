@@ -102,6 +102,18 @@ Open [http://localhost:5050](http://localhost:5050).
 7. **Detach & Export** the modified `.mdf` / `.ldf` pair.
 8. **Test** the catalog in a controlled Advance Steel environment before adopting it.
 
+## Advance Steel round trip
+
+Advance Steel Management Tools already provides the two ends of the workflow: export a complete component catalog, then import the repaired or extended catalog when the work is finished.
+
+| Export the full bolt catalog | Import the finished bolt catalog |
+| --- | --- |
+| ![Export full bolt command in Advance Steel Management Tools](docs/images/advance-steel-export-bolts.png) | ![Import bolts command in Advance Steel Management Tools](docs/images/advance-steel-import-bolts.png) |
+
+Catalog Studio operates on the `.mdf` / `.ldf` pair between those two steps. The original bolt definitions, grades, diameters, sets, holes, and automatic length rules remain visible in Advance Steel Management Tools:
+
+![Advance Steel Management Tools bolt catalog editor](docs/images/advance-steel-management-tools-bolts.png)
+
 ## What the web interface does
 
 ### Catalog dashboard
