@@ -1,0 +1,44 @@
+/* static/css/bolt-set-viewer.css */
+#viewer3d {
+    width: 100%;
+    height: 540px;
+    background:
+        linear-gradient(180deg, #fbfdff 0%, #eef2f6 100%);
+    cursor: grab;
+    touch-action: none;
+}
+#viewer3d:active { cursor: grabbing; }
+
+.editor-grid {
+    grid-template-columns: 56px minmax(200px, 1fr) 150px 84px auto;
+    gap: .4rem .6rem;
+    align-items: center;
+}
+.editor-row { display: contents; }
+.editor-row .editor-slot { font-weight: 700; text-align: right; color: #495057; }
+.editor-row .editor-meta { font-size: .78rem; color: #6c757d; }
+.editor-row .editor-slot small { display: block; font-weight: 400; color: #adb5bd; }
+
+@media (max-width: 992px) {
+    .editor-grid { grid-template-columns: 44px 1fr; }
+}
+
+.legend-chip { display: inline-flex; align-items: center; gap: .35rem; }
+.chip-swatch {
+    display: inline-block; width: .8rem; height: .8rem; border-radius: 2px;
+    border: 1px solid rgba(0,0,0,.15);
+}
+.swatch-bolt    { background: #8fa3b8; }
+.swatch-nut     { background: #5b6ee1; }
+.swatch-washer  { background: #e8a13c; }
+.swatch-grip    { background: rgba(56, 189, 248, .35); }
+.swatch-unmatched { background: repeating-linear-gradient(45deg, #e05d5d 0 4px, #f5b1b1 4px 8px); }
+
+#componentTable { font-size: .8rem; }
+#componentTable td, #componentTable th { padding: .3rem .5rem; }
+
+#warningsPanel .alert { margin-bottom: .4rem; padding: .4rem .6rem; font-size: .8rem; }
+#boltInfoPanel .row-item, #detailPanel .row-item { font-size: .85rem; }
+#boltInfoPanel .row-item .k, #detailPanel .row-item .k {
+    color: #6c757d; font-size: .72rem; text-transform: uppercase; letter-spacing: .02em;
+}

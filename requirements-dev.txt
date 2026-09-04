@@ -1,0 +1,2 @@
+-r catalog_studio/requirements.txt
+pytest

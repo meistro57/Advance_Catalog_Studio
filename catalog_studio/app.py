@@ -2,12 +2,12 @@
 import os
 
 from flask import (
-    Flask, render_template, request, redirect, url_for, flash, send_from_directory
+    Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 )
 from werkzeug.utils import secure_filename
 
 import config
-from utils import db, docker_ops, staging, metadata
+from utils import db, docker_ops, staging, metadata, bolt_sets
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -131,10 +131,63 @@ def show_database(database):
     tables = db.list_tables(database)
     counts = {t: db.get_row_count(database, t) for t in tables}
     meta = metadata.get(database)
+    catalog_type = meta.get("catalog_type") or db.guess_catalog_type(database)
     diameters = db.get_catalog_diameters(database)
     return render_template(
-        "database.html", database=database, tables=tables, counts=counts, meta=meta, diameters=diameters
+        "database.html", database=database, tables=tables, counts=counts, meta=meta,
+        diameters=diameters, catalog_type=catalog_type,
     )
+
+
+# --------------------------------------------------------------------------
+# Bolt-set viewer (issue #1, Phase 1: read-only graphical visualizer)
+# --------------------------------------------------------------------------
+
+@app.route("/db/<database>/bolt-set-viewer")
+def bolt_set_viewer(database):
+    """Page hosting the Three.js bolt-set visualizer (bolt catalogs only)."""
+    if db.guess_catalog_type(database) != "bolt":
+        flash("The bolt-set viewer only supports bolt catalogs.", "warning")
+        return redirect(url_for("show_database", database=database))
+    combos = bolt_sets.get_bolt_combos(database)
+    if not combos:
+        flash("No bolt sets found in SetOfBolts for this database.", "warning")
+    return render_template(
+        "bolt_set_viewer.html", database=database, combos=combos,
+    )
+
+
+@app.route("/db/<database>/bolt-set-viewer/payload")
+def bolt_set_viewer_payload(database):
+    """JSON view model for one (standard, set, material, diameter, length)."""
+    try:
+        diameter = float(request.args.get("diameter", ""))
+        length_arg = request.args.get("length", "")
+        length = float(length_arg) if length_arg else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "diameter/length must be numbers."}), 400
+
+    standard = request.args.get("standard", "")
+    set_name = request.args.get("set", "")
+    material = request.args.get("material", "")
+    if not (standard and set_name and material):
+        return jsonify({"ok": False, "error": "standard, set, and material are required."}), 400
+
+    try:
+        lengths = bolt_sets.get_bolt_lengths(database, standard, material, diameter)
+        if length is None or length not in lengths:
+            length = lengths[0] if lengths else None
+        if length is None:
+            return jsonify({
+                "ok": False,
+                "error": f"No SetBolts lengths found for {standard} / {material} / {diameter} mm.",
+            })
+        view = bolt_sets.bolt_set_view(
+            database, standard, set_name, material, diameter, length
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify(view)
 
 
 @app.route("/db/<database>/add-diameter", methods=["GET", "POST"])

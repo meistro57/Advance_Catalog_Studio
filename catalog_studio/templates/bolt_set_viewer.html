@@ -1,0 +1,184 @@
+<!-- templates/bolt_set_viewer.html -->
+{% extends "base.html" %}
+{% block title %}Bolt-Set Viewer &middot; {{ database }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bolt-set-viewer.css') }}">
+<script type="importmap">
+{
+    "imports": {
+        "three": "{{ url_for('static', filename='vendor/three/three.module.js') }}",
+        "three/addons/": "{{ url_for('static', filename='vendor/three/') }}"
+    }
+}
+</script>
+<script>window.BOLT_DATABASE = {{ database|tojson }};</script>
+
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">&#128295; Bolt-Set Viewer <span class="text-muted fs-6">(read-only)</span></h4>
+        <span class="text-muted small">Schematic assembly from catalog records &mdash; bolt, washers, nut, and clamped-material grip zone.</span>
+    </div>
+    <span class="badge bg-secondary text-uppercase">bolt catalog</span>
+</div>
+
+<!-- Selection toolbar -->
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-lg-4">
+                <label class="form-label small fw-semibold text-muted mb-1">Bolt Set</label>
+                <select id="comboSelect" class="form-select form-select-sm">
+                    {% for c in combos %}
+                    <option value="{{ c.standard }}|{{ c.set }}|{{ c.material }}|{{ c.diameter }}"
+                            data-standard="{{ c.standard }}" data-set="{{ c.set }}"
+                            data-material="{{ c.material }}" data-diameter="{{ c.diameter }}">
+                        {{ c.standard }} &middot; {{ c.set }} &middot; {{ c.material }} &middot; &#8960; {{ c.diameter }} mm
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Bolt Length</label>
+                <select id="lengthSelect" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Display</label>
+                <select id="modeSelect" class="form-select form-select-sm">
+                    <option value="assembled">Assembled</option>
+                    <option value="exploded">Exploded</option>
+                </select>
+            </div>
+            <div class="col-lg-3 d-flex gap-2 justify-content-end">
+                <button id="resetViewBtn" class="btn btn-sm btn-outline-secondary">&#10021; Reset View</button>
+                <button id="fitViewBtn" class="btn btn-sm btn-outline-secondary">Fit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Assembly editor (client-side preview, no SQL writes) -->
+    <div class="col-12">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">&#9998; Assembly Editor <span class="badge bg-info text-dark ms-1">preview only</span></span>
+                <span class="d-flex align-items-center gap-2">
+                    <span id="editorBadge" class="badge bg-secondary">no changes</span>
+                    <button id="resetDraftBtn" class="btn btn-sm btn-outline-light" disabled>Reset changes</button>
+                </span>
+            </div>
+            <div class="card-body py-3">
+                <div id="editorRows" class="d-grid editor-grid"></div>
+                <hr class="my-2">
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="gripAutoToggle" checked>
+                            <label class="form-check-label small" for="gripAutoToggle">
+                                <strong>Clamped material (grip):</strong> auto &mdash; fill remaining bolt length
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-auto" id="gripFixedWrap">
+                        <label class="form-label small fw-semibold text-muted mb-1">Grip thickness (mm)</label>
+                        <input type="number" id="gripValueInput" class="form-control form-control-sm" min="0" step="0.1" style="width: 110px" disabled>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <span class="text-muted small" id="gripResultText"></span>
+                    </div>
+                </div>
+                <div class="alert alert-warning py-1 px-2 small mt-2 mb-0 d-none" id="draftNotice">
+                    Edits below are a local preview. They are <strong>not written to the database</strong>;
+                    a server-side review step will be added with Phase 3.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D canvas -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white small d-flex justify-content-between">
+                <span class="fw-bold">Schematic Assembly</span>
+                <span id="sceneCaption" class="text-white-50">select a bolt set to begin</span>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div id="viewer3d"></div>
+                <div id="webglFallback" class="d-none p-4 text-center text-muted">
+                    WebGL is not available in this browser. Use the component table below to review the catalog records.
+                </div>
+                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center d-none">
+                    <span class="spinner-border text-primary"></span>
+                </div>
+            </div>
+            <div class="card-footer bg-white py-2">
+                <div class="d-flex flex-wrap gap-3 small">
+                    <span class="legend-chip"><span class="chip-swatch swatch-bolt"></span>Bolt / head</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-nut"></span>Nut</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-washer"></span>Washer</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-grip"></span>Clamped material (schematic grip)</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-unmatched"></span>Unmatched record</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component data table (accessibility fallback + detail) -->
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-light small fw-bold">Component Records (source: SetOfBolts / SetNutsBolts)</div>
+            <div class="table-wrap">
+                <table class="table table-sm table-striped mb-0" id="componentTable">
+                    <thead><tr>
+                        <th>Slot</th><th>Role</th><th>Standard (DIN)</th><th>Material</th>
+                        <th class="text-end">Dia (mm)</th><th class="text-end">Height (mm)</th>
+                        <th class="text-end">Width (mm)</th><th class="text-end">Pos</th>
+                        <th>Name</th><th>Match</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side panels -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Bolt Record (source: SetBolts)</div>
+            <div class="card-body py-2" id="boltInfoPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Component Details <span class="text-muted fw-normal">(hover / click a part &mdash; hover details reflect preview edits)</span></div>
+            <div class="card-body py-2" id="detailPanel">
+                <div class="text-muted small">Hover a rendered component to identify its source record.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Length Rules (source: ScrewNew)</div>
+            <div class="card-body py-2" id="screwRulesPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Interpretation Notes</div>
+            <div class="card-body py-2" id="notesPanel">
+                <div class="text-muted small">No notes.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light small fw-bold">Warnings &amp; Notes</div>
+            <div class="card-body py-2" id="warningsPanel">
+                <div class="text-muted small">Warnings will appear here.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/bolt-set-viewer.js') }}"></script>
+{% endblock %}

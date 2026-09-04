@@ -37,7 +37,10 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | --- | --- |
 | Validated Advance Steel version | **2026** |
 | Catalog types | Bolt and anchor |
+| Table editor raw row operations | Implemented |
 | Guided bolt-diameter cloning | Implemented |
+| Bolt-set visualizer (read-only) | Phase 1 implemented |
+| Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented |
@@ -90,6 +93,15 @@ python catalog_studio/app.py
 ```
 
 Open [http://localhost:5050](http://localhost:5050).
+
+### Run the tests
+
+The bolt-set view-model mapping and route smoke tests do not need the SQL Server:
+
+```bash
+pip install -r requirements-dev.txt   # adds pytest
+python -m pytest tests/
+```
 
 ## Typical workflow
 
@@ -158,6 +170,14 @@ Searches textual columns across the database and reports matches by table and co
 For work that does not fit a guided tool, each table can be browsed and filtered directly. Supported tables allow adding, editing, duplicating, and deleting rows.
 
 Raw editing intentionally remains available, but relationship-dependent changes should use a guided workflow whenever possible.
+
+### Bolt-set viewer (Phase 1 — read-only)
+
+Bolt catalogs get a schematic Three.js visualizer that renders a selected bolt set as physical hardware: bolt head and shank, configured washers, nut, and the clamped-material grip zone, with assembled and exploded views, dimension callouts, and hover-to-identify source records. Component positions come from the catalog rows (see the verified/assumed mapping notes in `AGENTS.md`); a component table is always available as an accessibility fallback. Nothing in the viewer writes to SQL — editing controls are a later phase.
+
+### Assembly editor (Phase 2 — client-side preview)
+
+Next to the viewer, the assembly editor lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only — handing them to the server-side preview/transaction flow is Phase 3, once the `Position`-field semantics are verified.
 
 ## Why bolt diameters are difficult
 
@@ -255,12 +275,18 @@ Advance_Catalog_Studio/
 │   ├── app.py                 # Flask routes and application entry point
 │   ├── config.py              # Local paths, SQL connection, and AS version
 │   ├── templates/             # Browser interface
+│   ├── static/
+│   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer
+│   │   ├── css/
+│   │   └── vendor/three/           # Pinned local Three.js r160 (offline)
 │   └── utils/
+│       ├── bolt_sets.py       # Bolt-set view model for the viewer
 │       ├── db.py              # SQL inspection and catalog operations
 │       ├── docker_ops.py      # File transfer to/from scratch SQL Server
 │       ├── metadata.py        # Catalog type/version metadata
 │       ├── schema_templates.py # New bolt and anchor database templates
 │       └── staging.py         # Upload/export file pairing
+├── tests/                     # Pytest: view-model mapping + route smoke tests
 ├── db_inspect.py
 ├── diagnose_sets.py
 ├── export_bolts.py
@@ -273,6 +299,8 @@ Advance_Catalog_Studio/
 The long-term goal is to make catalog editing resemble the hardware being configured—not the SQL schema hiding underneath it.
 
 ### Graphical bolt-set builder
+
+> Status: the read-only visualizer (Phase 1) and the client-side assembly editor (Phase 2) described in the sections above are implemented. Remaining work under issue #1 is verifying the `Position`-field semantics against a live catalog and wiring draft proposals into the server-side preview and transaction flow (Phase 3). The list below is the roadmap for that final phase.
 
 A visual assembly editor is planned for adjusting complete bolt sets without manually tracing `SetOfBolts`, `SetNutsBolts`, `SetBolts`, and `ScrewNew` records.
 

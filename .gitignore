@@ -1,0 +1,12 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Crush tool workspace data
+.crush/
+
+# Runtime export outputs (sample catalog pairs in catalog_studio/uploads/ are
+# intentionally tracked; exports/ holds generated files)
+catalog_studio/exports/*

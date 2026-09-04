@@ -10,6 +10,9 @@
         {% if meta.get('catalog_type') %}<span class="badge bg-secondary">{{ meta.catalog_type }}</span>{% endif %}
     </h4>
     <div class="d-flex gap-2">
+        {% if catalog_type == 'bolt' %}
+        <a href="/db/{{ database }}/bolt-set-viewer" class="btn btn-sm btn-success">&#128295; Bolt-Set Viewer</a>
+        {% endif %}
         <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary">&#128297; Add / Clone Diameter</a>
         <a href="/db/{{ database }}/find-replace" class="btn btn-sm btn-outline-warning">Find &amp; Replace</a>
     </div>
