@@ -1,14 +1,17 @@
 # app.py
 import datetime
 import os
+import secrets
 
 from flask import (
-    Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
+    Flask, render_template, request, redirect, url_for, flash, send_from_directory,
+    jsonify, session, abort,
 )
 from werkzeug.utils import secure_filename
 
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
+from utils import staging_cleanup
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -18,6 +21,23 @@ app.config.from_object(config)
 app.jinja_env.filters["fmm"] = fabrication.format_mm
 app.jinja_env.filters["fin_fraction"] = fabrication.format_in
 app.jinja_env.filters["f_dim"] = fabrication.format_dim_text
+
+
+def _csrf_token() -> str:
+    token = session.get("_csrf")
+    if not token:
+        token = secrets.token_hex(16)
+        session["_csrf"] = token
+    return token
+
+
+def _csrf_valid() -> bool:
+    return bool(session.get("_csrf")) and request.form.get("csrf_token", "") == session["_csrf"]
+
+
+@app.context_processor
+def _inject_csrf():
+    return {"csrf_token": _csrf_token()}
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(config.EXPORT_DIR, exist_ok=True)
@@ -29,7 +49,7 @@ os.makedirs(config.EXPORT_DIR, exist_ok=True)
 
 @app.route("/")
 def index():
-    staged = staging.list_staged_pairs()
+    staged_status = staging_cleanup.scan_upload_dir(config.UPLOAD_DIR)
     try:
         attached = db.list_databases()
     except Exception as e:
@@ -40,7 +60,9 @@ def index():
     meta = metadata.all_meta()
     return render_template(
         "index.html",
-        staged=staged,
+        staged=staged_status["pairs"],
+        orphan_files=staged_status["orphans"],
+        uploads_status=staged_status,
         attached=attached,
         exports=exports,
         container_up=container_up,
@@ -49,6 +71,102 @@ def index():
         as_versions=sorted(config.SUPPORTED_AS_VERSIONS),
         default_as_version=config.ADVANCE_STEEL_VERSION,
     )
+
+
+# --------------------------------------------------------------------------
+# Staged-upload cleanup (issue #3): remove / flush / purge
+# --------------------------------------------------------------------------
+
+def _known_staged_names() -> set:
+    status = staging_cleanup.scan_upload_dir(config.UPLOAD_DIR)
+    known = set()
+    for pair in status["pairs"]:
+        known.add(pair["mdf"])
+        if pair.get("ldf"):
+            known.add(pair["ldf"])
+    known.update(status["orphans"])
+    return known
+
+
+@app.route("/uploads/status")
+def uploads_status():
+    """Read-only stats used to populate the flush confirmation dialog."""
+    return jsonify(staging_cleanup.scan_upload_dir(config.UPLOAD_DIR))
+
+
+@app.route("/uploads/remove", methods=["POST"])
+def uploads_remove():
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    names = request.form.getlist("names")
+    # derive targets server-side from the known staged list only
+    known = _known_staged_names()
+    safe = []
+    for name in names:
+        if name in known:
+            safe.append(name)
+    if not safe:
+        flash("Nothing to remove (no matching staged file).", "warning")
+        return redirect(url_for("index"))
+    result = staging_cleanup.move_to_trash(config.UPLOAD_DIR, safe)
+    _report_cleanup(result)
+    if result["moved"]:
+        flash(f"Remove: moved {len(result['moved'])} staged file(s) to the staging trash. "
+              f"Attached databases and exports are unaffected.", "success")
+    return redirect(url_for("index"))
+
+
+@app.route("/uploads/flush", methods=["POST"])
+def uploads_flush():
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    files = staging_cleanup.list_catalog_files(config.UPLOAD_DIR)
+    if not files:
+        flash("Staging area is already empty.", "info")
+        return redirect(url_for("index"))
+    pre_sizes = {
+        n: os.path.getsize(os.path.join(config.UPLOAD_DIR, n))
+        for n in files
+        if os.path.exists(os.path.join(config.UPLOAD_DIR, n))
+    }
+    result = staging_cleanup.move_to_trash(config.UPLOAD_DIR, files)
+    _report_cleanup(result)
+    reclaimed = sum(pre_sizes.get(n, 0) for n in result["moved"]) / 1024.0
+    flash(
+        f"Cleared {len(result['moved'])} staged file(s) "
+        f"({reclaimed / 1024:.2f} MiB) into the staging trash. "
+        f"Attached databases and exports are unaffected.",
+        "success",
+    )
+    return redirect(url_for("index"))
+
+
+@app.route("/uploads/purge", methods=["POST"])
+def uploads_purge():
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    try:
+        result = staging_cleanup.purge_trash(config.UPLOAD_DIR)
+    except staging_cleanup.StagingCleanupError as e:
+        flash(f"Purge failed: {e}", "danger")
+        return redirect(url_for("index"))
+    flash(
+        f"Purged {result['purged']} item(s) from the staging trash "
+        f"({result['bytes'] / 1024:.2f} KiB reclaimed).", "success"
+    )
+    return redirect(url_for("index"))
+
+
+def _report_cleanup(result):
+    """Flash warnings for missing/rejected files (success is reported by the
+    individual routes with their precise moved counts)."""
+    missing = result.get("missing") or []
+    rejected = result.get("rejected") or []
+    if missing:
+        flash(f"{len(missing)} file(s) were already missing ({', '.join(missing)}).", "warning")
+    if rejected:
+        flash(f"{len(rejected)} target(s) were not removed "
+              f"({', '.join(r['name'] for r in rejected)}).", "danger")
 
 
 @app.route("/upload", methods=["POST"])

@@ -41,17 +41,21 @@ and display-name token replacement.
   `catalog_studio/config.py` (`Scratch2026!Pw`) and duplicated in every
   root-level CLI script.
 - Start the web app (port **5050**): `python catalog_studio/app.py`
-- Attach existing catalog pairs (`catalog_studio/uploads/*.mdf`) through the
-  web UI (upload → attach), or run one-off inspection/export scripts against an
+- Attach existing catalog pairs through the web UI (upload → attach). The
+  checked-in example pairs live in `samples/`; copy one into the runtime
+  staging dir first, e.g. `cp samples/A325TC.mdf catalog_studio/uploads/`
+  (and its `_log.ldf`), or run one-off inspection/export scripts against an
   already-attached database, e.g.:
   ```bash
   python db_inspect.py A325TC_mark
   python export_bolts.py A325TC_mark out.csv
   python export_catalog.py HiltiHY200 out.csv
   ```
-- Checked-in sample data lives in `catalog_studio/uploads/` (A325TC, Grade5,
-  US_Hooked_Anchors) and `raw_files/`. `catalog_studio/exports/` and
-  `catalog_studio/uploads/` are also the runtime working dirs of the app.
+- Checked-in sample data lives in `samples/` (A325TC, Grade5, US_Headed/
+  US_Hooked/US_Threaded_Anchors, plus Nelson/raw_files).
+  `catalog_studio/uploads/` is a RUNTIME staging area: uploads are
+  git-ignored and can be cleaned with the dashboard's Remove / Clear staged
+  uploads actions (issue #3). `catalog_studio/exports/` is the export dir.
 
 ## Code layout
 
@@ -68,6 +72,12 @@ and display-name token replacement.
   the mdf (extra tables would break Advance Steel import).
 - `catalog_studio/utils/staging.py` — pairs `.mdf` with `_log.ldf` in uploads/,
   suggests DB names from filenames, lists exports/.
+- `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the runtime
+  upload staging area (issue #3): strict path containment (plain basenames
+  with `.mdf`/`.ldf` only, no traversal/absolute paths/symlinks escaping the
+  canonical upload dir), scan stats for the confirmation dialogs, and
+  recoverable removal — files move into `uploads/.trash` and only an explicit
+  purge deletes them. Fully unit-tested.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_sets.py` — bolt-set view model for the graphical
@@ -281,9 +291,15 @@ dimension logic of its own.
     is not corrupted.
 - `preview_find_replace` / `apply_find_replace` open a fresh connection per
   table/column; fine for small catalogs, slow on large ones.
+- Destructive browser actions (the staging cleanup POSTs) require a CSRF
+  token from the session; `_csrf_token()` is injected into templates and
+  `_csrf_valid()` guards each cleanup route. Target filenames are always
+  re-derived server-side from the scanned staged list, never trusted from the
+  browser.
 - `.gitignore` excludes `venv/`, `__pycache__/`, `.pytest_cache/`, `.crush/`,
-  and generated files in `catalog_studio/exports/`. Sample catalog `.mdf` /
-  `.ldf` pairs under `catalog_studio/uploads/` are intentionally tracked.
+  everything in `catalog_studio/uploads/` (kept via `.gitkeep`) and generated
+  files in `catalog_studio/exports/`. Example `.mdf`/`.ldf` pairs are tracked
+  under `samples/` (and `raw_files/`), never in the runtime upload dir.
 - Only Advance Steel **2026** is validated; schema shapes are known to differ
   across versions (comments reference a FastenSuite `integrity_check.py`
   expecting a different bolt schema). Treat any new schema as unverified.

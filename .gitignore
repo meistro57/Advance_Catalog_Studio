@@ -7,6 +7,8 @@ __pycache__/
 # Crush tool workspace data
 .crush/
 
-# Runtime export outputs (sample catalog pairs in catalog_studio/uploads/ are
-# intentionally tracked; exports/ holds generated files)
+# Runtime staging + exports (uploaded catalog pairs are runtime state; keep the
+# directory itself via .gitkeep). Intentional examples live in samples/.
+catalog_studio/uploads/*
+!catalog_studio/uploads/.gitkeep
 catalog_studio/exports/*

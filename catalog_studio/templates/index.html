@@ -66,45 +66,156 @@
         </div>
 
         <div class="card mt-4">
-            <div class="card-header">Staged files (uploads/)</div>
-            <div class="card-body">
-                {% if staged %}
-                    {% for pair in staged %}
-                    <form action="/attach" method="post" class="row g-2 align-items-center mb-2 border-bottom pb-2">
-                        <input type="hidden" name="base" value="{{ pair.base }}">
-                        <input type="hidden" name="mdf" value="{{ pair.mdf }}">
-                        <input type="hidden" name="ldf" value="{{ pair.ldf or '' }}">
-                        <div class="col-auto">
-                            <strong>{{ pair.mdf }}</strong>
-                            {% if pair.ldf %}
-                                <span class="badge bg-secondary">{{ pair.ldf }}</span>
-                            {% else %}
-                                <span class="badge badge-missing text-white">missing .ldf</span>
-                            {% endif %}
-                        </div>
-                        <div class="col-auto">
-                            <input type="text" name="db_name" class="form-control form-control-sm"
-                                   placeholder="database name" style="width:150px">
-                        </div>
-                        <div class="col-auto">
-                            <select name="as_version" class="form-select form-select-sm" style="width:100px">
-                                {% for v in as_versions %}
-                                <option value="{{ v }}" {% if v == default_as_version %}selected{% endif %}>AS {{ v }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-auto">
-                            <button class="btn btn-sm btn-success" type="submit" {% if not pair.ldf %}disabled{% endif %}>
-                                Attach
-                            </button>
-                        </div>
-                    </form>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted mb-0">No staged files yet.</p>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Staged files (uploads/)</span>
+                {% if staged or orphan_files %}
+                <span class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#flushModal">Clear staged uploads</button>
+                    {% if uploads_status.trash.count %}
+                    <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#purgeModal">Purge trash ({{ uploads_status.trash.count }})</button>
+                    {% endif %}
+                </span>
                 {% endif %}
             </div>
+            <div class="card-body">
+                {% if not staged and not orphan_files %}
+                    <p class="text-muted mb-0">No staged files yet.</p>
+                {% endif %}
+
+                {% for pair in staged %}
+                <div class="d-flex align-items-center gap-2 border-bottom pb-2 mb-2">
+                    <div class="flex-grow-1">
+                        <form action="/attach" method="post" class="row g-2 align-items-center m-0">
+                            <input type="hidden" name="base" value="{{ pair.base }}">
+                            <input type="hidden" name="mdf" value="{{ pair.mdf }}">
+                            <input type="hidden" name="ldf" value="{{ pair.ldf or '' }}">
+                            <div class="col-auto">
+                                <strong>{{ pair.mdf }}</strong>
+                                {% if pair.ldf %}
+                                    <span class="badge bg-secondary">{{ pair.ldf }}</span>
+                                {% else %}
+                                    <span class="badge badge-missing text-white">missing .ldf</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-auto">
+                                <input type="text" name="db_name" class="form-control form-control-sm"
+                                       placeholder="database name" style="width:150px">
+                            </div>
+                            <div class="col-auto">
+                                <select name="as_version" class="form-select form-select-sm" style="width:100px">
+                                    {% for v in as_versions %}
+                                    <option value="{{ v }}" {% if v == default_as_version %}selected{% endif %}>AS {{ v }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-sm btn-success" type="submit" {% if not pair.ldf %}disabled{% endif %}>Attach</button>
+                            </div>
+                        </form>
+                    </div>
+                    <form action="/uploads/remove" method="post" class="m-0">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="names" value="{{ pair.mdf }}">
+                        {% if pair.ldf %}<input type="hidden" name="names" value="{{ pair.ldf }}">{% endif %}
+                        <button class="btn btn-sm btn-outline-danger" type="submit"
+                                onclick="return confirm('Remove staged pair {{ pair.mdf }} + {{ pair.ldf }}? The files are moved to the staging trash. This does not detach an attached database.');">
+                            Remove
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+
+                {% for name in orphan_files %}
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                    <span>
+                        <strong>{{ name }}</strong>
+                        <span class="badge bg-warning text-dark">orphaned file</span>
+                    </span>
+                    <form action="/uploads/remove" method="post" class="m-0">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="names" value="{{ name }}">
+                        <button class="btn btn-sm btn-outline-danger" type="submit"
+                                onclick="return confirm('Remove orphaned staged file {{ name }}? It is moved to the staging trash.');">
+                            Remove
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
         </div>
+
+        <!-- flush confirmation modal -->
+        <div class="modal fade" id="flushModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="/uploads/flush" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Clear staged uploads?</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="flushSummary">
+                            <p class="text-muted">Loading staging information…</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger" id="flushConfirmBtn" disabled>Clear staged uploads</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- purge trash modal -->
+        <div class="modal fade" id="purgeModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="/uploads/purge" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Permanently purge staging trash?</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>This <strong>permanently deletes</strong> the
+                            {{ uploads_status.trash.count }} item(s) in the staging trash
+                            ({{ '%.2f'|format(uploads_status.trash.bytes / 1048576) }} MiB).
+                            This cannot be undone. Attached databases and exports are unaffected.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-dark">Purge trash</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        document.getElementById('flushModal').addEventListener('show.bs.modal', function () {
+            fetch('/uploads/status').then(function (r) { return r.json(); }).then(function (s) {
+                var mib = (s.total_bytes / 1048576);
+                var summary = document.getElementById('flushSummary');
+                var orphanWords = s.orphan_count === 1 ? 'orphaned file' : 'orphaned files';
+                var pairWords = s.pair_count === 1 ? 'pair' : 'pairs';
+                summary.innerHTML =
+                    '<ul class="mb-2">' +
+                    '<li>' + s.mdf_count + ' .mdf file(s)</li>' +
+                    '<li>' + s.ldf_count + ' .ldf file(s)</li>' +
+                    '<li>' + s.pair_count + ' complete ' + pairWords + '</li>' +
+                    '<li>' + s.orphan_count + ' ' + orphanWords + '</li>' +
+                    '<li>' + mib.toFixed(2) + ' MiB to be moved to the staging trash</li>' +
+                    '</ul>' +
+                    '<p class="text-muted small mb-0">Staging directory: <code>' + s.upload_dir + '</code><br>' +
+                    'Attached databases and completed exports are <strong>not</strong> affected. ' +
+                    'Files move to <code>.trash</code> and can be purged later.</p>';
+                document.getElementById('flushConfirmBtn').disabled = false;
+            }).catch(function () {
+                document.getElementById('flushSummary').innerHTML =
+                    '<p class="text-danger">Could not read staging information. Refresh and try again.</p>';
+            });
+        });
+        </script>
     </div>
 
     <div class="col-lg-6">

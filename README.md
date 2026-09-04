@@ -44,6 +44,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Phase 1 schema investigation; auto-detection added |
+| Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented |
@@ -136,6 +137,8 @@ Catalog Studio operates on the `.mdf` / `.ldf` pair between those two steps. The
 The home page is the ingest/edit/export control centre. It shows:
 
 - uploaded catalog pairs waiting to be attached;
+- per-pair **Remove** and **Clear staged uploads** actions with a staging
+  trash (recoverable until an explicit purge) and confirmation counts/sizes;
 - databases currently attached to the scratch SQL Server;
 - Advance Steel version and catalog-type tags;
 - new bolt and anchor catalog creation;
@@ -302,6 +305,7 @@ Advance_Catalog_Studio/
 │       ├── schema_templates.py # New bolt and anchor database templates
 │       └── staging.py          # Upload/export file pairing
 ├── tests/                     # Pytest: view-model mapping + route smoke tests
+├── samples/                   # Example mdf/ldf catalog pairs (tracked)
 ├── docs/
 │   ├── images/
 │   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
@@ -368,7 +372,7 @@ These are planned features, not claims about the current release. Development wi
 - Test exported catalogs before rolling them into a working environment.
 - SQL identifiers are handled separately from values; future catalog schemas still require validation.
 - Only Advance Steel 2026 has been tested so far.
-- The Flask development server has no authentication or multi-user protections.
+- The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
 
 ## Contributing
