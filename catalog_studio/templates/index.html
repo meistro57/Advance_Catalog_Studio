@@ -1,0 +1,162 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+{% block title %}Catalog Studio{% endblock %}
+{% block content %}
+
+{% if not container_up %}
+<div class="alert alert-warning">
+    Scratch SQL Server container isn't running. Start it, then refresh:
+    <code>docker start hilti-scratch-sql</code>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Upload a new mdf/ldf export</div>
+            <div class="card-body">
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <div class="mb-2">
+                        <label class="form-label">.mdf file</label>
+                        <input type="file" name="mdf_file" class="form-control" accept=".mdf">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">.ldf file</label>
+                        <input type="file" name="ldf_file" class="form-control" accept=".ldf">
+                    </div>
+                    <button class="btn btn-primary btn-sm" type="submit">Upload</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">Create a new catalog from scratch</div>
+            <div class="card-body">
+                <form action="/create" method="post" class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Database name</label>
+                        <input type="text" name="db_name" class="form-control form-control-sm" placeholder="e.g. MyNewAnchors" required>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Catalog type</label>
+                        <select name="catalog_type" class="form-select form-select-sm">
+                            {% for key, tpl in catalog_types.items() %}
+                            <option value="{{ key }}">{{ tpl.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">AS version</label>
+                        <select name="as_version" class="form-select form-select-sm">
+                            {% for v in as_versions %}
+                            <option value="{{ v }}" {% if v == default_as_version %}selected{% endif %}>AS {{ v }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-primary" type="submit">Create</button>
+                    </div>
+                </form>
+                <p class="text-muted small mt-2 mb-0">
+                    Creates the full table structure and seeds standard lookup data
+                    (sources, strength classes, common diameters) so you can start
+                    adding real entries immediately.
+                </p>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">Staged files (uploads/)</div>
+            <div class="card-body">
+                {% if staged %}
+                    {% for pair in staged %}
+                    <form action="/attach" method="post" class="row g-2 align-items-center mb-2 border-bottom pb-2">
+                        <input type="hidden" name="base" value="{{ pair.base }}">
+                        <input type="hidden" name="mdf" value="{{ pair.mdf }}">
+                        <input type="hidden" name="ldf" value="{{ pair.ldf or '' }}">
+                        <div class="col-auto">
+                            <strong>{{ pair.mdf }}</strong>
+                            {% if pair.ldf %}
+                                <span class="badge bg-secondary">{{ pair.ldf }}</span>
+                            {% else %}
+                                <span class="badge badge-missing text-white">missing .ldf</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <input type="text" name="db_name" class="form-control form-control-sm"
+                                   placeholder="database name" style="width:150px">
+                        </div>
+                        <div class="col-auto">
+                            <select name="as_version" class="form-select form-select-sm" style="width:100px">
+                                {% for v in as_versions %}
+                                <option value="{{ v }}" {% if v == default_as_version %}selected{% endif %}>AS {{ v }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-sm btn-success" type="submit" {% if not pair.ldf %}disabled{% endif %}>
+                                Attach
+                            </button>
+                        </div>
+                    </form>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">No staged files yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Attached databases</div>
+            <div class="card-body">
+                {% if attached %}
+                    <div class="list-group">
+                        {% for name in attached %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <a href="/db/{{ name }}">{{ name }}</a>
+                                {% set m = meta.get(name, {}) %}
+                                {% if m.get('as_version') %}
+                                <span class="badge bg-info text-dark">AS {{ m.as_version }}</span>
+                                {% endif %}
+                                {% if m.get('catalog_type') %}
+                                <span class="badge bg-secondary">{{ m.catalog_type }}</span>
+                                {% endif %}
+                            </span>
+                            <form action="/db/{{ name }}/detach" method="post" class="m-0">
+                                <button class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Detach {{ name }} and export it? It will be removed from the live SQL Server session.');">
+                                    Detach &amp; Export
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nothing attached yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">Exports ready to import into Advance Steel</div>
+            <div class="card-body">
+                {% if exports %}
+                    <ul class="list-group">
+                        {% for f in exports %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ f }}
+                            <a class="btn btn-sm btn-outline-primary" href="/exports/{{ f }}">Download</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">Nothing exported yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

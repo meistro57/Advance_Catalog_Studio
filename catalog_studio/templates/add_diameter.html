@@ -1,0 +1,297 @@
+<!-- templates/add_diameter.html -->
+{% extends "base.html" %}
+{% block title %}Add Diameter &middot; {{ database }}{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">&#128297; Add / Clone Diameter to <strong>{{ database }}</strong></h4>
+        <span class="text-muted small">Cascades a new nominal diameter across all related tables (rules, distances, assemblies, nuts/washers, and bolt lengths).</span>
+    </div>
+    <div>
+        {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
+        <span class="badge bg-secondary text-uppercase">{{ catalog_type }} catalog</span>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Configuration Form -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white fw-bold">
+                1. Diameter Configuration
+            </div>
+            <div class="card-body">
+                <form method="post" id="diameterForm" action="/db/{{ database }}/add-diameter">
+                    
+                    <!-- Preset Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Standard Size Preset</label>
+                        <select id="presetSelect" name="preset" class="form-select">
+                            <option value="custom">-- Custom Size (enter mm manually) --</option>
+                            <optgroup label="Imperial (Fractions)">
+                                {% for p in presets %}
+                                    {% if '"' in p.fraction %}
+                                    <option value="{{ p.fraction }}"
+                                            data-mm="{{ p.mm }}"
+                                            data-name="{{ p.run_name }}"
+                                            data-token="{{ p.token }}"
+                                            {% if form_data.preset == p.fraction %}selected{% endif %}>
+                                        {{ p.label }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Metric (ISO)">
+                                {% for p in presets %}
+                                    {% if 'M' in p.fraction %}
+                                    <option value="{{ p.fraction }}"
+                                            data-mm="{{ p.mm }}"
+                                            data-name="{{ p.run_name }}"
+                                            data-token="{{ p.token }}"
+                                            {% if form_data.preset == p.fraction %}selected{% endif %}>
+                                        {{ p.label }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                        <div class="form-text">Selecting a preset automatically fills the exact millimeters, Advance Steel format string, and name token.</div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Target Diameter (mm) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.0001" name="target_dia" id="targetDiaInput" class="form-control"
+                                   value="{{ form_data.target_dia }}" required placeholder="e.g. 9.525">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Display String (RunName) <span class="text-danger">*</span></label>
+                            <input type="text" name="target_name" id="targetNameInput" class="form-control"
+                                   value="{{ form_data.target_name }}" required placeholder="e.g.  3/8 inch">
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Source Diameter to Clone -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">2. Source Template Diameter</label>
+                        <select name="source_dia" id="sourceDiaSelect" class="form-select" required>
+                            {% for d in existing_diameters %}
+                                <option value="{{ d.key }}"
+                                        data-token="{{ d.token }}"
+                                        {% if form_data.source_dia|string == d.key|string %}selected{% endif %}
+                                        {% if d.is_orphan %}class="text-danger"{% endif %}>
+                                    {{ d.key }} mm ({{ d.run_name.strip() }}) &mdash; {{ d.total_related }} related records
+                                    {% if d.is_orphan %}[ORPHAN - NO DATA]{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Choose an existing functional diameter to copy assembly rules, distance tolerances, nuts, and washers from.</div>
+                    </div>
+
+                    <!-- Name Find & Replace in Part Names -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Name search token</label>
+                            <input type="text" name="replace_from" id="replaceFromInput" class="form-control"
+                                   value="{{ form_data.replace_from }}" placeholder="e.g. 1/2">
+                            <div class="form-text">Fraction/token in source part names.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Name replace token</label>
+                            <input type="text" name="replace_to" id="replaceToInput" class="form-control"
+                                   value="{{ form_data.replace_to }}" placeholder="e.g. 3/8">
+                            <div class="form-text">Fraction/token for new part names.</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Advanced Scaling Options -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">3. Scaling &amp; Table Options</label>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="scale_dimensions" id="scaleDimensions"
+                                   value="1" {% if form_data.scale_dimensions %}checked{% endif %}>
+                            <label class="form-check-label small" for="scaleDimensions">
+                                <strong>Scale head dimensions &amp; component weights</strong>
+                                <span class="d-block text-muted">Multiplies head diameter/height by ratio (target/source) and weights by (target/source)&sup2;.</span>
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="scale_along_across" id="scaleAlongAcross"
+                                   value="1" {% if form_data.scale_along_across %}checked{% endif %}>
+                            <label class="form-check-label small" for="scaleAlongAcross">
+                                <strong>Scale edge &amp; pitch distances in BoltsDistances</strong>
+                                <span class="d-block text-muted">Scales <code>along</code> and <code>across</code> edge distances proportionally with the new diameter.</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Orphan Clean-up if detected -->
+                    {% if preview and preview.orphans_found %}
+                    <div class="alert alert-warning py-2 mb-3">
+                        <div class="fw-bold small mb-1">&#9888; Orphan / Miskeyed Entry Detected:</div>
+                        {% for o in preview.orphans_found %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="cleanup_keys" value="{{ o.key }}" id="clean_{{ loop.index }}" checked>
+                            <label class="form-check-label small" for="clean_{{ loop.index }}">
+                                Delete orphan entry <code>Key={{ o.key }}</code> ('{{ o.run_name.strip() }}') from <code>BoltsDiameters</code>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Buttons -->
+                    <div class="d-flex gap-2 justify-content-between pt-2">
+                        <button type="submit" name="action" value="preview" class="btn btn-outline-primary">
+                            &#128065; Preview Changes
+                        </button>
+                        <button type="submit" name="action" value="apply" class="btn btn-success"
+                                onclick="return confirm('Generate this diameter across all tables in {{ database }}?');">
+                            &#10004; Apply &amp; Create Diameter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview / Details Column -->
+    <div class="col-lg-6">
+        {% if preview %}
+        <div class="card shadow-sm border-0 mb-4 border-success">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">&#10003; Preview Summary: {{ preview.total_rows }} Rows to Create</span>
+                <span class="badge bg-light text-dark">Scale Ratio: {{ preview.scale }}x</span>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Cloning from <strong>{{ preview.source_dia }} mm</strong> &rarr; <strong>{{ preview.target_dia }} mm ({{ preview.target_name.strip() }})</strong>.
+                </p>
+
+                <div class="list-group mb-3">
+                    {% for table_name, data in preview.tables.items() %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ table_name }}</strong>
+                            <div class="text-muted small">
+                                {% if table_name == 'BoltsDiameters' %}Nominal diameter lookup entry
+                                {% elif table_name == 'BoltsDistances' %}Hole tolerance edge/pitch distances
+                                {% elif table_name == 'ScrewNew' %}Grip length and screw length calculation rules
+                                {% elif table_name == 'SetOfBolts' %}Hardware set compositions (nuts &amp; washers)
+                                {% elif table_name == 'SetNutsBolts' %}Nut and washer component definitions
+                                {% elif table_name == 'SetBolts' %}Bolt definitions across all lengths
+                                {% elif table_name == 'AnchorsName' %}Anchor standard definitions
+                                {% elif table_name == 'AnchorsDefinition' %}Anchor lengths and geometry
+                                {% elif table_name == 'AnchorsHoleDefinition' %}Anchor hole drilling specs
+                                {% endif %}
+                            </div>
+                        </div>
+                        <span class="badge bg-primary rounded-pill fs-6">{{ data.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if preview.tables.get('SetBolts') and preview.tables.SetBolts.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Sample Generated Bolt Rows (SetBolts)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>Name</th><th>Length</th><th>Head Dia</th><th>Head Ht</th><th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in preview.tables.SetBolts.samples %}
+                            <tr>
+                                <td><code>{{ b.Name }}</code></td>
+                                <td>{{ b.Length }} mm</td>
+                                <td>{{ b.ScrewHeadOuterDiameter }}</td>
+                                <td>{{ b.HeadHeight }}</td>
+                                <td>{{ b.Weight }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if preview.tables.get('SetNutsBolts') and preview.tables.SetNutsBolts.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Sample Components (SetNutsBolts)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>Standard</th><th>Name</th><th>Height</th><th>OD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for n in preview.tables.SetNutsBolts.samples %}
+                            <tr>
+                                <td>{{ n.Standard }}</td>
+                                <td><code>{{ n.Name }}</code></td>
+                                <td>{{ n.Height }}</td>
+                                <td>{{ n.OutsideDiameter }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <!-- Helper Card when no preview is yet loaded -->
+        <div class="card shadow-sm border-0 mb-4 bg-light">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">&#128161; How Cascading Diameters Works</h5>
+                <p class="text-muted small">
+                    Advance Steel does not store bolt catalogs in a flat list. A functioning bolt diameter requires synchronized entries across 6 distinct database tables:
+                </p>
+                <ol class="small text-muted ps-3">
+                    <li class="mb-2"><strong>BoltsDiameters</strong>: Registers the nominal diameter in millimeters and the Advance Steel display string.</li>
+                    <li class="mb-2"><strong>BoltsDistances</strong>: Defines along/across edge distances for hole tolerances (0mm, 1mm, 2mm).</li>
+                    <li class="mb-2"><strong>ScrewNew</strong>: Sets up the grip-length calculation formulas for each assembly standard (<code>MuS</code>, <code>Mu2S</code>, <code>MuKS</code>).</li>
+                    <li class="mb-2"><strong>SetOfBolts</strong>: Tells Advance Steel which nuts and washers to package with this bolt diameter.</li>
+                    <li class="mb-2"><strong>SetNutsBolts</strong>: Creates the actual nut and washer part numbers for this diameter.</li>
+                    <li class="mb-2"><strong>SetBolts</strong>: Generates the full length run for this diameter with proportional head heights, diameters, and weights.</li>
+                </ol>
+                <div class="alert alert-info py-2 small mb-0">
+                    Click <strong>Preview Changes</strong> to see the exact records that will be generated before writing to the database.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+const presetSelect = document.getElementById('presetSelect');
+const targetDiaInput = document.getElementById('targetDiaInput');
+const targetNameInput = document.getElementById('targetNameInput');
+const replaceToInput = document.getElementById('replaceToInput');
+const sourceDiaSelect = document.getElementById('sourceDiaSelect');
+const replaceFromInput = document.getElementById('replaceFromInput');
+
+presetSelect.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    if (opt.value !== 'custom') {
+        targetDiaInput.value = opt.getAttribute('data-mm');
+        targetNameInput.value = opt.getAttribute('data-name');
+        replaceToInput.value = opt.getAttribute('data-token');
+    }
+});
+
+sourceDiaSelect.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    if (opt) {
+        replaceFromInput.value = opt.getAttribute('data-token') || '';
+    }
+});
+</script>
+{% endblock %}

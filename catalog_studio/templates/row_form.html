@@ -1,0 +1,151 @@
+<!-- templates/row_form.html -->
+{% extends "base.html" %}
+{% block title %}{{ mode|capitalize }} row &mdash; {{ database }}.{{ table }}{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}/{{ table }}">&laquo; {{ database }}.{{ table }}</a></p>
+<h4 class="mb-3">{{ mode|capitalize }} row in {{ table }}</h4>
+
+<div class="row g-4">
+    <div class="col-lg-{{ '6' if table == 'AnchorsDefinition' else '12' }}">
+        <form method="post" id="rowForm" class="bg-white p-4 rounded shadow-sm" style="max-width: 700px;">
+            {% for c in columns %}
+                {% set name = c.COLUMN_NAME %}
+                {% if mode == "edit" and name == pk_col %}
+                    <div class="mb-2">
+                        <label class="form-label">{{ name }} <span class="text-muted">(primary key, not editable)</span></label>
+                        <input type="text" class="form-control" value="{{ pk_val }}" disabled>
+                    </div>
+                {% else %}
+                    <div class="mb-2">
+                        <label class="form-label">{{ name }} <span class="text-muted">({{ c.DATA_TYPE }})</span></label>
+                        <input type="text" name="{{ name }}" class="form-control"
+                               value="{{ row[name] if row and row[name] is not none else '' }}">
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <button type="submit" class="btn btn-primary mt-2">
+                {{ "Save Changes" if mode == "edit" else "Add Row" }}
+            </button>
+        </form>
+    </div>
+
+    {% if table == "AnchorsDefinition" %}
+    <div class="col-lg-6">
+        <div class="bg-white p-3 rounded shadow-sm" style="position: sticky; top: 1rem;">
+            <p class="text-muted small mb-2">
+                Click into a field to highlight it here. Layout is a schematic reference,
+                not to scale &mdash; positions of Distance A/C/E/F/O are best-guess sequential
+                placement, not verified against Advance Steel's internal convention.
+            </p>
+            <svg viewBox="0 0 900 300" style="width:100%; height:auto;">
+                <style>
+                    .dim line, .dim path { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+                    .dim text { fill: #495057; font-size: 13px; font-family: sans-serif; }
+                    .dim.active line, .dim.active path { stroke: #dc3545; stroke-width: 2.5; }
+                    .dim.active text { fill: #dc3545; font-weight: bold; }
+                    .rod-body { fill: #cfd4da; stroke: #495057; }
+                    .thread-hatch { stroke: #868e96; stroke-width: 1; }
+                </style>
+
+                <!-- Head block -->
+                <rect x="20" y="125" width="80" height="70" class="rod-body" />
+                <!-- Shaft -->
+                <rect x="100" y="150" width="700" height="20" class="rod-body" />
+                <!-- Thread hatching (embedment end) -->
+                <g class="thread-hatch">
+                    {% for i in range(550, 800, 12) %}
+                    <line x1="{{ i }}" y1="150" x2="{{ i - 10 }}" y2="170" />
+                    {% endfor %}
+                </g>
+                <!-- Hook (dim by default, highlights if HookRadius focused) -->
+                <g id="dim-HookRadius" class="dim">
+                    <path d="M800,160 Q855,160 855,200 Q855,235 815,235" style="stroke-opacity:0.45;" />
+                    <text x="860" y="215">HookRadius</text>
+                </g>
+
+                <!-- Head dimensions -->
+                <g id="dim-HeadHeight" class="dim">
+                    <line x1="20" y1="108" x2="100" y2="108" />
+                    <line x1="20" y1="102" x2="20" y2="114" />
+                    <line x1="100" y1="102" x2="100" y2="114" />
+                    <text x="35" y="98">HeadHeight</text>
+                </g>
+                <g id="dim-HeadDiameter" class="dim">
+                    <line x1="10" y1="125" x2="10" y2="195" />
+                    <line x1="4" y1="125" x2="16" y2="125" />
+                    <line x1="4" y1="195" x2="16" y2="195" />
+                    <text x="-70" y="163" transform="rotate(-90 20 160)">HeadDiameter</text>
+                </g>
+                <g id="dim-NumberOfHeadEdges" class="dim">
+                    <line x1="60" y1="125" x2="30" y2="60" />
+                    <text x="0" y="52">NumberOfHeadEdges</text>
+                </g>
+
+                <!-- Sequential distance segments along the shaft -->
+                <g id="dim-TopDistance" class="dim">
+                    <line x1="100" y1="190" x2="200" y2="190" />
+                    <line x1="100" y1="184" x2="100" y2="196" />
+                    <line x1="200" y1="184" x2="200" y2="196" />
+                    <text x="115" y="205">TopDistance</text>
+                </g>
+                <g id="dim-DistanceF" class="dim">
+                    <line x1="200" y1="190" x2="300" y2="190" />
+                    <line x1="300" y1="184" x2="300" y2="196" />
+                    <text x="225" y="205">DistanceF</text>
+                </g>
+                <g id="dim-DistanceE" class="dim">
+                    <line x1="300" y1="190" x2="400" y2="190" />
+                    <line x1="400" y1="184" x2="400" y2="196" />
+                    <text x="325" y="205">DistanceE</text>
+                </g>
+                <g id="dim-DistanceA" class="dim">
+                    <line x1="400" y1="190" x2="500" y2="190" />
+                    <line x1="500" y1="184" x2="500" y2="196" />
+                    <text x="425" y="205">DistanceA</text>
+                </g>
+                <g id="dim-DistanceO" class="dim">
+                    <line x1="500" y1="190" x2="600" y2="190" />
+                    <line x1="600" y1="184" x2="600" y2="196" />
+                    <text x="525" y="205">DistanceO</text>
+                </g>
+                <g id="dim-DistanceC" class="dim">
+                    <line x1="600" y1="190" x2="700" y2="190" />
+                    <line x1="700" y1="184" x2="700" y2="196" />
+                    <text x="625" y="205">DistanceC</text>
+                </g>
+                <g id="dim-BottomDistance" class="dim">
+                    <line x1="700" y1="190" x2="800" y2="190" />
+                    <line x1="800" y1="184" x2="800" y2="196" />
+                    <text x="705" y="205">BottomDistance</text>
+                </g>
+
+                <!-- ThreadLength -->
+                <g id="dim-ThreadLength" class="dim">
+                    <line x1="550" y1="225" x2="800" y2="225" />
+                    <line x1="550" y1="219" x2="550" y2="231" />
+                    <line x1="800" y1="219" x2="800" y2="231" />
+                    <text x="620" y="240">ThreadLength</text>
+                </g>
+
+                <!-- Overall Length -->
+                <g id="dim-Length" class="dim">
+                    <line x1="20" y1="255" x2="850" y2="255" />
+                    <line x1="20" y1="249" x2="20" y2="261" />
+                    <line x1="850" y1="249" x2="850" y2="261" />
+                    <text x="420" y="270">Length (overall)</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.querySelectorAll('#rowForm input[name]').forEach(function (input) {
+    var dim = document.getElementById('dim-' + input.name);
+    if (!dim) return;
+    input.addEventListener('focus', function () { dim.classList.add('active'); });
+    input.addEventListener('blur', function () { dim.classList.remove('active'); });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,14 @@
+{
+  "Grade5": {
+    "catalog_type": "bolt",
+    "as_version": 2026
+  },
+  "US_Hooked_Anchors": {
+    "catalog_type": "anchor",
+    "as_version": 2026
+  },
+  "A325TC_mark": {
+    "catalog_type": "bolt",
+    "as_version": 2026
+  }
+}

@@ -1,0 +1,133 @@
+<!-- templates/table.html -->
+{% extends "base.html" %}
+{% block title %}{{ database }}.{{ table }}{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0">{{ database }}.{{ table }}</h4>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <form method="get" class="d-flex align-items-center gap-1">
+            <select name="filter_col" class="form-select form-select-sm" style="width:140px">
+                <option value="">Filter column...</option>
+                {% for col in columns %}
+                <option value="{{ col }}" {% if col == filter_col %}selected{% endif %}>{{ col }}</option>
+                {% endfor %}
+            </select>
+            <select name="filter_op" class="form-select form-select-sm" style="width:100px">
+                <option value="=" {% if filter_op == '=' %}selected{% endif %}>equals</option>
+                <option value="contains" {% if filter_op == 'contains' %}selected{% endif %}>contains</option>
+            </select>
+            <input type="text" name="filter_val" class="form-control form-control-sm" style="width:120px"
+                   placeholder="value" value="{{ filter_val }}">
+            <button class="btn btn-sm btn-outline-primary" type="submit">Go</button>
+            {% if filter_col and filter_val %}
+            <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+            {% endif %}
+        </form>
+
+        {% if virtual %}
+        <form method="get" class="d-flex align-items-center gap-1 border-start ps-2">
+            <label class="small text-muted mb-0">{{ virtual.label }}</label>
+            <select name="virtual_val" class="form-select form-select-sm" style="width:110px" onchange="this.form.submit()">
+                <option value="">(any)</option>
+                {% for v in virtual_values %}
+                <option value="{{ v }}" {% if virtual_val|string == v|string %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+            {% if virtual_val %}
+            <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+            {% endif %}
+        </form>
+        {% endif %}
+
+        <input id="quickFilter" class="form-control form-control-sm" style="width:180px" placeholder="Quick text filter...">
+        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#findReplaceModal">
+            Find &amp; Replace
+        </button>
+        {% if pk_col %}
+        <a class="btn btn-sm btn-primary" href="/db/{{ database }}/{{ table }}/add">+ Add Row</a>
+        {% else %}
+        <span class="badge bg-secondary">no primary key detected — read only</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if table == 'BoltsDiameters' %}
+<div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <strong>&#128161; Need to add a new diameter to this catalog?</strong>
+        <span class="small d-block text-muted">Adding a raw row here only registers the lookup string. To automatically cascade the diameter across all related tables (rules, distances, assemblies, nuts/washers, bolt lengths), use the <strong>Add / Clone Diameter</strong> wizard.</span>
+    </div>
+    <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary text-nowrap ms-3">&#128297; Add / Clone Diameter</a>
+</div>
+{% endif %}
+
+<div class="modal fade" id="findReplaceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/db/{{ database }}/find-replace">
+        <input type="hidden" name="return_to" value="{{ request.path }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Find &amp; Replace across {{ database }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Searches every text column in every table in this database — not just this one.</p>
+          <div class="mb-2">
+            <label class="form-label small mb-0">Find</label>
+            <input type="text" name="find" class="form-control" required autofocus>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-0">Replace with</label>
+            <input type="text" name="replace" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" name="action" value="preview" class="btn btn-outline-secondary btn-sm">Preview</button>
+          <button type="submit" name="action" value="apply" class="btn btn-danger btn-sm"
+                  onclick="return confirm('Apply this replace across the whole database? This can\'t be undone.');">
+              Apply Replace
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="table-wrap bg-white rounded shadow-sm">
+<table class="table table-sm table-bordered data-table mb-0" id="dataTable">
+    <thead>
+        <tr>
+            {% for col in columns %}<th>{{ col }}</th>{% endfor %}
+            {% if pk_col %}<th>Actions</th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+        <tr>
+            {% for col in columns %}<td>{{ row[col] if row[col] is not none else '' }}</td>{% endfor %}
+            {% if pk_col %}
+            <td class="text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/edit">Edit</a>
+                <form action="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/duplicate" method="post" class="d-inline">
+                    <button class="btn btn-sm btn-outline-success" type="submit">Duplicate</button>
+                </form>
+                <form action="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/delete" method="post" class="d-inline"
+                      onsubmit="return confirm('Delete this row?');">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+<script>
+document.getElementById('quickFilter').addEventListener('input', function () {
+    const term = this.value.toLowerCase();
+    document.querySelectorAll('#dataTable tbody tr').forEach(function (row) {
+        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

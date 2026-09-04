@@ -1,0 +1,42 @@
+<!-- templates/find_replace.html -->
+{% extends "base.html" %}
+{% block title %}Find & Replace &mdash; {{ database }}{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+<h4 class="mb-1">Find &amp; Replace across {{ database }}</h4>
+<p class="text-muted">Searches every text column in every table &mdash; not just the one you were looking at. Preview first, then apply.</p>
+
+<form method="post" class="bg-white p-3 rounded shadow-sm mb-4" style="max-width:600px;">
+    <div class="row g-2">
+        <div class="col">
+            <label class="form-label small mb-0">Find</label>
+            <input type="text" name="find" class="form-control" value="{{ find_text }}" required>
+        </div>
+        <div class="col">
+            <label class="form-label small mb-0">Replace with</label>
+            <input type="text" name="replace" class="form-control" value="{{ replace_text }}">
+        </div>
+    </div>
+    <div class="mt-3">
+        <button type="submit" name="action" value="preview" class="btn btn-outline-secondary btn-sm">Preview</button>
+        <button type="submit" name="action" value="apply" class="btn btn-danger btn-sm"
+                onclick="return confirm('Apply this replace across the whole database? This can\'t be undone.');">
+            Apply Replace
+        </button>
+    </div>
+</form>
+
+{% if preview is not none %}
+    <h5>Preview: matches for &ldquo;{{ find_text }}&rdquo;</h5>
+    {% if preview %}
+    <table class="table table-sm table-bordered bg-white" style="max-width:600px;">
+        <thead><tr><th>Table.Column</th><th>Matching rows</th></tr></thead>
+        <tbody>
+        {% for label, count in preview.items() %}
+            <tr><td>{{ label }}</td><td>{{ count }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+{% endif %}
+{% endblock %}

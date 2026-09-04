@@ -1,0 +1,54 @@
+<!-- templates/database.html -->
+{% extends "base.html" %}
+{% block title %}{{ database }}{% endblock %}
+{% block content %}
+<p><a href="/">&laquo; Home</a></p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+        {{ database }}
+        {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
+        {% if meta.get('catalog_type') %}<span class="badge bg-secondary">{{ meta.catalog_type }}</span>{% endif %}
+    </h4>
+    <div class="d-flex gap-2">
+        <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary">&#128297; Add / Clone Diameter</a>
+        <a href="/db/{{ database }}/find-replace" class="btn btn-sm btn-outline-warning">Find &amp; Replace</a>
+    </div>
+</div>
+
+{% if diameters %}
+<div class="card shadow-sm border-0 mb-4 bg-white">
+    <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small text-uppercase text-muted">Catalog Diameters ({{ diameters|length }})</span>
+            <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-outline-primary py-0">+ Add Diameter</a>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            {% for d in diameters %}
+                {% if d.is_orphan %}
+                <span class="badge bg-danger p-2" title="Orphan entry: 0 related records in database!">
+                    &#9888; {{ d.key }} mm ({{ d.run_name.strip() }}) &bull; 0 records (miskeyed / orphan)
+                </span>
+                {% else %}
+                <span class="badge bg-light text-dark border p-2">
+                    <strong>{{ d.run_name.strip() }}</strong> ({{ d.key }} mm)
+                    <span class="badge bg-secondary ms-1">{{ d.total_related }} rows</span>
+                </span>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<table class="table table-striped table-hover bg-white">
+    <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+    <tbody>
+    {% for t in tables %}
+        <tr>
+            <td><a href="/db/{{ database }}/{{ t }}">{{ t }}</a></td>
+            <td>{{ counts[t] }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
