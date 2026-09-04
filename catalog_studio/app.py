@@ -1,4 +1,5 @@
 # app.py
+import datetime
 import os
 
 from flask import (
@@ -7,11 +8,16 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 import config
-from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets
+from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
 app.config.from_object(config)
+
+# Dimension formatting helpers for the fabrication sheet templates.
+app.jinja_env.filters["fmm"] = fabrication.format_mm
+app.jinja_env.filters["fin_fraction"] = fabrication.format_in
+app.jinja_env.filters["f_dim"] = fabrication.format_dim_text
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(config.EXPORT_DIR, exist_ok=True)
@@ -230,6 +236,87 @@ def anchor_configurator_payload(database):
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
     return jsonify(view)
+
+
+# --------------------------------------------------------------------------
+# Printable anchor fabrication detail sheet (issue #2)
+# --------------------------------------------------------------------------
+
+DIM_MODES = ("imperial", "metric", "dual")
+
+
+@app.route("/db/<database>/fabrication-sheet")
+def fabrication_sheet(database):
+    """Dimensioned SVG fabrication detail for one anchor record (print/PDF)."""
+    mode = request.args.get("mode", "imperial")
+    if mode not in DIM_MODES:
+        mode = "imperial"
+    page = request.args.get("page", "letter")
+    if page not in fabrication.SHEET_SIZES:
+        page = "letter"
+    try:
+        anchor_id = int(request.args.get("anchor_id", ""))
+        def_id = int(request.args.get("def_id", ""))
+    except (TypeError, ValueError):
+        flash("Select an anchor and a length to open its detail sheet.", "warning")
+        return redirect(url_for("anchor_configurator", database=database))
+
+    view = anchor_sets.anchor_view(database, anchor_id, def_id)
+    if not view.get("ok"):
+        flash(view.get("error", "Could not load that anchor record."), "danger")
+        return redirect(url_for("anchor_configurator", database=database))
+
+    issues = fabrication.validate_sheet(view)
+    errors = [i for i in issues if i["level"] == "error"]
+    status = "draft" if errors else "released"
+
+    title_fields = {
+        "project": request.args.get("project", ""),
+        "job": request.args.get("job", ""),
+        "mark": request.args.get("mark", ""),
+        "quantity": request.args.get("quantity", "1"),
+        "prepared": request.args.get("prepared", ""),
+        "checked": request.args.get("checked", ""),
+        "revision": request.args.get("revision", ""),
+        "sheet_no": request.args.get("sheet_no", ""),
+    }
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    geo = view.get("geometry") or {}
+    sel = view.get("selection") or {}
+    db_meta = metadata.get(database)
+    filename = fabrication.sheet_filename(
+        job=title_fields["job"],
+        anchor_mark=title_fields["mark"],
+        standard=sel.get("standard"),
+        length_mm=geo.get("length_mm"),
+        diameter_mm=(view.get("anchor") or {}).get("diameter"),
+        revision=title_fields["revision"] or "0",
+        draft=status == "draft",
+    )
+
+    return render_template(
+        "fabrication_sheet.html",
+        database=database,
+        mode=mode,
+        page=page,
+        view=view,
+        issues=issues,
+        status=status,
+        schedule=fabrication.hardware_schedule(view),
+        svg=fabrication.generate_elevation_svg(view, mode),
+        title_fields=title_fields,
+        provenance={
+            "database": database,
+            "source": f"AnchorsName.ID={sel.get('anchor_id')}, "
+                      f"AnchorsDefinition.ID={sel.get('def_id')}",
+            "as_version": db_meta.get("as_version"),
+            "generated_at": now.strftime("%Y-%m-%d %H:%M UTC"),
+            "part_name": sel.get("part_name"),
+        },
+        filename=filename,
+        sheet_sizes=fabrication.SHEET_SIZES,
+    )
 
 
 @app.route("/db/<database>/add-diameter", methods=["GET", "POST"])

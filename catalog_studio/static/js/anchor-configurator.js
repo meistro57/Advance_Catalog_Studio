@@ -36,6 +36,7 @@ const els = {
     length: $('lengthSelect'),
     mode: $('modeSelect'),
     resetView: $('resetViewBtn'),
+    sheetLink: $('sheetLink'),
     caption: $('sceneCaption'),
     canvasHost: $('viewer3d'),
     fallback: $('webglFallback'),
@@ -634,6 +635,7 @@ async function loadSelection(keepDef = false) {
         renderNotes(data);
         renderWarnings(data);
         renderTable(data);
+        updateSheetLink(data);
         els.detail.innerHTML = '<div class="text-muted small">Hover a rendered component to identify its source record.</div>';
         partTargets(els.mode.value === 'exploded');
     } catch (err) {
@@ -643,6 +645,16 @@ async function loadSelection(keepDef = false) {
     } finally {
         if (seq === loadSeq) els.loading.classList.add('d-none');
     }
+}
+
+function updateSheetLink(v) {
+    if (!els.sheetLink || !v || !v.ok) return;
+    const qs = new URLSearchParams({
+        anchor_id: v.selection.anchor_id,
+        def_id: v.selection.def_id,
+    }).toString();
+    els.sheetLink.href = `/db/${encodeURIComponent(DATABASE)}/fabrication-sheet?${qs}`;
+    els.sheetLink.classList.remove('d-none');
 }
 
 function wire() {

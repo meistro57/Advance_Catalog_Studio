@@ -18,6 +18,19 @@ def test_anchor_configurator_routes_registered():
     assert "anchor_configurator_payload" in endpoints
 
 
+def test_fabrication_sheet_route_registered():
+    from app import app
+    assert "fabrication_sheet" in {r.endpoint for r in app.url_map.iter_rules()}
+
+
+def test_fabrication_sheet_redirects_when_ids_missing():
+    from app import app
+    client = app.test_client()
+    resp = client.get("/db/SomeDb/fabrication-sheet")
+    assert resp.status_code == 302
+    assert "anchor-configurator" in resp.headers["Location"]
+
+
 def test_bolt_set_viewer_redirects_for_non_bolt(monkeypatch):
     from app import app
     monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "anchor")

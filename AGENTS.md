@@ -79,6 +79,12 @@ and display-name token replacement.
   end splitting, anchor layout) are unit-tested and shared slot/matching code
   is reused from `bolt_sets.py` (anchor component columns are `DiameterN`
   without the bolt schema's " (mm)" suffix).
+- `catalog_studio/utils/fabrication.py` — printable fabrication detail sheet
+  (issue #2). Owns the documented US_Hooked_Anchors field mapping, inch
+  fraction / metric / dual dimension formatting (nearest 1/16 in with an
+  `≈` marker for inexact conversions), validation, safe sheet filenames, the
+  hardware schedule, and the dimensioned SVG elevation renderer. All of it is
+  unit-tested; the template never invents numbers.
 - `catalog_studio/static/vendor/three/` — **pinned local** Three.js r160
   (`three.module.js`, `OrbitControls.js`) so the workshop works offline. The
   viewer template loads it via an import map (`three` and `three/addons/`
@@ -89,6 +95,13 @@ and display-name token replacement.
 - `catalog_studio/static/js/anchor-configurator.js`,
   `templates/anchor_configurator.html` — the graphical anchor viewer
   (read-only; shares the bolt viewer CSS/import-map/Three.js vendor files).
+- `templates/fabrication_sheet.html`, `static/css/fabrication-sheet.css`,
+  route `/db/<db>/fabrication-sheet` — the printable fabrication detail
+  (issue #2). A standalone page (no nav chrome) whose SVG elevation is
+  generated server-side by `fabrication.generate_elevation_svg`; title-block
+  fields are mirrored into the sheet by inline JS before printing. The
+  anchor configurator links each selection to its sheet via the "Detail
+  Sheet" button.
 - `tests/` — pytest suite (conftest puts `catalog_studio/` on sys.path).
 - `catalog_studio/templates/*.html` — Jinja2 + Bootstrap 5.3.3 (CDN).
 - Root-level `*.py` (`db_inspect.py`, `export_catalog.py`, etc.) — one-off
@@ -191,6 +204,46 @@ unconfirmed) and are split by sign: `Position < 0` → embedded end, otherwise
 top end. With a head present, embedded-end hardware is stacked above the head
 height. Two-sided sets (e.g. US `2Na2W`) render nuts/washers at both ends and
 raise an interpretation note.
+
+## Shear-stud (connector) catalogs (issue #4)
+
+Nelson H4L (`raw_files/Nelson H4L.mdf`, attached as `NelsonH4L`) introduced a
+third catalog shape: shear-stud connector catalogs that REUSE `SetBolts` for
+the stud records and add `ConnectorStandard` / `ConnectorMaterial` /
+`ConnectorDiameters` / `ConnectorDistances` / `ConnectorRelations`.
+`guess_catalog_type` therefore checks for the `Connector*` tables BEFORE the
+generic "has SetBolts -> bolt" rule, or shear-stud catalogs misclassify as
+bolts (see `docs/shear-stud-schema.md` for the full observed schema, keys,
+minimum record set, and naming conventions). Field meanings such as
+`SetBolts.Type` are recorded as OBSERVED only — nothing in the connector
+shape is verified against a live AS 2026 install yet, so there is no
+shear-stud editing UI and adding one must start from that schema note.
+
+## Fabrication detail sheet (issue #2)
+
+The fabrication sheet renders the same verified anchor fields as the
+configurator as a dimensioned SVG for print ("Print / Save as PDF" in the
+browser; server-side PDF generation is a later phase). Field mapping is
+documented in the `fabrication.py` module docstring (verified against
+`US_Hooked_Anchors`). Conventions shared with the anchor viewer — overall rod
+length, thread at the top, concrete plane from `TopDistance`, hook drawn from
+`HookRadius` — are repeated on the sheet itself, and a prominent
+"NTS — USE WRITTEN DIMENSIONS" note is always shown. Hooks/legs/offsets that
+exist only as ambiguous catalog fields (`DistanceA/F/E/O/C`, `BottomDistance`)
+are reported in the fabrication table with their source-column labels but are
+NEVER drawn as geometry. Values without a numeric source (coating, thread
+designation) are shown as absent rather than inferred.
+
+Dimension formatting rules (tested in `tests/test_fabrication.py`): metric
+display preserves source precision (trailing zeros trimmed); imperial display
+rounds to the nearest 1/16 in and reduces the fraction, prefixing `≈` when
+the mm value is not exactly representable at that denominator; dual mode shows
+`fraction in (mm)`. The sheet status is `draft` whenever validation raises an
+error-level issue (missing/zero required fields, thread longer than the rod,
+missing hook radius, unmatched SetNutsBolts references) — drafts show a
+DRAFT / INCOMPLETE watermark and get a `DRAFT_` filename prefix. All geometry
+numbers on the sheet come from the server model; the template contains no
+dimension logic of its own.
 
 ## SQL conventions and gotchas
 

@@ -42,6 +42,8 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Bolt-set visualizer (read-only) | Phase 1 implemented |
 | Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
+| Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
+| Shear-stud (connector) catalogs | Phase 1 schema investigation; auto-detection added |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented |
@@ -184,6 +186,10 @@ Next to the viewer, the assembly editor lets you experiment with a bolt set with
 
 Anchor catalogs get a matching schematic viewer: pick an anchor and a length variant (each `AnchorsDefinition` part), and Catalog Studio renders the rod, the thread zone, the concrete/surface plane, the nut-and-washer hardware (from `AnchorsName` → `SetNutsBolts`), and the bottom termination read from the records — plain rod, cast-in hex head, or J-hook. All dimensions are shown in inches; hover/click identifies each component's source record; assembled and exploded views plus a component table (the WebGL-free fallback) follow the bolt viewer's conventions. Field semantics that could not be verified offline (rod-length reference, concrete-plane placement, `Position` end grouping) are flagged as interpretation notes rather than silently assumed, exactly as with bolt `Position` values.
 
+### Fabrication detail sheets (first vertical slice)
+
+From the anchor configurator, any selection can open a **printable fabrication detail** (`Detail Sheet` button): a standalone, dimensioned SVG elevation (rod, thread zone, concrete plane, hardware with table references, hook/head termination) plus a fabrication-data table, hardware schedule, title block, provenance/audit block, and a prominent "NTS — USE WRITTEN DIMENSIONS" note. Dimensions come only from verified catalog fields — values that exist only as ambiguous columns are reported with their source labels and never drawn, and missing values never invent a number. Metric, imperial (reduced 1/16-inch fractions with an `≈` marker for inexact conversions), and dual dimension modes are supported with tested conversions; paper sizes start with US Letter and 11 × 17 landscape. If validation finds a problem (missing/zero required fields, thread longer than the rod, no hook radius, unmatched hardware records) the sheet is watermarked **DRAFT / INCOMPLETE** and its suggested filename gains a `DRAFT_` prefix. PDF output currently uses the browser's Print / Save as PDF (vector, selectable text); server-side PDF generation and additional anchor shapes are later phases. The first supported family — `US_Hooked_Anchors` — and its exact field mapping are documented in `catalog_studio/utils/fabrication.py`.
+
 ## Why bolt diameters are difficult
 
 Advance Steel stores internal geometry in **millimetres**, even when the catalog displays imperial fractions.
@@ -284,17 +290,21 @@ Advance_Catalog_Studio/
 │   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer + editor
 │   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
 │   │   ├── js/anchor-configurator.js # Three.js anchor viewer
-│   │   ├── css/
+│   │   ├── css/                   # bolt-set-viewer.css, fabrication-sheet.css
 │   │   └── vendor/three/           # Pinned local Three.js r160 (offline)
 │   └── utils/
 │       ├── anchor_sets.py      # Anchor view model for the configurator
 │       ├── bolt_sets.py        # Bolt-set view model for the viewer
+│       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG
 │       ├── db.py               # SQL inspection and catalog operations
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
 │       ├── metadata.py         # Catalog type/version metadata
 │       ├── schema_templates.py # New bolt and anchor database templates
 │       └── staging.py          # Upload/export file pairing
 ├── tests/                     # Pytest: view-model mapping + route smoke tests
+├── docs/
+│   ├── images/
+│   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
 ├── db_inspect.py
 ├── diagnose_sets.py
 ├── export_bolts.py
