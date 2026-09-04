@@ -7,7 +7,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 import config
-from utils import db, docker_ops, staging, metadata, bolt_sets
+from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -185,6 +185,48 @@ def bolt_set_viewer_payload(database):
         view = bolt_sets.bolt_set_view(
             database, standard, set_name, material, diameter, length
         )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify(view)
+
+
+# --------------------------------------------------------------------------
+# Anchor configurator (graphical viewer, same patterns as the bolt viewer)
+# --------------------------------------------------------------------------
+
+@app.route("/db/<database>/anchor-configurator")
+def anchor_configurator(database):
+    """Page hosting the graphical anchor viewer (anchor catalogs only)."""
+    if db.guess_catalog_type(database) != "anchor":
+        flash("The anchor configurator only supports anchor catalogs.", "warning")
+        return redirect(url_for("show_database", database=database))
+    options = anchor_sets.get_anchor_options(database)
+    if not options:
+        flash("No anchors found in AnchorsName for this database.", "warning")
+    return render_template(
+        "anchor_configurator.html", database=database, options=options,
+    )
+
+
+@app.route("/db/<database>/anchor-configurator/payload")
+def anchor_configurator_payload(database):
+    """JSON view model for one (anchor, definition/length) selection."""
+    try:
+        anchor_id = int(request.args.get("anchor_id", ""))
+        def_id = int(request.args.get("def_id", ""))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "anchor_id and def_id must be integers."}), 400
+    try:
+        lengths = anchor_sets.get_anchor_lengths(database, anchor_id)
+        if not lengths:
+            return jsonify({
+                "ok": False,
+                "error": "No AnchorsDefinition length variants found for that anchor.",
+            })
+        if def_id not in [l["def_id"] for l in lengths]:
+            def_id = lengths[0]["def_id"]
+        view = anchor_sets.anchor_view(database, anchor_id, def_id)
+        view["available_lengths"] = lengths
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
     return jsonify(view)

@@ -74,6 +74,11 @@ and display-name token replacement.
   bolt-set viewer (issue #1). Pure mapping functions (slot parsing,
   SetNutsBolts matching, Position interpretation, stack/grip layout, screw-rule
   normalization) are unit-tested; SQL gathering functions sit at the bottom.
+- `catalog_studio/utils/anchor_sets.py` — anchor view model for the graphical
+  anchor configurator. Pure mapping functions (termination classification,
+  end splitting, anchor layout) are unit-tested and shared slot/matching code
+  is reused from `bolt_sets.py` (anchor component columns are `DiameterN`
+  without the bolt schema's " (mm)" suffix).
 - `catalog_studio/static/vendor/three/` — **pinned local** Three.js r160
   (`three.module.js`, `OrbitControls.js`) so the workshop works offline. The
   viewer template loads it via an import map (`three` and `three/addons/`
@@ -81,6 +86,9 @@ and display-name token replacement.
 - `catalog_studio/static/js/bolt-set-viewer.js`, `static/js/bolt-set-layout.js`,
   `static/css/bolt-set-viewer.css`, `templates/bolt_set_viewer.html` — the
   Three.js viewer (Phase 1) + client-side assembly editor (Phase 2).
+- `catalog_studio/static/js/anchor-configurator.js`,
+  `templates/anchor_configurator.html` — the graphical anchor viewer
+  (read-only; shares the bolt viewer CSS/import-map/Three.js vendor files).
 - `tests/` — pytest suite (conftest puts `catalog_studio/` on sys.path).
 - `catalog_studio/templates/*.html` — Jinja2 + Bootstrap 5.3.3 (CDN).
 - Root-level `*.py` (`db_inspect.py`, `export_catalog.py`, etc.) — one-off
@@ -127,6 +135,12 @@ bolt_sets.py** (grip override included) — keep the two files in sync. The
 editor never writes SQL; Phase 3 will hand proposals to a server-side
 preview/transaction flow.
 
+Display units: the viewer/editor shows **all dimensions in inches** (`fin()`
+in bolt-set-viewer.js converts mm→in at display time; `in2()` formats layout
+warning text). Storage and every layout computation stay in millimetres —
+never change the engine to inches, only the presentation layer. The editor's
+grip input is inches and is converted back to mm before layout.
+
 ## Bolt-set viewer: verified vs assumed (issue #1)
 
 Verified from the sample catalogs (A325TC_mark, Grade5) and encoded in
@@ -152,6 +166,31 @@ write positions back to a catalog until confirmed):
   as across-flats (hex corner radius = (flat/2)/cos(π/n)); washers are round.
 - The "grip zone" drawn is schematic: shank length minus hardware stacks; it
   is not a stored catalog value.
+
+## Anchor configurator: verified vs assumed
+
+Anchor catalogs (all sample DBs share one 10-table schema: `AnchorsName`,
+`AnchorsDefinition`, `AnchorsHoleDefinition`, `SetNutsBolts`, ...) are served
+by `/db/<db>/anchor-configurator` (page, anchor catalogs only) and its payload
+endpoint (`anchor_id` = an `AnchorsName.ID`, `def_id` = an
+`AnchorsDefinition.ID` length variant; the payload also lists
+`available_lengths` for the dropdown). Four bottom terminations appear in the
+samples, classified from `AnchorsDefinition` fields:
+- plain rod (HiltiHY200 adhesive, US Threaded);
+- hex head at the rod bottom (`HeadDiameter`/`HeadHeight`/`NumberOfHeadEdges`);
+- J-hook below the rod (`HookRadius`).
+
+**Assumed and flagged to the user** (module docstring of `anchor_sets.py`
+owns the interpretation; none of it is verified against a live Advance Steel
+install): `Length` is the overall rod length drawn from y=0 (bottom) to the
+tip; the concrete/surface plane is drawn at `Length - TopDistance` when that
+fits inside the rod; `ThreadLength` is drawn from the rod tip downward; the
+bottom termination sits at the embedded end. Hardware slots keep catalog
+authoring order (no re-ordering by `Position` magnitude, whose meaning is
+unconfirmed) and are split by sign: `Position < 0` → embedded end, otherwise
+top end. With a head present, embedded-end hardware is stacked above the head
+height. Two-sided sets (e.g. US `2Na2W`) render nuts/washers at both ends and
+raise an interpretation note.
 
 ## SQL conventions and gotchas
 

@@ -193,6 +193,11 @@ def _component_height(component: dict) -> tuple:
     return fallback, True
 
 
+def component_height_with_flag(component: dict) -> tuple:
+    """Public (height_mm, schematic_flag) pair; shared with anchor_sets.py."""
+    return _component_height(component)
+
+
 def build_layout(bolt: dict, partition: dict, grip_override: float = None) -> dict:
     """Place head-side and nut-side components on the bolt shank.
 

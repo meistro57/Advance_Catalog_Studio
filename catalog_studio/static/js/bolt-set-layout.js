@@ -6,6 +6,9 @@
  *
  * KEEP IN SYNC WITH build_layout() IN bolt_sets.py.
  *
+ * All MATH stays in millimetres (the catalog's internal unit). User-facing
+ * warning text reports inches, mirroring the viewer's display convention.
+ *
  * Conventions (shared with the Python side):
  * - Bolt shank spans y in [0, length]; head occupies [-head_height, 0].
  * - headSide / nutSide arrays are ordered bottom-to-top on their side
@@ -49,9 +52,9 @@ export function layoutAssembly({ length, headHeight, headSide = [], nutSide = []
         if (requested > available + 1e-9) {
             warnings.push({
                 severity: 'warning', code: 'grip_limited',
-                message: `Requested clamped-material thickness ${r2(requested)} mm does not fit ` +
-                         `on the ${r2(length)} mm bolt (hardware stacks take ${r2(headUsed + nutTotal)} mm); ` +
-                         `reduced to ${r2(Math.max(available, 0))} mm.`,
+                message: `Requested clamped-material thickness ${in2(requested)} in does not fit ` +
+                         `on the ${in2(length)} in bolt (hardware stacks take ${in2(headUsed + nutTotal)} in); ` +
+                         `reduced to ${in2(Math.max(available, 0))} in.`,
             });
         }
         nutBottom = headUsed + Math.min(requested, Math.max(available, 0));
@@ -74,8 +77,8 @@ export function layoutAssembly({ length, headHeight, headSide = [], nutSide = []
     if (gripThickness <= 0) {
         warnings.push({
             severity: 'danger', code: 'impossible_stack',
-            message: `Hardware stack (head-side ${r2(headUsed)} mm + nut-side ${r2(nutTotal)} mm) ` +
-                     `exceeds the ${r2(length)} mm bolt length; this set cannot assemble on this length.`,
+            message: `Hardware stack (head-side ${in2(headUsed)} in + nut-side ${in2(nutTotal)} in) ` +
+                     `exceeds the ${in2(length)} in bolt length; this set cannot assemble on this length.`,
         });
     }
     const gripH = Math.max(gripThickness, 0);
@@ -95,4 +98,10 @@ export function round4(n) {
 
 function r2(n) {
     return String(Math.round(n * 100) / 100);
+}
+
+const MM_PER_IN = 25.4;
+
+function in2(mm) {
+    return String(Math.round((mm / MM_PER_IN) * 1000) / 1000);
 }

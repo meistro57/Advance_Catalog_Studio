@@ -34,7 +34,7 @@
                     <option value="{{ c.standard }}|{{ c.set }}|{{ c.material }}|{{ c.diameter }}"
                             data-standard="{{ c.standard }}" data-set="{{ c.set }}"
                             data-material="{{ c.material }}" data-diameter="{{ c.diameter }}">
-                        {{ c.standard }} &middot; {{ c.set }} &middot; {{ c.material }} &middot; &#8960; {{ c.diameter }} mm
+                        {{ c.standard }} &middot; {{ c.set }} &middot; {{ c.material }} &middot; &#8960; {{ '%.4g'|format(c.diameter / 25.4) }} in
                     </option>
                     {% endfor %}
                 </select>
@@ -82,8 +82,8 @@
                         </div>
                     </div>
                     <div class="col-auto" id="gripFixedWrap">
-                        <label class="form-label small fw-semibold text-muted mb-1">Grip thickness (mm)</label>
-                        <input type="number" id="gripValueInput" class="form-control form-control-sm" min="0" step="0.1" style="width: 110px" disabled>
+                        <label class="form-label small fw-semibold text-muted mb-1">Grip thickness (in)</label>
+                        <input type="number" id="gripValueInput" class="form-control form-control-sm" min="0" step="0.05" style="width: 110px" disabled>
                     </div>
                     <div class="col-auto ms-auto">
                         <span class="text-muted small" id="gripResultText"></span>
@@ -131,8 +131,8 @@
                 <table class="table table-sm table-striped mb-0" id="componentTable">
                     <thead><tr>
                         <th>Slot</th><th>Role</th><th>Standard (DIN)</th><th>Material</th>
-                        <th class="text-end">Dia (mm)</th><th class="text-end">Height (mm)</th>
-                        <th class="text-end">Width (mm)</th><th class="text-end">Pos</th>
+                        <th class="text-end">Dia (in)</th><th class="text-end">Height (in)</th>
+                        <th class="text-end">Width (in)</th><th class="text-end">Pos</th>
                         <th>Name</th><th>Match</th>
                     </tr></thead>
                     <tbody></tbody>

@@ -41,6 +41,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Guided bolt-diameter cloning | Implemented |
 | Bolt-set visualizer (read-only) | Phase 1 implemented |
 | Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
+| Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented |
@@ -173,11 +174,15 @@ Raw editing intentionally remains available, but relationship-dependent changes 
 
 ### Bolt-set viewer (Phase 1 — read-only)
 
-Bolt catalogs get a schematic Three.js visualizer that renders a selected bolt set as physical hardware: bolt head and shank, configured washers, nut, and the clamped-material grip zone, with assembled and exploded views, dimension callouts, and hover-to-identify source records. Component positions come from the catalog rows (see the verified/assumed mapping notes in `AGENTS.md`); a component table is always available as an accessibility fallback. Nothing in the viewer writes to SQL — editing controls are a later phase.
+Bolt catalogs get a schematic Three.js visualizer that renders a selected bolt set as physical hardware: bolt head and shank, configured washers, nut, and the clamped-material grip zone, with assembled and exploded views, dimension callouts, and hover-to-identify source records. All on-screen dimensions are shown in **inches** (the catalog stores millimetres internally, exactly as Advance Steel does). Component positions come from the catalog rows (see the verified/assumed mapping notes in `AGENTS.md`); a component table is always available as an accessibility fallback. Nothing in the viewer writes to SQL — editing controls are a later phase.
 
 ### Assembly editor (Phase 2 — client-side preview)
 
 Next to the viewer, the assembly editor lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only — handing them to the server-side preview/transaction flow is Phase 3, once the `Position`-field semantics are verified.
+
+### Anchor configurator (graphical)
+
+Anchor catalogs get a matching schematic viewer: pick an anchor and a length variant (each `AnchorsDefinition` part), and Catalog Studio renders the rod, the thread zone, the concrete/surface plane, the nut-and-washer hardware (from `AnchorsName` → `SetNutsBolts`), and the bottom termination read from the records — plain rod, cast-in hex head, or J-hook. All dimensions are shown in inches; hover/click identifies each component's source record; assembled and exploded views plus a component table (the WebGL-free fallback) follow the bolt viewer's conventions. Field semantics that could not be verified offline (rod-length reference, concrete-plane placement, `Position` end grouping) are flagged as interpretation notes rather than silently assumed, exactly as with bolt `Position` values.
 
 ## Why bolt diameters are difficult
 
@@ -276,16 +281,19 @@ Advance_Catalog_Studio/
 │   ├── config.py              # Local paths, SQL connection, and AS version
 │   ├── templates/             # Browser interface
 │   ├── static/
-│   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer
+│   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer + editor
+│   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
+│   │   ├── js/anchor-configurator.js # Three.js anchor viewer
 │   │   ├── css/
 │   │   └── vendor/three/           # Pinned local Three.js r160 (offline)
 │   └── utils/
-│       ├── bolt_sets.py       # Bolt-set view model for the viewer
-│       ├── db.py              # SQL inspection and catalog operations
-│       ├── docker_ops.py      # File transfer to/from scratch SQL Server
-│       ├── metadata.py        # Catalog type/version metadata
+│       ├── anchor_sets.py      # Anchor view model for the configurator
+│       ├── bolt_sets.py        # Bolt-set view model for the viewer
+│       ├── db.py               # SQL inspection and catalog operations
+│       ├── docker_ops.py       # File transfer to/from scratch SQL Server
+│       ├── metadata.py         # Catalog type/version metadata
 │       ├── schema_templates.py # New bolt and anchor database templates
-│       └── staging.py         # Upload/export file pairing
+│       └── staging.py          # Upload/export file pairing
 ├── tests/                     # Pytest: view-model mapping + route smoke tests
 ├── db_inspect.py
 ├── diagnose_sets.py
@@ -316,6 +324,8 @@ Planned capabilities include:
 The aim is simple: select and adjust the physical bolt assembly on screen, then let Catalog Studio maintain the related database records.
 
 ### Anchor configuration that makes sense
+
+> Status: a graphical, read-only anchor viewer is implemented (see the Anchor configurator section above) and exercises the same rendering patterns as the bolt viewer. The purpose-built *editing* interface described below remains planned; it depends on verifying the anchor `Position` semantics against a live catalog first, in the same way the bolt-set editor does.
 
 Anchor catalogs need a purpose-built interface rather than a generic form containing dozens of disconnected fields. The planned anchor configurator will organise data around the actual anchor and its installation geometry.
 

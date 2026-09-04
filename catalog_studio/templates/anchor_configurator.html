@@ -1,0 +1,145 @@
+<!-- templates/anchor_configurator.html -->
+{% extends "base.html" %}
+{% block title %}Anchor Configurator &middot; {{ database }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bolt-set-viewer.css') }}">
+<script type="importmap">
+{
+    "imports": {
+        "three": "{{ url_for('static', filename='vendor/three/three.module.js') }}",
+        "three/addons/": "{{ url_for('static', filename='vendor/three/') }}"
+    }
+}
+</script>
+<script>window.ANCHOR_DATABASE = {{ database|tojson }};</script>
+
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">&#128295; Anchor Configurator <span class="text-muted fs-6">(graphical viewer)</span></h4>
+        <span class="text-muted small">Schematic anchor from catalog records &mdash; rod, thread, concrete plane, hardware, and bottom termination.</span>
+    </div>
+    <span class="badge bg-secondary text-uppercase">anchor catalog</span>
+</div>
+
+<!-- Selection toolbar -->
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-lg-6">
+                <label class="form-label small fw-semibold text-muted mb-1">Anchor</label>
+                <select id="anchorSelect" class="form-select form-select-sm">
+                    {% for o in options %}
+                    <option value="{{ o.anchor_id }}"
+                            data-anchor-id="{{ o.anchor_id }}">
+                        {{ o.standard }} &middot; {{ o.set_name }} &middot; {{ o.material }} &middot; &#8960; {{ '%.4g'|format(o.diameter / 25.4) }} in {% if o.def_count == 0 %}(no lengths){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label small fw-semibold text-muted mb-1">Anchor Length / Part</label>
+                <select id="lengthSelect" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-lg-2 d-flex gap-2 justify-content-end">
+                <label class="form-label small fw-semibold text-muted mb-1">Display</label>
+                <select id="modeSelect" class="form-select form-select-sm">
+                    <option value="assembled">Assembled</option>
+                    <option value="exploded">Exploded</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- 3D canvas -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white small d-flex justify-content-between">
+                <span class="fw-bold">Schematic Anchor</span>
+                <span class="d-flex gap-2">
+                    <span id="sceneCaption" class="text-white-50">select an anchor to begin</span>
+                    <button id="resetViewBtn" class="btn btn-sm btn-outline-light py-0">&#10021; Reset View</button>
+                </span>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div id="viewer3d"></div>
+                <div id="webglFallback" class="d-none p-4 text-center text-muted">
+                    WebGL is not available in this browser. Use the component table below to review the catalog records.
+                </div>
+                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center d-none">
+                    <span class="spinner-border text-primary"></span>
+                </div>
+            </div>
+            <div class="card-footer bg-white py-2">
+                <div class="d-flex flex-wrap gap-3 small">
+                    <span class="legend-chip"><span class="chip-swatch swatch-rod"></span>Rod</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-thread"></span>Thread zone</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-concrete"></span>Concrete / surface</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-nut"></span>Nut</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-washer"></span>Washer</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-unmatched"></span>Unmatched record</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component data table (accessibility fallback + detail) -->
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-light small fw-bold">Component Records (source: AnchorsName / SetNutsBolts)</div>
+            <div class="table-wrap">
+                <table class="table table-sm table-striped mb-0" id="componentTable">
+                    <thead><tr>
+                        <th>Slot</th><th>End</th><th>Role</th><th>Standard (DIN)</th><th>Material</th>
+                        <th class="text-end">Dia (in)</th><th class="text-end">Height (in)</th>
+                        <th class="text-end">Width (in)</th><th class="text-end">Pos</th>
+                        <th>Name</th><th>Match</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side panels -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Anchor Record</div>
+            <div class="card-body py-2" id="anchorInfoPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Geometry</div>
+            <div class="card-body py-2" id="geometryPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Component Details <span class="text-muted fw-normal">(hover / click a part)</span></div>
+            <div class="card-body py-2" id="detailPanel">
+                <div class="text-muted small">Hover a rendered component to identify its source record.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Interpretation Notes</div>
+            <div class="card-body py-2" id="notesPanel">
+                <div class="text-muted small">No notes.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light small fw-bold">Warnings</div>
+            <div class="card-body py-2" id="warningsPanel">
+                <div class="text-muted small">Warnings will appear here.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/anchor-configurator.js') }}"></script>
+{% endblock %}

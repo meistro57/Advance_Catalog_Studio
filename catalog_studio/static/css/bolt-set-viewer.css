@@ -29,6 +29,9 @@
     border: 1px solid rgba(0,0,0,.15);
 }
 .swatch-bolt    { background: #8fa3b8; }
+.swatch-rod     { background: #7c8ea3; }
+.swatch-thread  { background: #c7d2de; }
+.swatch-concrete { background: rgba(163, 177, 138, .55); }
 .swatch-nut     { background: #5b6ee1; }
 .swatch-washer  { background: #e8a13c; }
 .swatch-grip    { background: rgba(56, 189, 248, .35); }

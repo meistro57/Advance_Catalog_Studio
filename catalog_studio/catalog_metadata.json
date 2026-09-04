@@ -10,5 +10,9 @@
   "A325TC_mark": {
     "catalog_type": "bolt",
     "as_version": 2026
+  },
+  "US_Headed_Anchors_mark": {
+    "catalog_type": "anchor",
+    "as_version": 2026
   }
 }

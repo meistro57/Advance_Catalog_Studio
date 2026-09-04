@@ -11,6 +11,13 @@ def test_bolt_set_viewer_routes_registered():
     assert "bolt_set_viewer_payload" in endpoints
 
 
+def test_anchor_configurator_routes_registered():
+    from app import app
+    endpoints = {r.endpoint for r in app.url_map.iter_rules()}
+    assert "anchor_configurator" in endpoints
+    assert "anchor_configurator_payload" in endpoints
+
+
 def test_bolt_set_viewer_redirects_for_non_bolt(monkeypatch):
     from app import app
     monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "anchor")
@@ -31,4 +38,20 @@ def test_payload_rejects_missing_fields():
     from app import app
     client = app.test_client()
     resp = client.get("/db/SomeDb/bolt-set-viewer/payload?diameter=12.7")
+    assert resp.status_code == 400
+
+
+def test_anchor_configurator_redirects_for_non_anchor(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "bolt")
+    client = app.test_client()
+    resp = client.get("/db/SomeBolt/anchor-configurator")
+    assert resp.status_code == 302
+    assert "/db/SomeBolt" in resp.headers["Location"]
+
+
+def test_anchor_payload_rejects_bad_ids():
+    from app import app
+    client = app.test_client()
+    resp = client.get("/db/SomeDb/anchor-configurator/payload?anchor_id=abc&def_id=1")
     assert resp.status_code == 400

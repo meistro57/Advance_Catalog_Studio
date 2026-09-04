@@ -82,6 +82,16 @@ function fmt(n) {
     return String(Math.round(v * 10000) / 10000);
 }
 
+// The catalog stores dimensions in millimetres, but the viewer displays
+// inches (visible dimensions). Conversion happens here at display time only;
+// every layout computation stays in mm.
+const MM_PER_IN = 25.4;
+
+function fin(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    return fmt(Number(mm) / MM_PER_IN);
+}
+
 function hexRadius(acrossFlats, sides = 6) {
     return acrossFlats / 2 / Math.cos(Math.PI / sides);
 }
@@ -237,7 +247,7 @@ function buildModel(view) {
     const headH = Number(bolt.head_height) || 0;
     const dia = Number(bolt.diameter) || 0;
     const headBottom = -headH;
-    const caption = `${view.selection.standard} / ${view.selection.set} / \u2300${fmt(view.selection.diameter)} \u00d7 ${fmt(view.selection.length)} mm`;
+    const caption = `${view.selection.standard} / ${view.selection.set} / \u2300${fin(view.selection.diameter)} \u00d7 ${fin(view.selection.length)} in`;
 
     if (!assemblyGroup) {
         els.caption.textContent = caption;
@@ -300,16 +310,16 @@ function buildModel(view) {
     axis.computeLineDistances();
     dims.add(axis);
 
-    dimensionLine(axisBottom, axisTop, dimX, `total ${fmt(L + headH)}`, dims);
+    dimensionLine(axisBottom, axisTop, dimX, `total ${fin(L + headH)} in`, dims);
     if (gripH > 0.01) {
-        dimensionLine(gripBottom, gripBottom + gripH, dimX + 24, `grip ${fmt(gripH)}`, dims);
+        dimensionLine(gripBottom, gripBottom + gripH, dimX + 24, `grip ${fin(gripH)} in`, dims);
     }
     const diaLine = new THREE.LineBasicMaterial({ color: COLORS.dimline });
     const dx = shankR;
     const dY = axisBottom - 10;
     dims.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
         [new THREE.Vector3(-dx, dY, 0), new THREE.Vector3(dx, dY, 0)]), diaLine));
-    const diaLabel = makeLabel(`\u2300 ${fmt(dia)}`);
+    const diaLabel = makeLabel(`\u2300 ${fin(dia)} in`);
     diaLabel.position.set(0, dY - 4.5, 0);
     dims.add(diaLabel);
     assemblyGroup.add(dims);
@@ -463,7 +473,7 @@ function buildDisplay(d) {
         if (!p.matched) {
             warnings.push({
                 severity: p.role !== 'part' ? 'danger' : 'warning', code: 'unmatched_component',
-                message: `Slot ${p.slot}: no unique SetNutsBolts record for Standard '${p.standard}', diameter ${fmt(p.diameter)} mm. Shown without catalog dimensions.`,
+                message: `Slot ${p.slot}: no unique SetNutsBolts record for Standard '${p.standard}', diameter ${fin(p.diameter)} in. Shown without catalog dimensions.`,
             });
         }
     }
@@ -501,9 +511,9 @@ function renderBoltPanel() {
     infoRows(els.boltInfo, [
         ['Standard', b.standard || '\u2013'],
         ['Material', b.material || '\u2013'],
-        ['Diameter', `${fmt(b.diameter)} mm`],
-        ['Length (under head)', `${fmt(b.length)} mm`],
-        ['Head', `${fmt(b.head_width)} w \u00d7 ${fmt(b.head_height)} h, ${b.head_corners || 6}-sided${b.head_corners_assumed ? ' *' : ''}`],
+        ['Diameter', `${fin(b.diameter)} in`],
+        ['Length (under head)', `${fin(b.length)} in`],
+        ['Head', `${fin(b.head_width)} w \u00d7 ${fin(b.head_height)} h, ${b.head_corners || 6}-sided${b.head_corners_assumed ? ' *' : ''}`],
         ['Name', b.name || '\u2013'],
         ['Weight', b.weight != null ? `${fmt(b.weight)} kg` : '\u2013'],
         ['Source', 'SetBolts'],
@@ -516,9 +526,9 @@ function describePart(p) {
         ['Slot', `DIN${p.slot}`],
         ['Standard', p.standard],
         ['Material', p.material || '\u2013'],
-        ['Diameter', p.diameter != null ? `${fmt(p.diameter)} mm` : '\u2013'],
-        ['Height', p.height != null ? `${fmt(p.height)} mm` : 'no record'],
-        ['Width', p.width != null ? `${fmt(p.width)} mm` : 'no record'],
+        ['Diameter', p.diameter != null ? `${fin(p.diameter)} in` : '\u2013'],
+        ['Height', p.height != null ? `${fin(p.height)} in` : 'no record'],
+        ['Width', p.width != null ? `${fin(p.width)} in` : 'no record'],
         ['Corners', p.corners != null ? String(p.corners) : 'no record'],
         ['Position field', p.position != null ? String(p.position) : '\u2013'],
     ];
@@ -581,16 +591,16 @@ function renderRules(view) {
     const active = view.active_screw_band;
     const tbl = document.createElement('table');
     tbl.className = 'table table-sm table-striped mb-0 small';
-    tbl.innerHTML = '<thead><tr><th>Grip range (mm)</th><th>Base length (mm)</th><th>Delta (mm)</th><th>Set</th></tr></thead>';
+    tbl.innerHTML = '<thead><tr><th>Grip range (in)</th><th>Base length (in)</th><th>Delta (in)</th><th>Set</th></tr></thead>';
     const body = document.createElement('tbody');
     for (const band of bands) {
         const tr = document.createElement('tr');
         const isActive = active && active.grip_min === band.grip_min && active.grip_max === band.grip_max && active.base_length === band.base_length;
         if (isActive) tr.className = 'table-info';
         tr.innerHTML = [
-            `<td>${fmt(band.grip_min)}\u2013${fmt(band.grip_max)}${isActive ? ' \u2190 grip' : ''}</td>`,
-            `<td>${fmt(band.base_length)}</td>`,
-            `<td>${fmt(band.length_delta)}</td>`,
+            `<td>${fin(band.grip_min)}\u2013${fin(band.grip_max)}${isActive ? ' \u2190 grip' : ''}</td>`,
+            `<td>${fin(band.base_length)}</td>`,
+            `<td>${fin(band.length_delta)}</td>`,
             `<td>${band.set || '\u2013'}</td>`,
         ].join('');
         body.appendChild(tr);
@@ -620,9 +630,9 @@ function renderTable(view) {
             `<td>${p.role}</td>`,
             `<td>${p.standard}${p.changed && p.standard !== p.orig_din ? ` <span class="text-muted small" title="original: ${p.orig_din}">(orig ${p.orig_din})</span>` : ''}</td>`,
             `<td>${p.material || '\u2013'}</td>`,
-            `<td class="text-end">${fmt(p.diameter)}</td>`,
-            `<td class="text-end">${fmt(p.height)}</td>`,
-            `<td class="text-end">${fmt(p.width)}</td>`,
+            `<td class="text-end">${fin(p.diameter)}</td>`,
+            `<td class="text-end">${fin(p.height)}</td>`,
+            `<td class="text-end">${fin(p.width)}</td>`,
             `<td class="text-end">${p.position != null ? p.position : '\u2013'}</td>`,
             `<td>${p.name || p.standard}</td>`,
             `<td>${badge}</td>`,
@@ -761,13 +771,13 @@ function renderEditor() {
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = currentKey
-            ? `${s.part.standard} \u00b7 ${s.part.name || ''} \u00b7 ${s.part.material} \u00b7 h ${fmt(s.part.height)} \u00b7 \u2300${fmt(s.part.width || s.part.diameter)}`
+            ? `${s.part.standard} \u00b7 ${s.part.name || ''} \u00b7 ${s.part.material} \u00b7 h ${fin(s.part.height)} \u00b7 \u2300${fin(s.part.width || s.part.diameter)} in`
             : `(no SetNutsBolts record for ${s.orig.part.standard})`;
         partSel.appendChild(placeholder);
         for (const p of opts) {
             const o = document.createElement('option');
             o.value = optionKey(p);
-            o.textContent = `${p.standard} \u00b7 ${p.name || ''} \u00b7 ${p.material} \u00b7 h ${fmt(p.height)} \u00b7 \u2300${fmt(p.width || p.diameter)}`;
+            o.textContent = `${p.standard} \u00b7 ${p.name || ''} \u00b7 ${p.material} \u00b7 h ${fin(p.height)} \u00b7 \u2300${fin(p.width || p.diameter)} in`;
             if (currentKey && o.value === currentKey) {
                 placeholder.disabled = true;
                 o.selected = true;
@@ -864,7 +874,7 @@ function updateDirtyUI() {
     const grip = display ? display.grip : null;
     const modeTxt = draft.gripMode === 'fixed' ? 'fixed' : 'auto';
     els.gripResult.textContent = grip
-        ? `effective grip: ${fmt(grip.thickness)} mm (${modeTxt})`
+        ? `effective grip: ${fin(grip.thickness)} in (${modeTxt})`
         : '';
 }
 
@@ -909,7 +919,7 @@ async function loadSelection(preserveLength = true) {
         for (const len of view.available_lengths || []) {
             const opt = document.createElement('option');
             opt.value = len;
-            opt.textContent = `${fmt(len)} mm`;
+            opt.textContent = `${fin(len)} in`;
             if (len === current) opt.selected = true;
             els.length.appendChild(opt);
         }
@@ -949,12 +959,12 @@ function wire() {
         els.gripValue.disabled = els.gripAuto.checked;
         if (!els.gripAuto.checked && !els.gripValue.value) {
             const d = display ? display.grip.thickness : (serverView.grip ? serverView.grip.thickness : 0);
-            els.gripValue.value = fmt(Math.max(Number(d) || 0, 0));
+            els.gripValue.value = fmt(Math.max(Number(d) || 0, 0) / MM_PER_IN);
         }
         commit();
     });
     els.gripValue.addEventListener('input', () => {
-        draft.gripValue = els.gripValue.value === '' ? 0 : Number(els.gripValue.value);
+        draft.gripValue = els.gripValue.value === '' ? 0 : (Number(els.gripValue.value) * MM_PER_IN);
         commit();
     });
 }
