@@ -242,15 +242,15 @@ def anchor_configurator_payload(database):
 # Printable anchor fabrication detail sheet (issue #2)
 # --------------------------------------------------------------------------
 
-DIM_MODES = ("imperial", "metric", "dual")
-
 
 @app.route("/db/<database>/fabrication-sheet")
 def fabrication_sheet(database):
-    """Dimensioned SVG fabrication detail for one anchor record (print/PDF)."""
-    mode = request.args.get("mode", "imperial")
-    if mode not in DIM_MODES:
-        mode = "imperial"
+    """Dimensioned SVG fabrication detail for one anchor record (print/PDF).
+
+    The sheet always displays dimensions in imperial inches; metric/dual
+    formatting helpers stay available in utils/fabrication.py for later use.
+    """
+    mode = "imperial"
     page = request.args.get("page", "letter")
     if page not in fabrication.SHEET_SIZES:
         page = "letter"

@@ -237,8 +237,10 @@ designation) are shown as absent rather than inferred.
 Dimension formatting rules (tested in `tests/test_fabrication.py`): metric
 display preserves source precision (trailing zeros trimmed); imperial display
 rounds to the nearest 1/16 in and reduces the fraction, prefixing `≈` when
-the mm value is not exactly representable at that denominator; dual mode shows
-`fraction in (mm)`. The sheet status is `draft` whenever validation raises an
+the mm value is not exactly representable at that denominator. The printed
+detail sheet always renders dimensions in **imperial inches**; the metric and
+dual formatting helpers remain in `fabrication.py` (with tests) for later
+phases. The sheet status is `draft` whenever validation raises an
 error-level issue (missing/zero required fields, thread longer than the rod,
 missing hook radius, unmatched SetNutsBolts references) — drafts show a
 DRAFT / INCOMPLETE watermark and get a `DRAFT_` filename prefix. All geometry

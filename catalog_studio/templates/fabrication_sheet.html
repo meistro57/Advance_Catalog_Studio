@@ -13,13 +13,6 @@
     <form class="toolbar-form" method="get" id="sheetForm">
         <input type="hidden" name="anchor_id" value="{{ view.selection.anchor_id }}">
         <input type="hidden" name="def_id" value="{{ view.selection.def_id }}">
-        <label>Units
-            <select name="mode" onchange="this.form.submit()">
-                {% for m in ['imperial', 'metric', 'dual'] %}
-                <option value="{{ m }}" {% if mode == m %}selected{% endif %}>{{ m|capitalize }}</option>
-                {% endfor %}
-            </select>
-        </label>
         <label>Paper
             <select name="page" onchange="this.form.submit()">
                 {% for key, sz in sheet_sizes.items() %}
@@ -80,40 +73,35 @@
                 <tr><td>Material / grade</td><td class="val" colspan="2">{{ view.anchor.material or '&mdash;' }}</td></tr>
                 {% if geo.termination.kind == 'hook' %}
                 <tr><td>Hook radius</td>
-                    <td class="val mm">{{ geo.termination.hook_radius|fmm }}</td>
                     <td class="val in">{{ geo.termination.hook_radius|fin_fraction }} in</td></tr>
                 {% elif geo.termination.kind == 'head' %}
-                <tr><td>Head</td><td class="val" colspan="2">{{ geo.termination.width|fmm }} x {{ geo.termination.height|fmm }} mm (head)</td></tr>
+                <tr><td>Head</td><td class="val in">{{ geo.termination.width|fin_fraction }} x {{ geo.termination.height|fin_fraction }} in (head)</td></tr>
                 {% else %}
                 <tr><td>Bottom termination</td><td class="val" colspan="2">Plain rod end</td></tr>
                 {% endif %}
                 {% for dist in geo.distances %}
                 {% if dist.field != 'TopDistance' %}
                 <tr><td>{{ dist.label }}</td>
-                    <td class="val mm">{{ dist.value_mm|fmm }}</td>
                     <td class="val in">{{ dist.value_mm|fin_fraction }} in</td></tr>
                 {% endif %}
                 {% endfor %}
                 <tr><td>Item weight</td>
-                    <td class="val mm" colspan="2">{{ view.anchor.weight }} kg</td></tr>
+                    <td class="val">{{ view.anchor.weight }} kg</td></tr>
                 <tr class="dim-row"><td>Nominal diameter</td>
-                    <td class="val mm">{{ view.anchor.diameter|fmm }}</td>
                     <td class="val in">{{ view.anchor.diameter|fin_fraction }} in</td></tr>
                 <tr class="dim-row"><td>Overall length</td>
-                    <td class="val mm">{{ geo.length_mm|fmm }}</td>
                     <td class="val in">{{ geo.length_mm|fin_fraction }} in</td></tr>
                 <tr class="dim-row"><td>Thread length (top)</td>
-                    <td class="val mm">{{ geo.thread_length_mm|fmm }}</td>
                     <td class="val in">{{ geo.thread_length_mm|fin_fraction }} in</td></tr>
                 {% if geo.top_distance_mm %}
                 <tr class="dim-row"><td>Top projection</td>
-                    <td class="val mm">{{ geo.top_distance_mm|fmm }}</td>
                     <td class="val in">{{ geo.top_distance_mm|fin_fraction }} in</td></tr>
                 {% endif %}
                 </tbody>
             </table>
-            <p class="units-note">Units: mm stored in the catalog; imperial shown as reduced fractions of 1/16 in.
-                <span class="approx-note">&#8776; marks approximate conversions. Coating/finish: not present in catalog &mdash; confirm separately.</span></p>
+            <p class="units-note">All dimensions in inches, shown as reduced fractions of 1/16 in.
+                <span class="approx-note">&#8776; marks approximate conversions from the catalogue&rsquo;s stored millimetres.
+                Coating/finish: not present in catalog &mdash; confirm separately.</span></p>
 
             <h2>Hardware (per anchor)</h2>
             {% if schedule %}
@@ -126,7 +114,7 @@
                     <td>{{ row.description }}</td>
                     <td>{{ row.standard }}</td>
                     <td>{{ row.material or '&mdash;' }}</td>
-                    <td class="val mm">{{ row.diameter_mm|fmm }} mm{% if row.diameter_mm %} ({{ row.diameter_mm|fin_fraction }} in){% endif %}</td>
+                    <td class="val in">{{ row.diameter_mm|fin_fraction }} in</td>
                     <td class="qty">{{ row.qty }}</td>
                 </tr>
                 {% endfor %}
