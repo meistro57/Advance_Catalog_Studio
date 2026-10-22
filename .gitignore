@@ -12,3 +12,5 @@ __pycache__/
 catalog_studio/uploads/*
 !catalog_studio/uploads/.gitkeep
 catalog_studio/exports/*
+
+.venv/
