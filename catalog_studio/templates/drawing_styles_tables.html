@@ -13,9 +13,9 @@
   <tbody>
   {% for t in tables %}
     <tr>
-      <td>{{ t.table }}</td>
+      <td>{{ t.name }}</td>
       <td>{{ t.row_count }}</td>
-      <td><a class="btn btn-sm btn-primary" href="{{ url_for('drawing_styles_table', database=database, table=t.table) }}">Open</a></td>
+      <td><a class="btn btn-sm btn-primary" href="{{ url_for('drawing_styles_table', database=database, table=t.name) }}">Open</a></td>
     </tr>
   {% endfor %}
   </tbody>
