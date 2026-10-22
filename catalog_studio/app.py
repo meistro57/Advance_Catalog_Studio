@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
+from utils import table_editor, drawing_styles
 from utils import staging_cleanup
 from utils.schema_templates import CATALOG_TEMPLATES
 
@@ -169,6 +170,14 @@ def _report_cleanup(result):
               f"({', '.join(r['name'] for r in rejected)}).", "danger")
 
 
+def _pending_edits_get() -> list[dict]:
+    return list(session.get("drawing_pending_edits") or [])
+
+
+def _pending_edits_set(items: list[dict]) -> None:
+    session["drawing_pending_edits"] = items
+
+
 @app.route("/upload", methods=["POST"])
 def upload():
     saved = []
@@ -261,6 +270,170 @@ def show_database(database):
         "database.html", database=database, tables=tables, counts=counts, meta=meta,
         diameters=diameters, catalog_type=catalog_type,
     )
+
+
+@app.route("/db/<database>/drawing-styles")
+def drawing_styles_home(database):
+    return render_template(
+        "drawing_styles_home.html",
+        database=database,
+        style_rows=drawing_styles.list_styles(database),
+        pending_count=len(_pending_edits_get()),
+    )
+
+
+@app.route("/db/<database>/drawing-styles/tables")
+def drawing_styles_tables(database):
+    tables = table_editor.list_tables_with_counts(database)
+    return render_template(
+        "drawing_styles_tables.html",
+        database=database,
+        tables=tables,
+        pending_count=len(_pending_edits_get()),
+    )
+
+
+@app.route("/db/<database>/drawing-styles/tables/<table>")
+def drawing_styles_table(database, table):
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 50, type=int)
+    sort_col = request.args.get("sort", "") or None
+    sort_dir = request.args.get("dir", "ASC")
+    search = request.args.get("q", "")
+
+    payload = table_editor.fetch_table_page(
+        database=database,
+        table=table,
+        page=page,
+        page_size=page_size,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        search=search,
+    )
+    return render_template(
+        "drawing_styles_table.html",
+        database=database,
+        table=table,
+        payload=payload,
+        pending_count=len(_pending_edits_get()),
+    )
+
+
+@app.route("/db/<database>/drawing-styles/tables/<table>/stage", methods=["POST"])
+def drawing_styles_stage_edit(database, table):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+
+    pk_cols = table_editor.get_primary_key_columns(database, table)
+    if not pk_cols:
+        flash("This table has no primary key; edits are disabled.", "warning")
+        return redirect(url_for("drawing_styles_table", database=database, table=table))
+
+    specs = {c.name: c for c in table_editor.get_column_specs(database, table)}
+    pk = {}
+    for col in pk_cols:
+        pk[col] = request.form.get(f"pk__{col}")
+
+    changes = {}
+    for name, spec in specs.items():
+        if name in pk_cols:
+            continue
+        if f"col__{name}" not in request.form:
+            continue
+        raw = request.form.get(f"col__{name}", "")
+        try:
+            coerced = table_editor.coerce_and_validate(raw, spec)
+        except ValueError as e:
+            flash(str(e), "danger")
+            return redirect(url_for("drawing_styles_table", database=database, table=table))
+        changes[name] = coerced
+
+    if not changes:
+        flash("No staged changes for that row.", "warning")
+        return redirect(url_for("drawing_styles_table", database=database, table=table))
+
+    items = _pending_edits_get()
+    items.append({"table": table, "pk": pk, "changes": changes})
+    _pending_edits_set(items)
+    flash("Row changes staged.", "success")
+    return redirect(url_for("drawing_styles_table", database=database, table=table))
+
+
+@app.route("/db/<database>/drawing-styles/pending/undo", methods=["POST"])
+def drawing_styles_pending_undo(database):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    items = _pending_edits_get()
+    if items:
+        items.pop()
+        _pending_edits_set(items)
+        flash("Undid the most recent staged edit.", "success")
+    else:
+        flash("No staged edits to undo.", "warning")
+    return redirect(url_for("drawing_styles_tables", database=database))
+
+
+@app.route("/db/<database>/drawing-styles/pending/commit", methods=["POST"])
+def drawing_styles_pending_commit(database):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    items = _pending_edits_get()
+    if not items:
+        flash("No staged edits to commit.", "warning")
+        return redirect(url_for("drawing_styles_tables", database=database))
+    applied = 0
+    for item in items:
+        table_editor.apply_updates_by_pk(database, item["table"], item["pk"], item["changes"])
+        applied += 1
+    _pending_edits_set([])
+    flash(f"Committed {applied} staged edit(s).", "success")
+    return redirect(url_for("drawing_styles_tables", database=database))
+
+
+@app.route("/db/<database>/drawing-styles/style/<int:style_key>")
+def drawing_style_detail(database, style_key):
+    bundle = drawing_styles.get_style_bundle(database, style_key)
+    if not bundle:
+        flash("Drawing style not found.", "warning")
+        return redirect(url_for("drawing_styles_home", database=database))
+    return render_template("drawing_style_detail.html", database=database, bundle=bundle)
+
+
+@app.route("/db/<database>/drawing-styles/style/<int:style_key>/duplicate", methods=["POST"])
+def drawing_style_duplicate(database, style_key):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    run_name = request.form.get("run_name", "").strip()
+    owner_text = request.form.get("owner_text", "DSC").strip() or "DSC"
+    if not run_name:
+        flash("New style RunName is required.", "danger")
+        return redirect(url_for("drawing_style_detail", database=database, style_key=style_key))
+    result = drawing_styles.duplicate_style(database, style_key, run_name=run_name, owner_text=owner_text)
+    flash(f"Duplicated style as Key={result['new_style_key']}.", "success")
+    return redirect(url_for("drawing_style_detail", database=database, style_key=result["new_style_key"]))
+
+
+@app.route("/db/<database>/drawing-styles/style/<int:style_key>/rename", methods=["POST"])
+def drawing_style_rename(database, style_key):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    run_name = request.form.get("run_name", "").strip()
+    owner_text = request.form.get("owner_text", "").strip()
+    if not run_name:
+        flash("RunName is required.", "danger")
+        return redirect(url_for("drawing_style_detail", database=database, style_key=style_key))
+    drawing_styles.rename_style(database, style_key, run_name=run_name, owner_text=owner_text)
+    flash("Style renamed.", "success")
+    return redirect(url_for("drawing_style_detail", database=database, style_key=style_key))
+
+
+@app.route("/db/<database>/drawing-styles/style/<int:style_key>/delete", methods=["POST"])
+def drawing_style_delete(database, style_key):
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    drawing_styles.delete_style(database, style_key)
+    flash("Style and dependent rows deleted.", "success")
+    return redirect(url_for("drawing_styles_home", database=database))
 
 
 # --------------------------------------------------------------------------
