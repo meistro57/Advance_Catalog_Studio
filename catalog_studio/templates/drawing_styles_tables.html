@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Drawing Style Tables{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">Drawing Style Tables</h2>
+  <div>
+    <span class="badge text-bg-secondary">Pending edits: {{ pending_count }}</span>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('drawing_styles_home', database=database) }}">Styles</a>
+  </div>
+</div>
+<table class="table table-sm table-striped">
+  <thead><tr><th>Table</th><th>Rows</th><th></th></tr></thead>
+  <tbody>
+  {% for t in tables %}
+    <tr>
+      <td>{{ t.table }}</td>
+      <td>{{ t.row_count }}</td>
+      <td><a class="btn btn-sm btn-primary" href="{{ url_for('drawing_styles_table', database=database, table=t.table) }}">Open</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ table }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 mb-0">{{ table }}</h2>
+  <div class="d-flex gap-2">
+    <span class="badge text-bg-secondary">{{ payload.total }} rows</span>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('drawing_styles_tables', database=database) }}">Back</a>
+  </div>
+</div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto"><input class="form-control form-control-sm" type="text" name="q" value="{{ payload.search }}" placeholder="Search"></div>
+  <div class="col-auto"><input class="form-control form-control-sm" type="number" min="1" name="page" value="{{ payload.page }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary" type="submit">Apply</button></div>
+</form>
+<div class="table-wrap">
+<table class="table table-sm table-striped data-table">
+  <thead><tr>{% for c in payload.columns %}<th>{{ c }}</th>{% endfor %}{% if payload.pk_columns %}<th>Stage</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for row in payload.rows %}
+    <tr>
+      {% for c in payload.columns %}<td>{{ row[c] }}</td>{% endfor %}
+      {% if payload.pk_columns %}
+      <td>
+        <form method="post" action="{{ url_for('drawing_styles_stage_edit', database=database, table=table) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          {% for pk in payload.pk_columns %}<input type="hidden" name="pk__{{ pk }}" value="{{ row[pk] }}">{% endfor %}
+          <input class="form-control form-control-sm mb-1" type="text" name="col__OwnerText" value="{{ row['OwnerText'] if 'OwnerText' in payload.columns else '' }}" placeholder="OwnerText">
+          <button class="btn btn-sm btn-outline-primary" type="submit">Stage</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="mt-3 d-flex gap-2">
+  <form method="post" action="{{ url_for('drawing_styles_pending_undo', database=database) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-sm btn-warning" type="submit">Undo Last Staged</button>
+  </form>
+  <form method="post" action="{{ url_for('drawing_styles_pending_commit', database=database) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-sm btn-success" type="submit">Commit Staged</button>
+  </form>
+</div>
+{% endblock %}

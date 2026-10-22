@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Style {{ bundle.style.Key }}{% endblock %}
+{% block content %}
+<h2 class="h4">Drawing Style {{ bundle.style.Key }}</h2>
+<p><strong>{{ bundle.style.RunName }}</strong> ({{ bundle.style.OwnerText }})</p>
+<ul>
+  {% for table, rows in bundle.children.items() %}
+  <li>{{ table }}: {{ rows|length }} rows</li>
+  {% endfor %}
+</ul>
+<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('drawing_styles_home', database=database) }}">Back</a>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Drawing Styles{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">Drawing Styles</h2>
+  <div>
+    <span class="badge text-bg-secondary">Pending edits: {{ pending_count }}</span>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('drawing_styles_tables', database=database) }}">Browse tables</a>
+  </div>
+</div>
+<table class="table table-sm table-striped">
+  <thead><tr><th>Key</th><th>RunName</th><th>OwnerText</th><th>Scale</th><th>Visible</th><th></th></tr></thead>
+  <tbody>
+  {% for s in style_rows %}
+    <tr>
+      <td>{{ s.Key }}</td><td>{{ s.RunName }}</td><td>{{ s.OwnerText }}</td><td>{{ s.Scale }}</td><td>{{ s.Visible }}</td>
+      <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('drawing_style_detail', database=database, style_key=s.Key) }}">Detail</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
