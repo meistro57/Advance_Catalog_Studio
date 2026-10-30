@@ -36,7 +36,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Area | Current status |
 | --- | --- |
 | Validated Advance Steel version | **2026** |
-| Catalog types | Bolt and anchor |
+| Catalog types | Bolt and anchor, plus drawing-style exports |
 | Table editor raw row operations | Implemented |
 | Guided bolt-diameter cloning | Implemented |
 | Bolt-set visualizer (read-only) | Phase 1 implemented |
@@ -47,7 +47,8 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
-| Raw table editing and filtering | Implemented |
+| Raw table editing and filtering | Implemented (composite-key safe) |
+| Drawing-style editor (Drawing Style Manager exports) | First slice: style tree, representation rules, label formulas, integrity check |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -175,6 +176,8 @@ Searches textual columns across the database and reports matches by table and co
 
 For work that does not fit a guided tool, each table can be browsed and filtered directly. Supported tables allow adding, editing, duplicating, and deleting rows.
 
+Many Advance Steel tables use **composite primary keys** (`SetBolts`, `ScrewNew`, `SetNutsBolts`, `BoltsDistances`, and in style exports `DetObjReprMapItems (Key, Order)`). Rows are addressed by every key column together, and each edit/delete runs in a transaction that rolls back unless exactly one row is affected. Duplicating a composite-key row bumps the last integer key column (e.g. the next `Order` within the same `Key`).
+
 Raw editing intentionally remains available, but relationship-dependent changes should use a guided workflow whenever possible.
 
 ### Bolt-set viewer (Phase 1 — read-only)
@@ -192,6 +195,20 @@ Anchor catalogs get a matching schematic viewer: pick an anchor and a length var
 ### Fabrication detail sheets (first vertical slice)
 
 From the anchor configurator, any selection can open a **printable fabrication detail** (`Detail Sheet` button): a standalone, dimensioned SVG elevation (rod, thread zone, concrete plane, hardware with table references, hook/head termination) plus a fabrication-data table, hardware schedule, title block, provenance/audit block, and a prominent "NTS — USE WRITTEN DIMENSIONS" note. Dimensions come only from verified catalog fields — values that exist only as ambiguous columns are reported with their source labels and never drawn, and missing values never invent a number. Dimensions display in **imperial inches** (reduced 1/16-inch fractions with an `≈` marker for inexact conversions); metric/dual formatting helpers and their conversion tests remain for later phases. Paper sizes start with US Letter and 11 × 17 landscape. If validation finds a problem (missing/zero required fields, thread longer than the rod, no hook radius, unmatched hardware records) the sheet is watermarked **DRAFT / INCOMPLETE** and its suggested filename gains a `DRAFT_` prefix. PDF output currently uses the browser's Print / Save as PDF (vector, selectable text); server-side PDF generation and additional anchor shapes are later phases. The first supported family — `US_Hooked_Anchors` — and its exact field mapping are documented in `catalog_studio/utils/fabrication.py`.
+
+### Drawing-style editor
+
+Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected as `drawing style` and get a one-page editor at `/db/<db>/drawing-style` instead of the Style Manager's nested dialogs:
+
+- **Style identity** — picker name, help text, owner, title and cut-view title formulas with a live rendered preview.
+- **Each view** — scale (shown as `1:16 (3/4" = 1'-0")`), representation map, dimension strategy, view-box depth, length clipping. Lengths display in feet-inches and accept either mm or ft-in (`2'-6 1/2"`).
+- **Representation rules** — every rule as a row with dropdowns for object set, appearance, label strategy and linetype, a preview of the label each rule prints, and move up / move down / copy below / delete.
+- **Libraries** — label formulas (with token preview), label strategies, appearances, object sets and their model roles.
+- **Integrity check** — every in-file reference is checked before you export.
+
+Dropdowns come from the export's own `InfoTableRelations` table (Autodesk's column → lookup map) plus a few verified fixes. References to Autodesk's built-in databases aren't in the export, so those stay as raw numbers. Schema notes: [`docs/drawing-style-schema.md`](docs/drawing-style-schema.md).
+
+To make a variant rather than overwrite a style, rename it before exporting.
 
 ## Why bolt diameters are difficult
 
@@ -372,6 +389,7 @@ These are planned features, not claims about the current release. Development wi
 - Test exported catalogs before rolling them into a working environment.
 - SQL identifiers are handled separately from values; future catalog schemas still require validation.
 - Only Advance Steel 2026 has been tested so far.
+- Drawing-style round trips (edit → export → Drawing Style Manager import) have been verified at the SQL level only; test imports on a copy of your style library first.
 - The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
 

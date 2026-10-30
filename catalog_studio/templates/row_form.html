@@ -8,18 +8,33 @@
 <div class="row g-4">
     <div class="col-lg-{{ '6' if table == 'AnchorsDefinition' else '12' }}">
         <form method="post" id="rowForm" class="bg-white p-4 rounded shadow-sm" style="max-width: 700px;">
+            {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
+            {% set rel_opts = relation_options or {} %}
             {% for c in columns %}
                 {% set name = c.COLUMN_NAME %}
-                {% if mode == "edit" and name == pk_col %}
+                {% set cur = row[name] if row and row[name] is not none else '' %}
+                {% if mode == "edit" and name in (pk_cols or []) %}
                     <div class="mb-2">
                         <label class="form-label">{{ name }} <span class="text-muted">(primary key, not editable)</span></label>
-                        <input type="text" class="form-control" value="{{ pk_val }}" disabled>
+                        <input type="text" class="form-control" value="{{ cur }}" disabled>
+                    </div>
+                {% elif name in rel_opts %}
+                    {% set ns = namespace(found=false) %}
+                    <div class="mb-2">
+                        <label class="form-label">{{ name }} <span class="text-muted">({{ c.DATA_TYPE }}, lookup)</span></label>
+                        <select name="{{ name }}" class="form-select">
+                            {% for v, l in rel_opts[name] %}
+                                {% if v|string == cur|string %}{% set ns.found = true %}{% endif %}
+                                <option value="{{ v }}" {% if v|string == cur|string %}selected{% endif %}>{{ l }}</option>
+                            {% endfor %}
+                            {% if not ns.found %}<option value="{{ cur }}" selected>{{ cur if cur != '' else '(blank)' }} (current)</option>{% endif %}
+                        </select>
                     </div>
                 {% else %}
                     <div class="mb-2">
                         <label class="form-label">{{ name }} <span class="text-muted">({{ c.DATA_TYPE }})</span></label>
                         <input type="text" name="{{ name }}" class="form-control"
-                               value="{{ row[name] if row and row[name] is not none else '' }}">
+                               value="{{ cur }}">
                     </div>
                 {% endif %}
             {% endfor %}
