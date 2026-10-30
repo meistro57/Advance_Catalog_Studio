@@ -101,6 +101,17 @@ same row values, so the geometry always follows the columns:
 - **dimension chain** — `Direction` (0 = X, 1 = Y), `ArrangeAbove` and the
   point count decide the sketch; point names come from
   `DetViewDimPointSelection.RunName`.
+- **dimension plan** — every chain of one view at once: X chains stack above
+  or below the part, Y chains beside it, numbered into a legend that repeats
+  direction, Above and point count. Lanes follow
+  `DetViewDimStrategyItems.Order`; beyond the lane cap the figure reports how
+  many were left out.
+- **chain anatomy** — a static explainer for one chain (line, ticks, Above,
+  Direction), shown once per style.
+- **dimension setup flags** — `ArrangeGlobally`, `GroupRelatedDimensions`,
+  `OneChainPerObjectInPoints1`, `AllowCombine`, `AutomaticallySeparate`,
+  `Group` and `LabelContents` are surfaced as badges in the editor table; their
+  exact AS behaviour is not verified, so they are labelled as AS switches.
 - **hatch swatch** — parallel lines at the preset's own `Angle` and a spacing
   proportional to its `Scale`, labelled with `PatternName`. Real AutoCAD
   pattern shapes are not reproduced.

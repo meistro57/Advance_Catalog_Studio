@@ -44,6 +44,9 @@
   .sd-svg .sd-plane { stroke:#fd7e14; stroke-width:1.2; stroke-dasharray:5 3; }
   .sd-svg .sd-scale-bed { fill:#fff; }
   .sd-svg .sd-overview-bar { fill:#0d6efd; opacity:.75; }
+  .sd-svg .sd-dim-ink { fill:#0d6efd; }
+  .sd-svg .sd-legend { font-size:8.5px; fill:#343a40; }
+  .sd-svg .sd-note-line { stroke:#adb5bd; stroke-width:.7; stroke-dasharray:2 2; }
   .sd-ladder { display:flex; flex-direction:column; gap:.15rem; margin:.35rem 0 .5rem; }
   .sd-ladder-scroll { max-height:14rem; overflow-y:auto; border:1px solid #f1f3f5; border-radius:.35rem; padding:.2rem; }
   .sd-step { display:flex; align-items:center; gap:.45rem; font-size:.75rem; background:#f8f9fa; border:1px solid #e9ecef; border-radius:.3rem; padding:.15rem .45rem; }
@@ -331,9 +334,37 @@
 
       {# ---------------- dimensions ---------------- #}
       {% if r.dims %}
-      <div class="ds-sub">Dimensions &mdash; {{ r.dim_strategy.row.RunName if r.dim_strategy else '' }}</div>
+      <div class="ds-sub d-flex justify-content-between align-items-end">
+        <span>Dimensions &mdash; {{ r.dim_strategy.row.RunName if r.dim_strategy else '' }} ({{ r.dims|length }})</span>
+        {% if r.dim_strategy %}<a class="small" href="/db/{{ database }}/DetViewDimStrategyNew/{{ r.dim_strategy.token }}/edit?return_to=/db/{{ database }}/drawing-style">strategy fields &rarr;</a>{% endif %}
+      </div>
+      <div class="ds-hint mb-2">
+        A dimension strategy is an ordered list, and each row is one chain: the points it measures, the axis it
+        runs along, and whether it lands above or below the part. Advance Steel reads the values from the model;
+        this editor only chooses which points are chained and where the chain goes.
+      </div>
+      <div class="row g-2 mb-2">
+        {% if r.diagrams.anatomy %}
+        <div class="col-lg-5">
+          <div class="sd-figure-card">
+            <div class="sd-title">How to read a chain</div>
+            {{ r.diagrams.anatomy|safe }}
+          </div>
+        </div>
+        {% endif %}
+        <div class="col-lg-{{ '7' if r.diagrams.anatomy else '12' }}">
+          <div class="sd-figure-card">
+            <div class="sd-title">All chains in this view</div>
+            {{ r.diagrams.plan|safe }}
+            <div class="sd-caption">Numbers match the table rows below. Lane spacing is schematic.</div>
+          </div>
+        </div>
+      </div>
       <table class="table table-sm small mb-0">
-        <thead class="table-light"><tr><th>#</th><th>Dimension request</th><th>Direction</th><th>Above</th><th>Points</th></tr></thead>
+        <thead class="table-light"><tr>
+          <th>#</th><th>Dimension request</th><th>Direction</th><th>Above</th>
+          <th>Points</th><th>Setup flags</th><th></th>
+        </tr></thead>
         <tbody>
         {% for d in r.dims %}
           <tr>
@@ -341,7 +372,30 @@
             <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName) }}{% else %}#{{ d.row.RequestLinear }}{% endif %}</td>
             <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y')]) }}{% endif %}</td>
             <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool') }}{% endif %}</td>
-            <td>{{ d.points|join(', ') }}</td>
+            <td>
+              {% if d.points %}
+                <span class="badge bg-light text-dark border">{{ d.points|length }} pt</span>
+                <span class="text-muted">{{ d.points[:3]|join(' · ') }}{% if d.points|length > 3 %} +{{ d.points|length - 3 }} more{% endif %}</span>
+              {% else %}<span class="text-muted">none listed</span>{% endif %}
+            </td>
+            <td>
+              {% if d.linear %}{% set lin = d.linear.row %}
+                {% for flag, label, title in [
+                  ('ArrangeGlobally', 'global', 'AS flag: arrange all chains of this axis together (meaning unconfirmed).'),
+                  ('GroupRelatedDimensions', 'grouped', 'AS flag: keep related dimensions in one group (meaning unconfirmed).'),
+                  ('OneChainPerObjectInPoints1', 'per object', 'AS flag: one chain per object for the Points1 list (meaning unconfirmed).'),
+                  ('AllowCombine', 'combine', 'AS flag: chains may be combined (meaning unconfirmed).'),
+                  ('AutomaticallySeparate', 'auto-split', 'AS flag: chains may be separated automatically (meaning unconfirmed).')
+                ] %}
+                  {% if lin[flag] %}<span class="badge bg-light text-dark border" title="{{ title }}">{{ label }}</span> {% endif %}
+                {% endfor %}
+                <span class="badge bg-light text-dark border" title="Group number in DetViewDimRequestLinear">group {{ lin.Group }}</span>
+                {% if lin.LabelContents %}<span class="badge bg-light text-dark border" title="LabelContents formula: {{ lin.LabelContents }}">{{ lin.LabelContents|truncate(22, True, '…') }}</span>{% endif %}
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              {% if d.linear %}<a class="small" href="/db/{{ database }}/DetViewDimRequestLinear/{{ d.linear.token }}/edit?return_to=/db/{{ database }}/drawing-style%23req-{{ r.row.Key }}">all fields &rarr;</a>{% endif %}
+            </td>
           </tr>
         {% endfor %}
         </tbody>

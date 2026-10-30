@@ -262,3 +262,95 @@ def test_style_overview_truncates_long_view_names():
         {"name": "5 - MARKS Column - Top and Bottom with extra words", "scale": 0.0625, "rules": 3, "dims": 1},
     ])
     assert "5 - MARKS Column - Top and Bo…" in svg
+
+
+def test_dimension_anatomy_labels_the_parts_of_a_chain():
+    svg = sd.dimension_anatomy_svg()
+    assert "A dimension chain, part by part" in svg
+    assert "the part" in svg
+    assert "above the part" in svg
+    assert "Blue line = one chain (one strategy row)" in svg
+    assert "Ticks = that request's points" in svg
+    assert "ArrangeAbove raises or drops the chain" in svg
+    assert "Direction 0 = X, 1 = Y (file values)" in svg
+    assert svg.count('class="sd-dim"') == 4
+
+
+def test_dimension_plan_draws_one_lane_per_request():
+    dims = [
+        {"linear": {"row": {"RunName": "Top chain", "Direction": 0, "ArrangeAbove": True}},
+         "points": ["A", "B", "C"]},
+        {"linear": {"row": {"RunName": "Bottom chain", "Direction": 0, "ArrangeAbove": False}},
+         "points": ["A", "B"]},
+        {"linear": {"row": {"RunName": "Side chain", "Direction": 1, "ArrangeAbove": True}},
+         "points": ["A", "B"]},
+    ]
+    svg = sd.dimension_plan_svg(dims)
+    assert "#1 Top chain · X · above · 3 pts" in svg
+    assert "#2 Bottom chain · X · below · 2 pts" in svg
+    assert "#3 Side chain · Y · above · 2 pts" in svg
+    assert svg.count('stroke-width="1.3"') == 3
+    assert svg.count('class="sd-dim"') == 7  # 3 + 2 + 2 ticks
+
+
+def test_dimension_plan_places_x_above_below_and_y_beside_the_part():
+    dims = [
+        {"linear": {"row": {"RunName": "Above", "Direction": 0, "ArrangeAbove": True}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Below", "Direction": 0, "ArrangeAbove": False}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Right", "Direction": 1, "ArrangeAbove": True}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Left", "Direction": 1, "ArrangeAbove": False}}, "points": ["A"]},
+    ]
+    svg = sd.dimension_plan_svg(dims)
+    lanes = re.findall(r'<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" stroke="#', svg)
+    assert len(lanes) == 4
+    horizontal = [l for l in lanes if l[1] == l[3]]
+    vertical = [l for l in lanes if l[0] == l[2]]
+    assert len(horizontal) == 2 and len(vertical) == 2
+    part = re.search(r'class="sd-part" x="250.0" y="([\d.]+)" width="320.0" height="54.0"', svg)
+    part_top = float(part.group(1))
+    above_y = [float(l[1]) for l in horizontal if float(l[1]) < part_top]
+    below_y = [float(l[1]) for l in horizontal if float(l[1]) > part_top]
+    assert above_y and below_y and max(above_y) < part_top < min(below_y)
+    right = [float(l[0]) for l in vertical if float(l[0]) > 570.0]
+    left = [float(l[0]) for l in vertical if float(l[0]) < 250.0]
+    assert right and left
+
+
+def test_dimension_plan_reports_undrawn_lanes():
+    dims = [
+        {"linear": {"row": {"RunName": f"chain {i}", "Direction": 0, "ArrangeAbove": True}}, "points": ["A"]}
+        for i in range(20)
+    ]
+    svg = sd.dimension_plan_svg(dims)
+    assert "Not drawn (lane limit): 12 more above." in svg
+    assert "+10 more chain(s)" in svg
+    assert svg.count('stroke-width="1.3"') == sd.MAX_PLAN_LANES
+
+
+def test_dimension_plan_without_requests_says_so():
+    svg = sd.dimension_plan_svg([])
+    assert "no linear dimension requests" in svg
+
+
+def test_request_diagrams_include_plan_and_decorate_marks_first_anatomy():
+    request = {
+        "row": {"Key": 1, "Scale": 0.125},
+        "dims": [
+            {"linear": {"row": {"RunName": "A", "Direction": 0, "Number of Points": 1}},
+             "points": ["p"]},
+        ],
+    }
+    out = sd.request_diagrams(request)
+    assert "#1 A · X · below · 1 pt" in out["plan"]
+    assert out["anatomy"] is None
+    tree = {
+        "masters": [{"style": {"requests": [
+            {"row": {"Key": 1, "Scale": 0.125}, "dims": [{"linear": {"row": {"RunName": "A"}}, "points": []}]},
+            {"row": {"Key": 2, "Scale": 0.125}, "dims": [{"linear": {"row": {"RunName": "B"}}, "points": []}]},
+        ]}}],
+        "libraries": {},
+    }
+    sd.decorate_tree(tree)
+    reqs = tree["masters"][0]["style"]["requests"]
+    assert reqs[0]["diagrams"]["anatomy"]
+    assert reqs[1]["diagrams"]["anatomy"] is None

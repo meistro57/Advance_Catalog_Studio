@@ -392,6 +392,193 @@ def dimension_svg(linear, points=()):
     return _figure(520, 174, "Dimension chain schematic", "".join(parts))
 
 
+LANE_COLORS = ["#0d6efd", "#198754", "#fd7e14", "#6f42c1", "#d63384", "#20a39e"]
+MAX_PLAN_LANES = 8
+
+
+def dimension_anatomy_svg(width=700.0, height=176.0):
+    """One chain, labelled: what a chain is, what its ticks are, and what
+    Above / Direction control. Static teaching figure."""
+    parts = [
+        _text(4, 14, "A dimension chain, part by part", "sd-head"),
+        _rect(40, 100, 260, 30, "sd-part"),
+        _text(170, 119, "the part", "sd-label-sm", "middle"),
+        _line(40, 74, 300, 74, "sd-dim"),
+    ]
+    for tx, index in ((40, 1), (170, 2), (300, 3)):
+        parts.append(_line(tx, 68, tx, 80, "sd-dim"))
+        parts.append(_text(tx, 62, str(index), "sd-label-sm", "middle"))
+    parts.append(_line(170, 80, 170, 98, "sd-note-line"))
+    parts.append(_text(170, 94, "above the part", "sd-note", "middle"))
+
+    bullets = [
+        "Blue line = one chain (one strategy row)",
+        "Ticks = that request's points",
+        "ArrangeAbove raises or drops the chain",
+        "Direction 0 = X, 1 = Y (file values)",
+    ]
+    for i, text in enumerate(bullets):
+        y = 52 + i * 20
+        parts.append(_text(330, y, "•", "sd-dim-ink"))
+        parts.append(_text(344, y, text, "sd-label-sm"))
+    parts.append(
+        _text(4, 168, "AS measures the values from the model; this editor only chooses which points are chained and where they land.", "sd-note")
+    )
+    return _figure(width, height, "Dimension chain anatomy", "".join(parts))
+
+
+def dimension_plan_svg(dims, width=720.0):
+    """Every chain of one view at once: X chains stack above/below the part,
+    Y chains sit beside it, each lane numbered into the legend."""
+    entries = []
+    for i, d in enumerate(dims or ()):
+        linear = (d.get("linear") or {}).get("row")
+        if not linear:
+            continue
+        entries.append({
+            "index": i + 1,
+            "name": linear.get("RunName") or f"request #{linear.get('Key')}",
+            "direction": 1 if str(linear.get("Direction", "0")).strip() == "1" else 0,
+            "above": _truthy(linear.get("ArrangeAbove")),
+            "points": list(d.get("points") or ()),
+        })
+    if not entries:
+        return _figure(
+            width,
+            70,
+            "Dimension strategy",
+            _text(4, 30, "This strategy has no linear dimension requests.", "sd-label"),
+        )
+
+    max_lanes = MAX_PLAN_LANES
+    x_above_all = [e for e in entries if e["direction"] == 0 and e["above"]]
+    x_below_all = [e for e in entries if e["direction"] == 0 and not e["above"]]
+    y_right_all = [e for e in entries if e["direction"] == 1 and e["above"]]
+    y_left_all = [e for e in entries if e["direction"] == 1 and not e["above"]]
+    x_above, x_below = x_above_all[:max_lanes], x_below_all[:max_lanes]
+    y_right, y_left = y_right_all[:max_lanes], y_left_all[:max_lanes]
+    hidden = [
+        (label, len(all_lanes) - len(shown))
+        for label, all_lanes, shown in (
+            ("above", x_above_all, x_above),
+            ("below", x_below_all, x_below),
+            ("beside (right)", y_right_all, y_right),
+            ("beside (left)", y_left_all, y_left),
+        )
+        if len(all_lanes) > len(shown)
+    ]
+
+    pitch = 18.0
+    part_x0, part_x1 = 250.0, 570.0
+    part_h = 54.0
+    part_y0 = 22.0 + pitch * len(x_above)
+    part_y1 = part_y0 + part_h
+
+    legend_entries = entries[:10]
+    legend_rows = max(1, -(-len(legend_entries) // 2))
+    parts = [
+        _text(4, 14, "Chain within the view", "sd-head"),
+        _rect(part_x0, part_y0, part_x1 - part_x0, part_h, "sd-part"),
+        _text((part_x0 + part_x1) / 2, (part_y0 + part_y1) / 2 + 4, "part", "sd-label-sm", "middle"),
+        _line(part_x0 - 14, (part_y0 + part_y1) / 2, part_x1 + 14, (part_y0 + part_y1) / 2, "sd-center"),
+    ]
+
+    def ticks_x(lane_y, count):
+        out = []
+        if count < 1:
+            return out
+        step = (part_x1 - part_x0) / max(count - 1, 1)
+        for k in range(count):
+            tx = part_x0 + (0 if count == 1 else k * step)
+            out.append(_line(tx, lane_y - 5, tx, lane_y + 5, "sd-dim"))
+        return out
+
+    def ticks_y(lane_x, count):
+        out = []
+        if count < 1:
+            return out
+        step = part_h / max(count - 1, 1)
+        for k in range(count):
+            ty = part_y0 + (0 if count == 1 else k * step)
+            out.append(_line(lane_x - 5, ty, lane_x + 5, ty, "sd-dim"))
+        return out
+
+    def color(index):
+        return LANE_COLORS[(index - 1) % len(LANE_COLORS)]
+
+    for k, entry in enumerate(x_above):
+        lane_y = part_y0 - pitch * (k + 0.65)
+        parts.append(
+            f'<line x1="{part_x0:.1f}" y1="{lane_y:.1f}" x2="{part_x1:.1f}" y2="{lane_y:.1f}" '
+            f'stroke="{color(entry["index"])}" stroke-width="1.3"/>'
+        )
+        parts += ticks_x(lane_y, len(entry["points"]))
+        parts.append(_text(part_x0 - 10, lane_y + 3.5, f"#{entry['index']}", "sd-label-sm", "end"))
+    for k, entry in enumerate(x_below):
+        lane_y = part_y1 + pitch * (k + 0.65)
+        parts.append(
+            f'<line x1="{part_x0:.1f}" y1="{lane_y:.1f}" x2="{part_x1:.1f}" y2="{lane_y:.1f}" '
+            f'stroke="{color(entry["index"])}" stroke-width="1.3"/>'
+        )
+        parts += ticks_x(lane_y, len(entry["points"]))
+        parts.append(_text(part_x0 - 10, lane_y + 3.5, f"#{entry['index']}", "sd-label-sm", "end"))
+    for k, entry in enumerate(y_right):
+        lane_x = part_x1 + 24 + 16 * k
+        parts.append(
+            f'<line x1="{lane_x:.1f}" y1="{part_y0:.1f}" x2="{lane_x:.1f}" y2="{part_y1:.1f}" '
+            f'stroke="{color(entry["index"])}" stroke-width="1.3"/>'
+        )
+        parts += ticks_y(lane_x, len(entry["points"]))
+        parts.append(_text(lane_x, part_y0 - 8 - (k % 2) * 12, f"#{entry['index']}", "sd-label-sm", "middle"))
+    for k, entry in enumerate(y_left):
+        lane_x = part_x0 - 24 - 16 * k
+        parts.append(
+            f'<line x1="{lane_x:.1f}" y1="{part_y0:.1f}" x2="{lane_x:.1f}" y2="{part_y1:.1f}" '
+            f'stroke="{color(entry["index"])}" stroke-width="1.3"/>'
+        )
+        parts += ticks_y(lane_x, len(entry["points"]))
+        parts.append(_text(lane_x, part_y0 - 8 - (k % 2) * 12, f"#{entry['index']}", "sd-label-sm", "middle"))
+
+    legend_top = part_y1 + pitch * len(x_below) + 32
+    for i, entry in enumerate(legend_entries):
+        column = i // legend_rows
+        row = i % legend_rows
+        name = entry["name"] if len(entry["name"]) <= 42 else entry["name"][:41].rstrip() + "…"
+        points = len(entry["points"])
+        pts = f"{points} pt" + ("s" if points != 1 else "")
+        entry_text = (
+            f"#{entry['index']} {name} · {'X' if entry['direction'] == 0 else 'Y'} · "
+            f"{'above' if entry['above'] else 'below'} · {pts}"
+        )
+        x = 4 + column * 356
+        y = legend_top + row * 13
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y - 7:.1f}" width="8" height="8" rx="1.5" '
+            f'fill="{color(entry["index"])}"/>'
+        )
+        parts.append(_text(x + 13, y, _esc_text(entry_text), "sd-legend", raw=True))
+
+    notes = []
+    if len(entries) > len(legend_entries):
+        notes.append(f"+{len(entries) - len(legend_entries)} more chain(s) — the table below lists them all.")
+    if hidden:
+        notes.append(
+            "Not drawn (lane limit): "
+            + ", ".join(f"{count} more {label}" for label, count in hidden)
+            + "."
+        )
+    notes.append(
+        "Lanes follow DetViewDimStrategyItems order. Chain positions are schematic; "
+        "AS measures the values themselves."
+    )
+    note_y = legend_top + legend_rows * 13 + 8
+    for note in notes:
+        parts.append(_text(4, note_y, note, "sd-note"))
+        note_y += 13
+    height = note_y + 6
+    return _figure(width, height, "Dimension strategy plan", "".join(parts))
+
+
 def hatch_swatch_svg(settings, size=54.0):
     """Hatch sample using the preset's own angle and scale (spacing is
     relative, so two presets can be compared side by side)."""
@@ -471,6 +658,8 @@ def request_diagrams(request):
         "viewbox": view_box_svg(sysbox) if sysbox else None,
         "clip": length_clip_svg(clip) if clip else None,
         "dims": dims,
+        "plan": dimension_plan_svg(request.get("dims") or ()),
+        "anatomy": None,
     }
 
 
@@ -481,10 +670,14 @@ def decorate_tree(tree):
         style = master.get("style")
         if not style:
             continue
+        anatomy_done = False
         for request in style.get("requests", []):
             if request.get("missing"):
                 continue
             request["diagrams"] = request_diagrams(request)
+            if request["diagrams"]["dims"] and not anatomy_done:
+                request["diagrams"]["anatomy"] = dimension_anatomy_svg()
+                anatomy_done = True
         style["overview_svg"] = style_overview_svg([
             {
                 "name": request["row"].get("RunName") or f"view {request['row'].get('Key')}",

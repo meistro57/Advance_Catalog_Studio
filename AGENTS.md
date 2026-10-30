@@ -96,8 +96,10 @@ and display-name token replacement.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
 - `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
   schematic SVG figures (style overview, print-scale ruler, view box, length
-  clipping, dimension chain, hatch swatches) plus the page-level
-  `decorate_tree()` helper. Builders are pure and unit-tested; the page embeds them and redraws
+  clipping, dimension-chain anatomy, per-view dimension plan, single chain,
+  hatch swatches) plus the page-level `decorate_tree()` helper. The dimension
+  plan caps lanes per side (`MAX_PLAN_LANES`) and says how many it left out;
+  the anatomy figure is attached to the first view with dimensions only. Builders are pure and unit-tested; the page embeds them and redraws
   live through `POST /db/<db>/drawing-style/diagram`, which reuses the same
   builders so there is one geometry implementation (no JS twin). Keep the
   "unverified" notes in the figures when touching them.
