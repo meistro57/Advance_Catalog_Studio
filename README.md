@@ -1,21 +1,23 @@
 # Advance Steel Catalog Studio
 
-> Because handling your Advance Steel bolt and anchor data should be easy.
+> Because handling your Advance Steel bolt, anchor, and drawing-style data should be easy.
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-web%20app-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Advance Steel](https://img.shields.io/badge/Advance%20Steel-2026-0696D7)](https://www.autodesk.com/products/advance-steel/overview)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Advance Steel Catalog Studio** is a local, browser-based workbench for inspecting, editing, repairing, creating, and exporting Autodesk Advance Steel component catalogs stored as SQL Server `.mdf` / `.ldf` database pairs.
+**Advance Steel Catalog Studio** is a local, browser-based workbench for inspecting, editing, repairing, creating, and exporting Autodesk Advance Steel databases stored as SQL Server `.mdf` / `.ldf` pairs: bolt and anchor component catalogs, and drawing styles exported from the Drawing Style Manager.
 
-It replaces fragile, repetitive table-by-table editing with a guided workflow that understands the relationships behind bolt diameters, bolt lengths, nuts, washers, assembly sets, grip rules, and edge distances.
+It replaces fragile, repetitive table-by-table editing with guided workflows that understand the relationships behind bolt diameters, bolt lengths, nuts, washers, assembly sets, grip rules, and edge distances, and behind drawing styles: view requests, representation rules, label formulas, and dimension strategies.
 
 ![Catalog Studio dashboard](docs/images/catalog-studio-dashboard.png)
 
 ## Why this exists
 
 Adding a bolt diameter to an Advance Steel catalog is not a single-row operation. A usable diameter may depend on coordinated records across six tables. Miss one relationship—or store an imperial size incorrectly—and the diameter can appear in Advance Steel while its bolts disappear, fail length calculation, or break connection joints.
+
+Drawing styles have the same problem in a different shape. One style is a chain of linked records (style → view request → representation map → rules → appearance / label strategy → label formula), and the Drawing Style Manager makes you click through a dialog for each link. Changing what a beam label says, or how deep a section looks, means hunting through nested windows.
 
 Catalog Studio gives those databases a safer workshop:
 
@@ -27,6 +29,8 @@ Catalog Studio gives those databases a safer workshop:
 - Preview changes before applying them.
 - Detect orphaned diameter records.
 - Find and replace text across database tables.
+- Edit a whole drawing style on one page: view titles, scale, view depth, representation rules, label formulas.
+- Check every in-file reference before export.
 - Detach and export the finished database pair for Advance Steel import.
 
 ## Project status
@@ -110,14 +114,14 @@ python -m pytest tests/
 
 ## Typical workflow
 
-1. **Copy** the catalog `.mdf` and `.ldf` files away from the live Advance Steel data directory.
+1. **Export or copy** the `.mdf` and `.ldf` pair: a catalog from Management Tools, or a style from the Drawing Style Manager. Never work on the live Advance Steel data directory.
 2. **Upload** the pair in Catalog Studio.
-3. **Attach** it to the disposable SQL Server using a clean database name.
-4. **Inspect** the catalog metadata, diameters, tables, row counts, and relationship warnings.
-5. **Preview** a guided operation such as Add / Clone Diameter or Find & Replace.
-6. **Apply** the change as a database transaction.
+3. **Attach** it to the disposable SQL Server using a clean database name. The type (bolt, anchor, shear stud, drawing style) is detected automatically.
+4. **Inspect** the database: diameters and relationship warnings for catalogs, or the Drawing Style Editor and its integrity check for styles.
+5. **Preview** a guided operation such as Add / Clone Diameter or Find & Replace, or make edits in the style editor.
+6. **Apply** the change. Database changes run as transactions.
 7. **Detach & Export** the modified `.mdf` / `.ldf` pair.
-8. **Test** the catalog in a controlled Advance Steel environment before adopting it.
+8. **Test** it in a controlled Advance Steel environment before adopting it.
 
 ## Advance Steel round trip
 
@@ -131,6 +135,8 @@ Catalog Studio operates on the `.mdf` / `.ldf` pair between those two steps. The
 
 ![Advance Steel Management Tools bolt catalog editor](docs/images/advance-steel-management-tools-bolts.png)
 
+Drawing styles follow the same pattern: export a style from the **Drawing Style Manager**, edit the pair in Catalog Studio, then import it back through the Drawing Style Manager. Rename the style in the editor first if you want a variant next to the original. Importing an edited style back into Advance Steel has not been tested yet (see [Safety and limitations](#safety-and-limitations)).
+
 ## What the web interface does
 
 ### Catalog dashboard
@@ -141,7 +147,7 @@ The home page is the ingest/edit/export control centre. It shows:
 - per-pair **Remove** and **Clear staged uploads** actions with a staging
   trash (recoverable until an explicit purge) and confirmation counts/sizes;
 - databases currently attached to the scratch SQL Server;
-- Advance Steel version and catalog-type tags;
+- Advance Steel version and type tags (bolt, anchor, shear stud, drawing style);
 - new bolt and anchor catalog creation;
 - completed exports ready for download.
 
@@ -153,6 +159,8 @@ Opening an attached database shows every table and its live row count. Bolt cata
 - related-record totals;
 - orphan warnings for diameters with no working child records;
 - shortcuts to the guided diameter tool and database-wide find/replace.
+
+Drawing-style databases show a **Drawing Style Editor** button instead of the diameter tools.
 
 ### Add / Clone Diameter wizard
 
@@ -206,9 +214,25 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **Libraries** — label formulas (with token preview), label strategies, appearances, object sets and their model roles.
 - **Integrity check** — every in-file reference is checked before you export.
 
-Dropdowns come from the export's own `InfoTableRelations` table (Autodesk's column → lookup map) plus a few verified fixes. References to Autodesk's built-in databases aren't in the export, so those stay as raw numbers. Schema notes: [`docs/drawing-style-schema.md`](docs/drawing-style-schema.md).
+![Drawing Style Editor: style identity, title formula preview, view settings](docs/images/drawing-style-editor.png)
 
-To make a variant rather than overwrite a style, rename it before exporting.
+![Representation rules grid with label previews](docs/images/drawing-style-rules.png)
+
+Dropdowns come from the export's own `InfoTableRelations` table (Autodesk's column → lookup map) plus a few verified fixes. References to Autodesk's built-in databases aren't in the export, so those stay as raw numbers rather than guessed labels. Schema notes: [`docs/drawing-style-schema.md`](docs/drawing-style-schema.md).
+
+Label formulas use Advance Steel's token syntax:
+
+| Token | Meaning |
+| --- | --- |
+| `%Field` | model property, e.g. `%Position`, `%Name`, `%MainPartPosNum`, `%BoltCount`, `%Note`, `%Scale` |
+| `#Newline` | line break |
+| `#Height(mm)` | text height |
+| `#Bold(0/1)`, `#Underline(0/1)`, `#Color(ACI)` | styling |
+| `#Rounded` … `#End` | framed text |
+
+The preview fills fields with sample values (`%Position` → `b104`), so `#Rounded%Position#End#Newline#Height(3.20)%Name` previews as a framed mark over the part name.
+
+To make a variant rather than overwrite a style, rename it before exporting. Unsaved edits are highlighted, and the save bar counts them; rule moves, copies and deletes apply immediately.
 
 ## Why bolt diameters are difficult
 
@@ -316,15 +340,17 @@ Advance_Catalog_Studio/
 │       ├── anchor_sets.py      # Anchor view model for the configurator
 │       ├── bolt_sets.py        # Bolt-set view model for the viewer
 │       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG
-│       ├── db.py               # SQL inspection and catalog operations
+│       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
+│       ├── drawing_styles.py   # Drawing-style tree, relations, label parser, ft-in, integrity
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
 │       ├── metadata.py         # Catalog type/version metadata
 │       ├── schema_templates.py # New bolt and anchor database templates
 │       └── staging.py          # Upload/export file pairing
-├── tests/                     # Pytest: view-model mapping + route smoke tests
+├── tests/                     # Pytest: view models, drawing styles, row tokens, routes
 ├── samples/                   # Example mdf/ldf catalog pairs (tracked)
 ├── docs/
 │   ├── images/
+│   ├── drawing-style-schema.md # Drawing Style Manager export structure
 │   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
 ├── db_inspect.py
 ├── diagnose_sets.py
@@ -368,6 +394,16 @@ Planned views include:
 - guided configuration for supported anchor families instead of direct foreign-key entry;
 - immediate relationship and completeness checks;
 - a final "what Advance Steel will receive" preview before saving.
+
+### Drawing styles
+
+Next steps for the drawing-style editor:
+
+- confirm that an edited style imports cleanly through the Drawing Style Manager, and how same-name styles are handled;
+- clone a whole style inside one export, so several variants can ship in one file;
+- edit dimension point selections and arranger strategies with the same dropdowns;
+- label the Advance Steel built-in values (geometric restrictions, object qualifiers, box modes) once they are verified against a live install;
+- styles that use detail processes (`DetailProcess*` tables, empty in the first sample).
 
 ### Catalog intelligence and comparison
 
