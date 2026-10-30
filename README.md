@@ -48,7 +48,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
-| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules, label formulas, integrity check, schematic figures (scale, view box, clipping, dimension chains) |
+| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains) |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -112,8 +112,9 @@ Open [http://localhost:5050](http://localhost:5050).
 ### Run the tests
 
 The suite needs no SQL Server. It covers the bolt-set view model and the dimensioned
-assembly profile, drawing-style label parsing and schematic figures, the fabrication
-sheet model, staging cleanup, connection timeouts, and route smoke tests:
+assembly profile, drawing-style label parsing, schematic figures and the htmx rule
+partials, the fabrication sheet model, staging cleanup, connection timeouts, and route
+smoke tests:
 
 ```bash
 pip install -r requirements-dev.txt   # adds pytest

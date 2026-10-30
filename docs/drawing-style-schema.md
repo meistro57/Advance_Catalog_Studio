@@ -120,6 +120,17 @@ Two readings above are interpretation, not source data: the box extents as
 "front/behind around a plane", and the clipping columns as the distances drawn.
 Both are called out in the figure footers.
 
+## Editor behaviour (htmx)
+
+The editor page edits rules in place. Rule buttons post `op=action:map:order`
+to `/db/<db>/drawing-style/rule`; an `HX-Request` post gets back just that
+map's rules block (`templates/_drawing_rules.html`, built from
+`drawing_styles.repr_block`), so reordering never reloads the page. Flashes
+come back as out-of-band swaps into `#flashHost`, and plain form posts still
+redirect to `#rules-<map>` for the no-JavaScript path. htmx is vendored at
+`static/vendor/htmx/htmx.min.js` (no CDN, no build step). Field saves post the
+whole form and answer with flashes only.
+
 ## Not verified yet
 
 - How the Drawing Style Manager import handles a style whose name already

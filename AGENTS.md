@@ -33,9 +33,9 @@ and display-name token replacement.
   `catalog_studio/requirements.txt` (only `Flask` and `pymssql`).
 - Dev-only test dependency (`pytest`) is in `requirements-dev.txt`; run the
   suite with `venv/bin/python -m pytest tests/`. All tests are unit/route tests
-  (bolt-set view model and profile drawing, drawing-style label parsing and
-  figures, fabrication sheet model, staging cleanup, connection timeouts) —
-  no database needed.
+  (bolt-set view model and profile drawing, drawing-style label parsing,
+  figures and htmx rule partials, fabrication sheet model, staging cleanup,
+  connection timeouts) — no database needed.
 - **No linter, no CI, no Makefile, no packaging config exist.** Verification
   is manual against the Docker SQL Server (plus the pytest suite).
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
