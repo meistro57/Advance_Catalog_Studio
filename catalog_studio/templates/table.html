@@ -44,7 +44,8 @@
         <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#findReplaceModal">
             Find &amp; Replace
         </button>
-        {% if pk_col %}
+        {% if pk_cols %}
+        {% if pk_cols|length > 1 %}<span class="badge bg-info text-dark" title="Rows are addressed by all key columns together">key: {{ pk_cols|join(' + ') }}</span>{% endif %}
         <a class="btn btn-sm btn-primary" href="/db/{{ database }}/{{ table }}/add">+ Add Row</a>
         {% else %}
         <span class="badge bg-secondary">no primary key detected — read only</span>
@@ -97,21 +98,21 @@
 <table class="table table-sm table-bordered data-table mb-0" id="dataTable">
     <thead>
         <tr>
-            {% for col in columns %}<th>{{ col }}</th>{% endfor %}
-            {% if pk_col %}<th>Actions</th>{% endif %}
+            {% for col in columns %}<th>{{ col }}{% if style_relations and (table, col) in style_relations and style_relations[(table, col)].local %}<br><span class="fw-normal small text-info">&rarr; {{ style_relations[(table, col)].table }}</span>{% endif %}</th>{% endfor %}
+            {% if pk_cols %}<th>Actions</th>{% endif %}
         </tr>
     </thead>
     <tbody>
     {% for row in rows %}
         <tr>
             {% for col in columns %}<td>{{ row[col] if row[col] is not none else '' }}</td>{% endfor %}
-            {% if pk_col %}
+            {% if pk_cols %}{% set tok = row_tokens[loop.index0] %}
             <td class="text-nowrap">
-                <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/edit">Edit</a>
-                <form action="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/duplicate" method="post" class="d-inline">
+                <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/{{ table }}/{{ tok }}/edit">Edit</a>
+                <form action="/db/{{ database }}/{{ table }}/{{ tok }}/duplicate" method="post" class="d-inline">
                     <button class="btn btn-sm btn-outline-success" type="submit">Duplicate</button>
                 </form>
-                <form action="/db/{{ database }}/{{ table }}/{{ row[pk_col] }}/delete" method="post" class="d-inline"
+                <form action="/db/{{ database }}/{{ table }}/{{ tok }}/delete" method="post" class="d-inline"
                       onsubmit="return confirm('Delete this row?');">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                 </form>

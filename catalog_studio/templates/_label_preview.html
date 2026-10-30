@@ -1,0 +1,27 @@
+{#- Renders drawing_styles.parse_label_format() output: a mock of how an
+    Advance Steel label/title formula reads on paper, with sample values. -#}
+<div class="label-preview">
+{%- for line in p.lines %}
+  <div class="lp-line">
+  {%- for s in line -%}
+    {%- if s.kind == 'frame_open' -%}<span class="lp-frame">
+    {%- elif s.kind == 'frame_close' -%}</span>
+    {%- else -%}
+      {%- set fs = (s.height * 3.4) if s.height else 14 -%}
+      <span class="lp-{{ s.kind }}{% if s.kind == 'field' and not s.known %} lp-unknown{% endif %}"
+            style="font-size:{{ [fs, 9]|max }}px;{% if s.bold %}font-weight:700;{% endif %}{% if s.underline %}text-decoration:underline;{% endif %}{% if s.color %}color:{{ s.color }};{% endif %}"
+            {% if s.kind == 'field' %}title="%{{ s.field }}"{% endif %}>
+        {%- if s.kind == 'field' %}{{ s.sample }}{% else %}{{ s.text }}{% endif -%}
+      </span>
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if not line %}&nbsp;{% endif -%}
+  </div>
+{%- endfor %}
+{%- if not p.lines or (p.lines|length == 1 and not p.lines[0]) %}<span class="text-muted small">(empty)</span>{% endif %}
+</div>
+{%- if p.fields %}
+<div class="small mt-1">
+  {%- for f in p.fields|unique %}<code class="me-1">%{{ f }}</code>{% endfor %}
+</div>
+{%- endif %}

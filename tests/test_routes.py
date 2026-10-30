@@ -68,3 +68,34 @@ def test_anchor_payload_rejects_bad_ids():
     client = app.test_client()
     resp = client.get("/db/SomeDb/anchor-configurator/payload?anchor_id=abc&def_id=1")
     assert resp.status_code == 400
+
+
+def test_drawing_style_routes_registered():
+    from app import app
+    endpoints = {r.endpoint for r in app.url_map.iter_rules()}
+    for ep in ("drawing_style", "drawing_style_save", "drawing_style_rule", "drawing_style_label_preview"):
+        assert ep in endpoints
+
+
+def test_drawing_style_redirects_for_non_style(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "bolt")
+    resp = app.test_client().get("/db/SomeBolt/drawing-style")
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/db/SomeBolt")
+
+
+def test_drawing_style_writes_require_csrf():
+    from app import app
+    client = app.test_client()
+    assert client.post("/db/X/drawing-style/save", data={}).status_code == 400
+    assert client.post("/db/X/drawing-style/rule", data={"op": "delete:1:0"}).status_code == 400
+
+
+def test_label_preview_renders_without_db():
+    from app import app
+    resp = app.test_client().post(
+        "/db/X/drawing-style/label-preview", data={"content": "#Rounded%Position#End#Newline%Name"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "lp-frame" in body and "b104" in body and "BEAM" in body

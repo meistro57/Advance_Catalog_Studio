@@ -78,6 +78,15 @@ and display-name token replacement.
   canonical upload dir), scan stats for the confirmation dialogs, and
   recoverable removal — files move into `uploads/.trash` and only an explicit
   purge deletes them. Fully unit-tested.
+- `catalog_studio/utils/drawing_styles.py` — Drawing Style Manager exports
+  (`catalog_type == "drawing style"`). Reads the export's own
+  `InfoTableRelations` map (+ `SUPPLEMENTARY_RELATIONS` fixes), builds the
+  style tree for `templates/drawing_style.html`, parses label formulas
+  (`parse_label_format`), converts mm <-> ft-in (`format_ft_in`/`parse_length`),
+  reorders representation rules (`(Key, Order)` swaps through a temp Order),
+  and runs `integrity_report`. Pure helpers are unit-tested in
+  `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
+  Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_sets.py` — bolt-set view model for the graphical
@@ -117,6 +126,16 @@ and display-name token replacement.
 - Root-level `*.py` (`db_inspect.py`, `export_catalog.py`, etc.) — one-off
   diagnostic/export scripts. They do **not** import from `catalog_studio`;
   each hardcodes its own connection settings, target database, and SQL.
+
+## Primary keys (critical)
+
+Advance Steel tables frequently have COMPOSITE primary keys (bolt: `SetBolts`,
+`ScrewNew`, `SetNutsBolts`, `BoltsDistances`; style: `DetObjReprMapItems`,
+`DetViewDimStrategyItems`, `DetailMasterTable`). Always address rows with
+`db.get_primary_key_columns()` + a full pk dict; URLs carry
+`db.make_row_token()` (raw value for single keys, `pk~<base64 json>` for
+composite). `db.update_row`/`db.delete_row` roll back unless exactly one row
+changes. `db.guess_primary_key()` now returns None for composite keys.
 
 ## Import convention (critical)
 

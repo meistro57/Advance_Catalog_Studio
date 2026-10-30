@@ -1,0 +1,387 @@
+<!-- templates/drawing_style.html -->
+{% extends "base.html" %}
+{% block title %}Drawing Style &mdash; {{ database }}{% endblock %}
+{% block content %}
+<style>
+  .ds-card { background:#fff; border:0; box-shadow:0 1px 3px rgba(0,0,0,.08); border-radius:.5rem; margin-bottom:1.25rem; }
+  .ds-card > .card-header { background:#212529; color:#fff; border-radius:.5rem .5rem 0 0; }
+  .ds-sub { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:#6c757d; font-weight:700; margin:1rem 0 .4rem; }
+  .ds-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:.6rem 1rem; }
+  .ds-grid label { font-size:.75rem; color:#495057; margin-bottom:0; }
+  .ds-hint { font-size:.72rem; color:#6c757d; }
+  .ds-rules td, .ds-rules th { white-space:nowrap; vertical-align:middle; font-size:.82rem; }
+  .ds-rules select { min-width:210px; }
+  .ds-rules .rule-label code { display:none; }
+  .ds-rules tr.changed { background:#fff3cd !important; }
+  .ds-rules .ord { color:#6c757d; width:2.5rem; }
+  input.changed, select.changed, textarea.changed { border-color:#fd7e14; box-shadow:0 0 0 .15rem rgba(253,126,20,.25); }
+  .label-preview { background:#fafafa; border:1px dashed #ced4da; border-radius:.3rem; padding:.35rem .6rem; font-family:"Arial Narrow",Arial,sans-serif; line-height:1.15; min-height:1.8rem; }
+  .lp-field { background:#e7f1ff; border-radius:2px; padding:0 2px; }
+  .lp-field.lp-unknown { background:#ffe5d0; }
+  .lp-frame { border:1.5px solid #333; border-radius:.6em; padding:0 .3em; }
+  .lp-cmd { color:#adb5bd; font-family:monospace; font-size:11px !important; }
+  .rule-label { max-width:240px; }
+  .rule-label .label-preview { padding:.1rem .35rem; min-height:0; font-size:11px; }
+  #saveBar { position:sticky; bottom:0; z-index:20; }
+  .ds-toc a { text-decoration:none; }
+  textarea.formula { font-family:monospace; font-size:.8rem; }
+</style>
+
+{% macro fld(table, token, col, value, kind='text', opts=None, rows=2, help=None, label=None, cls='', compact=false) -%}
+  {%- set name = table ~ '::' ~ token ~ '::' ~ col -%}
+  {%- if kind == 'length' -%}
+    {%- set ft = ftin(value) -%}
+    {%- set shown = ft if (ft and not ft.startswith('≈')) else (value if value is not none else '') -%}
+  {%- else -%}
+    {%- set shown = value if value is not none else '' -%}
+  {%- endif -%}
+  <div class="{{ cls }}">
+    {% if label is not none %}<label>{{ label or col }}</label>{% endif %}
+    <input type="hidden" name="o::{{ name }}" value="{{ shown }}">
+    {%- if kind == 'select' %}
+      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
+        {%- set ns = namespace(found=false) -%}
+        {%- for v, l in (opts or []) %}
+          {%- if v|string == shown|string %}{% set ns.found = true %}{% endif %}
+          <option value="{{ v }}" {% if v|string == shown|string %}selected{% endif %}>{{ l }}</option>
+        {%- endfor %}
+        {%- if not ns.found %}<option value="{{ shown }}" selected>{{ shown if shown != '' else '(blank)' }}{% if shown|string in ('', '0', '-1') %} — none{% else %} (current){% endif %}</option>{% endif %}
+      </select>
+    {%- elif kind == 'bool' %}
+      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
+        {%- for v in ['True','False'] %}<option value="{{ v }}" {% if shown|string == v %}selected{% endif %}>{{ 'Yes' if v == 'True' else 'No' }}</option>{% endfor %}
+      </select>
+    {%- elif kind == 'formula' %}
+      <textarea name="f::{{ name }}" rows="{{ rows }}" class="form-control form-control-sm formula ds-in live-label" data-orig="{{ shown }}">{{ shown }}</textarea>
+      <div class="live-target mt-1"></div>
+    {%- else %}
+      <input name="f::{{ name }}" value="{{ shown }}" class="form-control form-control-sm ds-in" data-orig="{{ shown }}">
+    {%- endif %}
+    {% if kind == 'length' %}<div class="ds-hint">{{ ((value|float)|round(3)) if value is not none else "" }} mm{% if not compact %}{% if ft %} · {{ ft }}{% endif %} — type mm or ft-in (2'-6 1/2"){% endif %}</div>{% endif %}
+    {% if help %}<div class="ds-hint">{{ help }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="mb-0">&#128208; Drawing Style Editor <small class="text-muted">{{ database }}</small>
+    {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
+  </h4>
+  <div class="d-flex gap-2">
+    <a href="/db/{{ database }}" class="btn btn-sm btn-outline-secondary">Raw tables</a>
+    <form method="post" action="/db/{{ database }}/detach" onsubmit="return confirm('Detach and export the mdf/ldf? Unsaved edits on this page will be lost.');">
+      <button class="btn btn-sm btn-success">&#11015; Detach &amp; Export mdf/ldf</button>
+    </form>
+  </div>
+</div>
+
+{# ---------------- integrity ---------------- #}
+{% if report.dangling or report.notes %}
+<div class="alert alert-warning">
+  <strong>&#9888; Integrity check:</strong> {{ report.dangling|length }} dangling reference(s), {{ report.notes|length }} note(s)
+  <ul class="mb-0 small">
+  {% for d in report.dangling %}<li><code>{{ d.table }}.{{ d.column }}</code> &rarr; {{ d.target }}: missing {{ d.missing|join(', ') }}</li>{% endfor %}
+  {% for n in report.notes %}<li>{{ n }}</li>{% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="alert alert-success py-2 small mb-3">&#10004; Integrity check: {{ report.checked }} in-file relations checked, no dangling references. Safe to export.</div>
+{% endif %}
+
+<div class="ds-toc small mb-3">
+  Jump to:
+  {% for m in tree.masters %}{% if m.style %}{% for r in m.style.requests %}{% if not r.missing %}
+    <a href="#req-{{ r.row.Key }}" class="badge bg-light text-dark border">{{ r.row.RunName }}</a>
+    <a href="#rules-{{ r.row.ObjReprMap }}" class="badge bg-light text-dark border">Representation rules</a>
+  {% endif %}{% endfor %}{% endif %}{% endfor %}
+  <a href="#lib" class="badge bg-light text-dark border">Label formulas &amp; libraries</a>
+</div>
+
+<form id="ruleForm" method="post" action="/db/{{ database }}/drawing-style/rule">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+</form>
+
+<form id="styleForm" method="post" action="/db/{{ database }}/drawing-style/save">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<input type="hidden" name="anchor" id="anchorField" value="">
+
+{% for m in tree.masters %}
+{# ---------------- style identity ---------------- #}
+<div class="card ds-card">
+  <div class="card-header d-flex justify-content-between">
+    <span>&#127991; Style: <strong>{{ m.row.RunName }}</strong></span>
+    <span class="small text-white-50">Master #{{ m.row.Key }} &middot; category {{ m.row.BaseCategory }}/{{ m.row.SubCategory }}</span>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-light border small py-2 mb-2">
+      &#128161; Want a variant instead of overwriting? Rename it here before exporting, then import the copy beside your original.
+      (How Advance Steel's importer treats a same-name style hasn't been tested yet &mdash; renaming avoids the question.)
+    </div>
+    <div class="ds-grid">
+      {{ fld('DetailMasterTable', m.token, 'RunName', m.row.RunName, label='Name in style picker') }}
+      {{ fld('DetailMasterTable', m.token, 'OwnerText', m.row.OwnerText, label='Owner') }}
+      {{ fld('DetailMasterTable', m.token, 'AvailableInDSVault', m.row.AvailableInDSVault, 'bool', label='Available in vault') }}
+      {{ fld('DetailMasterTable', m.token, 'ExamplePicture', m.row.ExamplePicture, label='Example picture') }}
+    </div>
+    <div class="mt-2">{{ fld('DetailMasterTable', m.token, 'HelpText', m.row.HelpText, label='Help text') }}</div>
+
+    {% if m.style %}{% set s = m.style %}
+    <div class="ds-sub">Detail style #{{ s.row.Key }}</div>
+    <div class="ds-grid">
+      {{ fld('DetailStyle', s.token, 'RunName', s.row.RunName, label='Style name') }}
+      {{ fld('DetailStyle', s.token, 'ScaleFormat', s.row.ScaleFormat, label='Scale format') }}
+      {{ fld('DetailStyle', s.token, 'DateFormat', s.row.DateFormat, label='Date format') }}
+      {{ fld('DetailStyle', s.token, 'TitlePosition', s.row.TitlePosition, label='Title position (AS enum)') }}
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'TitleFormat', s.row.TitleFormat, 'formula', rows=3, label='View title formula') }}</div>
+      <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'CutViewTitleFormat', s.row.CutViewTitleFormat, 'formula', rows=3, label='Cut-view title formula') }}</div>
+    </div>
+
+    {% for r in s.requests %}
+    {% if r.missing %}
+      <div class="alert alert-danger mt-3">View request #{{ r.missing }} is referenced but not in this file.</div>
+    {% else %}
+    {# ---------------- view request ---------------- #}
+    <div class="border rounded p-3 mt-3" id="req-{{ r.row.Key }}">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">&#128065; View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
+        <a class="small" href="/db/{{ database }}/DetViewRequest/{{ r.token }}/edit?return_to=/db/{{ database }}/drawing-style">all fields &rarr;</a>
+      </div>
+      <div class="ds-grid mt-2">
+        {{ fld('DetViewRequest', r.token, 'RunName', r.row.RunName, label='View name') }}
+        {{ fld('DetViewRequest', r.token, 'Scale', r.row.Scale, 'select', scale_choices, label='Scale') }}
+        {{ fld('DetViewRequest', r.token, 'CalloutTitleTemplate', r.row.CalloutTitleTemplate, label='Callout title template') }}
+        {{ fld('DetViewRequest', r.token, 'UsedForCutsAndCallouts', r.row.UsedForCutsAndCallouts, 'select', [(1,'Yes'),(0,'No')], label='Used for cuts & callouts') }}
+        {{ fld('DetViewRequest', r.token, 'ObjReprMap', r.row.ObjReprMap, 'select', options.DetViewRequest.ObjReprMap, label='Representation map') }}
+        {{ fld('DetViewRequest', r.token, 'DimStrategy', r.row.DimStrategy, 'select', options.DetViewRequest.DimStrategy, label='Dimension strategy') }}
+      </div>
+
+      {% if r.sysbox %}{% set b = r.sysbox %}
+      <div class="ds-sub">View box &mdash; {{ b.row.RunName }}</div>
+      <div class="ds-grid">
+        {{ fld('DetViewSystemAndBox', b.token, 'RunName', b.row.RunName, label='Box preset name') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'zDeltaFront', b.row.zDeltaFront, 'length', label='Depth in front') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'zDeltaRear', b.row.zDeltaRear, 'length', label='Depth behind') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'xDelta', b.row.xDelta, 'length', label='X extend') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'yDelta', b.row.yDelta, 'length', label='Y extend') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'xyMode', b.row.xyMode, label='XY mode (AS enum)') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'zMode', b.row.zMode, label='Z mode (AS enum)') }}
+        {{ fld('DetViewSystemAndBox', b.token, 'EnlargeByEnv', b.row.EnlargeByEnv, 'bool', label='Enlarge by environment') }}
+      </div>
+      {% endif %}
+
+      {% if r.clip %}{% set c = r.clip %}
+      <div class="ds-sub">Length clipping &mdash; {{ c.row.RunName }}</div>
+      <div class="ds-grid">
+        {{ fld('DetViewLengthClip', c.token, 'X Clip', c.row['X Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in X') }}
+        {{ fld('DetViewLengthClip', c.token, 'Y Clip', c.row['Y Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in Y') }}
+        {{ fld('DetViewLengthClip', c.token, 'MinRemainingLength', c.row.MinRemainingLength, 'length', label='Min remaining length') }}
+        {{ fld('DetViewLengthClip', c.token, 'MinClipIntervalLength', c.row.MinClipIntervalLength, 'length', label='Min clip interval') }}
+        {{ fld('DetViewLengthClip', c.token, 'Extension', c.row.Extension, 'length', label='Extension') }}
+        {{ fld('DetViewLengthClip', c.token, 'ClippingGap', c.row.ClippingGap, label='Clipping gap (units unverified)') }}
+      </div>
+      {% endif %}
+
+      {# ---------------- representation rules ---------------- #}
+      <div class="ds-sub d-flex justify-content-between align-items-end" id="rules-{{ r.row.ObjReprMap }}">
+        <span>Representation rules &mdash; {{ r.repr_map.row.RunName if r.repr_map else '?' }} ({{ r.repr_items|length }})</span>
+        <button form="ruleForm" name="op" value="renumber:{{ r.row.ObjReprMap }}:0" class="btn btn-sm btn-outline-secondary py-0">Renumber</button>
+      </div>
+      <div class="ds-hint mb-1">Rules run top to bottom; each object set is drawn by the first rule that matches it. Repeated sets with a different
+        geometric restriction (AS built-in enum, shown as a number) handle the special cases before the catch-all.</div>
+      <div class="table-responsive">
+      <table class="table table-sm table-hover ds-rules mb-0">
+        <thead class="table-light"><tr>
+          <th>#</th><th>Object set</th><th>Geom.</th><th>Appearance</th><th>Label</th><th>Label preview</th><th>Linetype</th><th>Simpl. gap</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for it in r.repr_items %}
+          <tr>
+            <td class="ord">{{ it.row.Order }}</td>
+            <td>{{ fld('DetObjReprMapItems', it.token, 'ObjQualifier', it.row.ObjQualifier, 'select', options.DetObjReprMapItems.ObjQualifier) }}</td>
+            <td style="width:4.5rem">{{ fld('DetObjReprMapItems', it.token, 'GeometricRestrictions', it.row.GeometricRestrictions) }}</td>
+            <td>{{ fld('DetObjReprMapItems', it.token, 'Appearance', it.row.Appearance, 'select', options.DetObjReprMapItems.Appearance) }}</td>
+            <td>{{ fld('DetObjReprMapItems', it.token, 'AnnotationStrategy', it.row.AnnotationStrategy, 'select', options.DetObjReprMapItems.AnnotationStrategy) }}</td>
+            <td class="rule-label">{% if it.label and it.label.fields %}{% with p = it.label %}{% include "_label_preview.html" %}{% endwith %}{% endif %}</td>
+            <td>{{ fld('DetObjReprMapItems', it.token, 'LineType', it.row.LineType, 'select', options.DetObjReprMapItems.LineType) }}</td>
+            <td style="width:6.5rem">{{ fld('DetObjReprMapItems', it.token, 'SimplifiedGap', it.row.SimplifiedGap, 'length', compact=true) }}</td>
+            <td class="text-nowrap">
+              <button form="ruleForm" name="op" value="up:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-secondary py-0" title="Move up" {% if loop.first %}disabled{% endif %}>&uarr;</button>
+              <button form="ruleForm" name="op" value="down:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-secondary py-0" title="Move down" {% if loop.last %}disabled{% endif %}>&darr;</button>
+              <button form="ruleForm" name="op" value="copy:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-success py-0" title="Copy below">&#10697;</button>
+              <button form="ruleForm" name="op" value="delete:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-danger py-0" title="Delete"
+                      onclick="return confirm('Delete rule {{ it.row.Order }} ({{ it.qset_name }})?');">&times;</button>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      {# ---------------- dimensions ---------------- #}
+      {% if r.dims %}
+      <div class="ds-sub">Dimensions &mdash; {{ r.dim_strategy.row.RunName if r.dim_strategy else '' }}</div>
+      <table class="table table-sm small mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Dimension request</th><th>Direction</th><th>Above</th><th>Points</th></tr></thead>
+        <tbody>
+        {% for d in r.dims %}
+          <tr>
+            <td>{{ d.row.Order }}</td>
+            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName) }}{% else %}#{{ d.row.RequestLinear }}{% endif %}</td>
+            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y')]) }}{% endif %}</td>
+            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool') }}{% endif %}</td>
+            <td>{{ d.points|join(', ') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{# ---------------- libraries ---------------- #}
+<div class="card ds-card" id="lib">
+  <div class="card-header">&#128218; Label formulas &amp; libraries</div>
+  <div class="card-body">
+    <ul class="nav nav-tabs small" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-labels" type="button">Label formulas</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-strat" type="button">Label strategies</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-app" type="button">Appearances</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-sets" type="button">Object sets</button></li>
+    </ul>
+    <div class="tab-content pt-3">
+      <div class="tab-pane fade show active" id="t-labels">
+        <div class="ds-hint mb-2">
+          Tokens: <code>%Field</code> = model property &middot; <code>#Newline</code> &middot; <code>#Height(mm)</code> &middot;
+          <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed.
+          Preview uses sample values; orange fields aren't in the sample list (still fine in AS).
+        </div>
+        {% for e in tree.libraries.get('DetAnnotationType', []) %}
+        <div class="row g-2 mb-3 border-bottom pb-2">
+          <div class="col-md-3">
+            {{ fld('DetAnnotationType', e.token, 'RunName', e.row.RunName, label='Name #' ~ e.row.Key) }}
+            <div class="ds-hint">Object qualifier: {{ e.row.ObjectQualifier }} (AS enum)</div>
+            <a class="small" href="/db/{{ database }}/DetAnnotationType/{{ e.token }}/duplicate"
+               onclick="event.preventDefault(); if(confirm('Duplicate this label formula as a new entry?')){ const f=document.createElement('form'); f.method='post'; f.action=this.href; document.body.appendChild(f); f.submit(); }">duplicate as new &rarr;</a>
+          </div>
+          <div class="col-md-9">{{ fld('DetAnnotationType', e.token, 'Content', e.row.Content, 'formula', rows=2, label='Formula') }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="tab-pane fade" id="t-strat">
+        <table class="table table-sm small">
+          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Label formula</th><th>Arranger</th><th>Group</th><th>On object</th><th>Merge dist</th></tr></thead>
+          <tbody>
+          {% for e in tree.libraries.get('DetObjAnnotationStrategy', []) %}
+            <tr>
+              <td>{{ e.row.Key }}</td>
+              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'RunName', e.row.RunName) }}</td>
+              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'AnnotationType', e.row.AnnotationType, 'select', options.DetObjAnnotationStrategy.AnnotationType) }}</td>
+              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'ArrangerStrategy', e.row.ArrangerStrategy, 'select', options.DetObjAnnotationStrategy.ArrangerStrategy) }}</td>
+              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'Group', e.row.Group, 'select', options.DetObjAnnotationStrategy.Group) }}</td>
+              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'SystemByObject', e.row.SystemByObject, 'bool') }}</td>
+              <td style="width:6rem">{{ fld('DetObjAnnotationStrategy', e.token, 'MergeMaxDist', e.row.MergeMaxDist) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tab-pane fade" id="t-app">
+        <div class="ds-hint mb-2">Body/axis/symbol columns are AS built-in display settings (numbers). Hatch columns resolve to this file's hatch presets.</div>
+        <table class="table table-sm small">
+          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th></th></tr></thead>
+          <tbody>
+          {% for e in tree.libraries.get('DetObjAppearance', []) %}
+            <tr>
+              <td>{{ e.row.Key }}</td>
+              <td>{{ fld('DetObjAppearance', e.token, 'RunName', e.row.RunName) }}</td>
+              <td>{{ e.row.BodyVisible }}</td><td>{{ e.row.BodyHidden }}</td><td>{{ e.row.Axis }}</td><td>{{ e.row.CutFacesFront }}</td>
+              <td>{{ fld('DetObjAppearance', e.token, 'HatchVisible', e.row.HatchVisible, 'select', options.DetObjAppearance.HatchVisible) }}</td>
+              <td>{{ fld('DetObjAppearance', e.token, 'HatchHidden', e.row.HatchHidden, 'select', options.DetObjAppearance.HatchHidden) }}</td>
+              <td><a href="/db/{{ database }}/DetObjAppearance/{{ e.token }}/edit?return_to=/db/{{ database }}/drawing-style">all &rarr;</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tab-pane fade" id="t-sets">
+        <div class="ds-hint mb-2">Object sets select what a rule applies to: AS object-type numbers plus optional model roles.</div>
+        <table class="table table-sm small">
+          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Members (object type · model role)</th></tr></thead>
+          <tbody>
+          {% for e in tree.libraries.get('DetObjQualifierSet', []) %}
+            <tr>
+              <td>{{ e.row.Key }}</td>
+              <td>{{ fld('DetObjQualifierSet', e.token, 'RunName', e.row.RunName) }}</td>
+              <td>{% for it in tree.qset_items.get(e.row.Key, []) %}<span class="badge bg-light text-dark border me-1">{{ it.ObjQualifier }}{% if it.ModelRole %} · {{ it.ModelRole }}{% endif %}</span>{% endfor %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="saveBar" class="bg-dark text-white rounded p-2 d-flex justify-content-between align-items-center shadow">
+  <span id="dirtyMsg" class="small text-white-50">No unsaved changes.</span>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-sm btn-outline-light" onclick="location.reload()">Discard</button>
+    <button type="submit" class="btn btn-sm btn-warning fw-bold">&#128190; Save changes</button>
+  </div>
+</div>
+</form>
+
+<script>
+(function () {
+  const form = document.getElementById('styleForm');
+  const msg = document.getElementById('dirtyMsg');
+  function refresh() {
+    let n = 0;
+    form.querySelectorAll('.ds-in').forEach(el => {
+      const changed = el.value !== el.dataset.orig;
+      el.classList.toggle('changed', changed);
+      const tr = el.closest('tr'); if (tr) tr.classList.toggle('changed', !!tr.querySelector('.ds-in.changed'));
+      if (changed) n++;
+    });
+    msg.textContent = n ? n + ' unsaved change' + (n > 1 ? 's' : '') : 'No unsaved changes.';
+    msg.className = 'small ' + (n ? 'text-warning fw-bold' : 'text-white-50');
+    window.__dirty = n > 0;
+  }
+  form.addEventListener('input', refresh);
+  form.addEventListener('change', refresh);
+  form.addEventListener('submit', () => {
+    window.__dirty = false;
+    const sec = [...document.querySelectorAll('[id^="req-"],[id^="rules-"],#lib')]
+      .filter(e => e.getBoundingClientRect().top < window.innerHeight / 2).pop();
+    document.getElementById('anchorField').value = sec ? sec.id : '';
+  });
+  document.getElementById('ruleForm').addEventListener('submit', e => {
+    if (window.__dirty && !confirm('You have unsaved field edits. Rule actions reload the page and drop them. Continue?')) e.preventDefault();
+  });
+  window.addEventListener('beforeunload', e => { if (window.__dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  // live label preview
+  const csrf = form.querySelector('[name=csrf_token]').value;
+  function preview(ta) {
+    const target = ta.parentElement.querySelector('.live-target');
+    const body = new URLSearchParams({content: ta.value, csrf_token: csrf});
+    fetch('/db/{{ database }}/drawing-style/label-preview', {method: 'POST', body})
+      .then(r => r.text()).then(html => { target.innerHTML = html; });
+  }
+  document.querySelectorAll('.live-label').forEach(ta => {
+    let t; preview(ta);
+    ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => preview(ta), 250); });
+  });
+})();
+</script>
+{% endblock %}

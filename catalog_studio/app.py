@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
-from utils import staging_cleanup
+from utils import staging_cleanup, drawing_styles
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -585,12 +585,18 @@ def detach(database):
     ldf_filename = f"{database}_log.ldf"
     try:
         db_meta = metadata.get(database)
+        # Ask SQL Server where the files really live BEFORE detaching -- the
+        # physical names needn't match the database name, and docker cp needs
+        # an absolute in-container path.
+        files = db.get_physical_files(database)
+        if not files.get("mdf") or not files.get("ldf"):
+            raise RuntimeError(f"Couldn't find the physical mdf/ldf for '{database}'.")
         db.detach_database(database)
         docker_ops.copy_out_of_container(
-            f"{database}.mdf", os.path.join(config.EXPORT_DIR, mdf_filename)
+            files["mdf"], os.path.join(config.EXPORT_DIR, mdf_filename)
         )
         docker_ops.copy_out_of_container(
-            f"{database}_log.ldf", os.path.join(config.EXPORT_DIR, ldf_filename)
+            files["ldf"], os.path.join(config.EXPORT_DIR, ldf_filename)
         )
         as_version = db_meta.get("as_version", config.ADVANCE_STEEL_VERSION)
         flash(
@@ -615,7 +621,7 @@ def show_table(database, table):
         return redirect(url_for("show_database", database=database))
 
     columns = [c["COLUMN_NAME"] for c in db.get_columns(database, table)]
-    pk_col = db.guess_primary_key(database, table)
+    pk_cols = db.get_primary_key_columns(database, table)
 
     filter_col = request.args.get("filter_col", "")
     filter_op = request.args.get("filter_op", "=")
@@ -638,13 +644,17 @@ def show_table(database, table):
     else:
         rows = db.get_rows(database, table)
 
+    row_tokens = [db.make_row_token(r, pk_cols) for r in rows] if pk_cols else []
+
     return render_template(
         "table.html",
         database=database,
         table=table,
         columns=columns,
         rows=rows,
-        pk_col=pk_col,
+        row_tokens=row_tokens,
+        pk_cols=pk_cols,
+        style_relations=_style_relations_or_none(database),
         filter_col=filter_col,
         filter_op=filter_op,
         filter_val=filter_val,
@@ -689,15 +699,136 @@ def add_row(database, table):
     )
 
 
+# --------------------------------------------------------------------------
+# Drawing styles (Drawing Style Manager exports)
+# --------------------------------------------------------------------------
+
+def _style_relations_or_none(database):
+    """Relations map when this db is a drawing-style export, else None."""
+    try:
+        if drawing_styles.is_drawing_style(database):
+            return drawing_styles.load_relations(database)
+    except Exception:
+        pass
+    return None
+
+
+def _relation_options_for(database, table):
+    rels = _style_relations_or_none(database)
+    if not rels:
+        return {}
+    try:
+        return drawing_styles.options_for_table(database, table, rels)
+    except Exception:
+        return {}
+
+
+@app.route("/db/<database>/drawing-style")
+def drawing_style(database):
+    if db.guess_catalog_type(database) != "drawing style":
+        flash("This database isn't a drawing-style export.", "warning")
+        return redirect(url_for("show_database", database=database))
+    rels = drawing_styles.load_relations(database)
+    tree = drawing_styles.style_tree(database)
+    from collections import defaultdict
+    options = defaultdict(lambda: defaultdict(list))
+    for t, cols in drawing_styles.all_relation_options(database, rels).items():
+        options[t].update(cols)
+    report = drawing_styles.integrity_report(database, rels)
+    scale_choices = [
+        (1.0 / n, drawing_styles.scale_label(1.0 / n))
+        for n in drawing_styles.STANDARD_SCALE_DENOMINATORS
+    ]
+    return render_template(
+        "drawing_style.html", database=database, tree=tree, options=options,
+        report=report, meta=metadata.get(database), scale_choices=scale_choices,
+        length_cols=drawing_styles.LENGTH_COLUMNS, ftin=drawing_styles.format_ft_in,
+        scale_denom=drawing_styles.scale_denominator,
+    )
+
+
+@app.route("/db/<database>/drawing-style/save", methods=["POST"])
+def drawing_style_save(database):
+    if not _csrf_valid():
+        abort(400)
+    edits = []
+    for name, value in request.form.items():
+        if not name.startswith("f::"):
+            continue
+        parts = name.split("::")
+        if len(parts) != 4:
+            continue
+        _, table, token, col = parts
+        original = request.form.get("o::" + "::".join(parts[1:]))
+        if original is not None and original == value:
+            continue  # untouched; don't round-trip floats/text needlessly
+        edits.append((table, token, col, value))
+    if not edits:
+        flash("No changes.", "info")
+    else:
+        n, errors = drawing_styles.apply_field_edits(database, edits)
+        if n:
+            flash(f"Saved {len(edits) - len(errors)} field(s) across {n} record(s).", "success")
+        for e in errors:
+            flash(e, "danger")
+    anchor = request.form.get("anchor", "")
+    return redirect(url_for("drawing_style", database=database) + (f"#{anchor}" if anchor else ""))
+
+
+@app.route("/db/<database>/drawing-style/rule", methods=["POST"])
+def drawing_style_rule(database):
+    """Representation-rule actions. Buttons post op='action:key:order'."""
+    if not _csrf_valid():
+        abort(400)
+    key = ""
+    try:
+        action, key, order = request.form.get("op", "").split(":")
+        key, order = int(key), int(order)
+        if action in ("up", "down"):
+            drawing_styles.move_repr_item(database, key, order, -1 if action == "up" else 1)
+        elif action == "copy":
+            new_order = drawing_styles.insert_repr_item_after(database, key, order)
+            flash(f"Rule copied to position {new_order}.", "success")
+        elif action == "delete":
+            db.delete_row(database, "DetObjReprMapItems", {"Key": key, "Order": order})
+            drawing_styles.compact_repr_orders(database, key)
+            flash("Rule deleted.", "success")
+        elif action == "renumber":
+            drawing_styles.compact_repr_orders(database, key)
+            flash("Rule order renumbered.", "success")
+        else:
+            raise ValueError(f"unknown action {action!r}")
+    except Exception as e:
+        flash(f"Rule change failed: {e}", "danger")
+    return redirect(url_for("drawing_style", database=database) + f"#rules-{key}")
+
+
+@app.route("/db/<database>/drawing-style/label-preview", methods=["POST"])
+def drawing_style_label_preview(database):
+    content = request.form.get("content", "")
+    return render_template("_label_preview.html", p=drawing_styles.parse_label_format(content))
+
+
+def _resolve_row(database, table, pk_val):
+    """(pk_cols, pk dict) for a row token, or (None, error message)."""
+    pk_cols = db.get_primary_key_columns(database, table)
+    if not pk_cols:
+        return None, "No primary key column found — this table is read only here."
+    try:
+        return pk_cols, db.parse_row_token(pk_val, pk_cols)
+    except ValueError as e:
+        return None, str(e)
+
+
 @app.route("/db/<database>/<table>/<pk_val>/edit", methods=["GET", "POST"])
 def edit_row(database, table, pk_val):
     if table not in db.list_tables(database):
         flash("Unknown table.", "danger")
         return redirect(url_for("show_database", database=database))
 
-    pk_col = db.guess_primary_key(database, table)
-    if not pk_col:
-        flash("No primary key column found — can't edit rows in this table directly.", "warning")
+    pk_cols, pk = _resolve_row(database, table, pk_val)
+    if pk_cols is None:
+        flash(pk, "warning")
         return redirect(url_for("show_table", database=database, table=table))
 
     columns = db.get_columns(database, table)
@@ -706,18 +837,21 @@ def edit_row(database, table, pk_val):
         updates = {}
         for c in columns:
             name = c["COLUMN_NAME"]
-            if name == pk_col:
+            if name in pk_cols:
                 continue
             raw = request.form.get(name, "")
             updates[name] = db.coerce_value(raw, c["DATA_TYPE"])
         try:
-            db.update_row(database, table, pk_col, pk_val, updates)
+            db.update_row(database, table, pk, updates)
             flash("Row updated.", "success")
         except Exception as e:
             flash(f"Update failed: {e}", "danger")
-        return redirect(url_for("show_table", database=database, table=table))
+        return redirect(request.form.get("return_to") or url_for("show_table", database=database, table=table))
 
-    row = db.get_row(database, table, pk_col, pk_val)
+    row = db.get_row(database, table, pk)
+    if row is None:
+        flash("Row not found (or key matched more than one row).", "warning")
+        return redirect(url_for("show_table", database=database, table=table))
     return render_template(
         "row_form.html",
         database=database,
@@ -725,22 +859,27 @@ def edit_row(database, table, pk_val):
         columns=columns,
         row=row,
         mode="edit",
-        pk_col=pk_col,
-        pk_val=pk_val,
+        pk_cols=pk_cols,
+        relation_options=_relation_options_for(database, table),
+        return_to=request.args.get("return_to", ""),
     )
 
 
 @app.route("/db/<database>/<table>/<pk_val>/duplicate", methods=["POST"])
 def duplicate_row_route(database, table, pk_val):
-    pk_col = db.guess_primary_key(database, table)
-    if not pk_col:
-        flash("No primary key column found — can't duplicate rows in this table.", "warning")
+    pk_cols, pk = _resolve_row(database, table, pk_val)
+    if pk_cols is None:
+        flash(pk, "warning")
         return redirect(url_for("show_table", database=database, table=table))
     try:
-        new_id = db.duplicate_row(database, table, pk_col, pk_val)
-        if new_id is not None:
-            flash(f"Duplicated as new {pk_col}={new_id}. Edit it below.", "success")
-            return redirect(url_for("edit_row", database=database, table=table, pk_val=new_id))
+        new_pk = db.duplicate_row(database, table, pk_cols, pk)
+        if new_pk is not None:
+            label = ", ".join(f"{k}={v}" for k, v in new_pk.items())
+            flash(f"Duplicated as {label}. Edit it below.", "success")
+            return redirect(url_for(
+                "edit_row", database=database, table=table,
+                pk_val=db.make_row_token(new_pk, pk_cols),
+            ))
         flash("Duplicated. New row added to the bottom of the table.", "success")
     except Exception as e:
         flash(f"Duplicate failed: {e}", "danger")
@@ -749,16 +888,16 @@ def duplicate_row_route(database, table, pk_val):
 
 @app.route("/db/<database>/<table>/<pk_val>/delete", methods=["POST"])
 def delete_row_route(database, table, pk_val):
-    pk_col = db.guess_primary_key(database, table)
-    if not pk_col:
-        flash("No primary key column found — can't delete rows in this table.", "warning")
+    pk_cols, pk = _resolve_row(database, table, pk_val)
+    if pk_cols is None:
+        flash(pk, "warning")
         return redirect(url_for("show_table", database=database, table=table))
     try:
-        db.delete_row(database, table, pk_col, pk_val)
+        db.delete_row(database, table, pk)
         flash("Row deleted.", "success")
     except Exception as e:
         flash(f"Delete failed: {e}", "danger")
-    return redirect(url_for("show_table", database=database, table=table))
+    return redirect(request.form.get("return_to") or url_for("show_table", database=database, table=table))
 
 
 if __name__ == "__main__":

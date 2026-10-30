@@ -161,16 +161,24 @@ VIRTUAL_FILTERS = {
 }
 
 
-def get_row(database: str, table: str, pk_col: str, pk_val):
-    conn, cur = connect(database)
-    cur.execute(f"SELECT * FROM [{table}] WHERE [{pk_col}] = %s", (pk_val,))
-    row = cur.fetchone()
-    conn.close()
-    return row
+# --------------------------------------------------------------------------
+# Primary keys (single AND composite)
+#
+# Many Advance Steel tables have COMPOSITE primary keys -- e.g. SetBolts,
+# ScrewNew, SetNutsBolts, BoltsDistances in bolt catalogs, and
+# DetObjReprMapItems (Key, Order) / DetViewDimStrategyItems / DetailMasterTable
+# in drawing-style exports. Addressing a row by only the first PK column
+# silently edits/deletes EVERY row that shares it (54 representation rules
+# share Key=22001 in a typical style export). Every row operation below takes
+# a full pk dict and refuses to touch anything other than exactly one row.
+# --------------------------------------------------------------------------
+
+COMPOSITE_TOKEN_PREFIX = "pk~"
 
 
-def guess_primary_key(database: str, table: str):
-    """Prefer an actual PK/identity column; fall back to a column named ID."""
+def get_primary_key_columns(database: str, table: str) -> list:
+    """Ordered list of the table's primary-key columns. Falls back to ['ID']
+    when there is no declared PK but an ID column exists; [] otherwise."""
     conn, cur = connect(database)
     cur.execute("""
         SELECT c.name
@@ -179,13 +187,22 @@ def guess_primary_key(database: str, table: str):
         JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
         JOIN sys.tables t ON t.object_id = i.object_id
         WHERE t.name = %s AND i.is_primary_key = 1
+        ORDER BY ic.key_ordinal
     """, (table,))
-    row = cur.fetchone()
+    cols = [r["name"] for r in cur.fetchall()]
     conn.close()
-    if row:
-        return row["name"]
-    cols = [c["COLUMN_NAME"] for c in get_columns(database, table)]
-    return "ID" if "ID" in cols else None
+    if cols:
+        return cols
+    names = [c["COLUMN_NAME"] for c in get_columns(database, table)]
+    return ["ID"] if "ID" in names else []
+
+
+def guess_primary_key(database: str, table: str):
+    """Single-column PK name, or None when the PK is composite/missing.
+    Kept for callers that can only address rows by one column; anything that
+    edits rows should use get_primary_key_columns + a pk dict instead."""
+    cols = get_primary_key_columns(database, table)
+    return cols[0] if len(cols) == 1 else None
 
 
 def is_identity_column(database: str, table: str, column: str) -> bool:
@@ -215,12 +232,94 @@ def coerce_value(value, data_type: str):
     return value
 
 
-def update_row(database: str, table: str, pk_col: str, pk_val, updates: dict):
+def _jsonable(v):
+    if isinstance(v, (int, str)) or v is None:
+        return v
+    if isinstance(v, float):
+        return v
+    return str(v)  # Decimal, datetime, etc. -- SQL Server converts back implicitly
+
+
+def make_row_token(row: dict, pk_cols: list) -> str:
+    """URL path segment identifying one row. Single PK -> the raw value (keeps
+    old URLs working); composite -> 'pk~' + urlsafe-base64 JSON of all values."""
+    import base64
+    import json
+    if len(pk_cols) == 1:
+        return str(row[pk_cols[0]])
+    payload = json.dumps([_jsonable(row[c]) for c in pk_cols], separators=(",", ":"))
+    return COMPOSITE_TOKEN_PREFIX + base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+
+
+def parse_row_token(token: str, pk_cols: list) -> dict:
+    import base64
+    import json
+    if not pk_cols:
+        raise ValueError("Table has no primary key.")
+    if len(pk_cols) == 1:
+        return {pk_cols[0]: token}
+    if not token.startswith(COMPOSITE_TOKEN_PREFIX):
+        raise ValueError(
+            f"This table has a composite key ({', '.join(pk_cols)}); a single value "
+            "can't identify one row."
+        )
+    raw = token[len(COMPOSITE_TOKEN_PREFIX):]
+    raw += "=" * (-len(raw) % 4)
+    values = json.loads(base64.urlsafe_b64decode(raw.encode()).decode())
+    if not isinstance(values, list) or len(values) != len(pk_cols):
+        raise ValueError("Row token does not match this table's key.")
+    return dict(zip(pk_cols, values))
+
+
+def _pk_where(pk: dict):
+    if not pk:
+        raise ValueError("Empty primary key.")
+    clause = " AND ".join(f"[{c}] = %s" for c in pk)
+    return clause, list(pk.values())
+
+
+def get_row(database: str, table: str, pk: dict):
+    clause, params = _pk_where(pk)
     conn, cur = connect(database)
-    set_clause = ", ".join(f"[{c}] = %s" for c in updates)
-    values = list(updates.values()) + [pk_val]
-    cur.execute(f"UPDATE [{table}] SET {set_clause} WHERE [{pk_col}] = %s", values)
+    cur.execute(f"SELECT * FROM [{table}] WHERE {clause}", params)
+    rows = cur.fetchall()
     conn.close()
+    return rows[0] if len(rows) == 1 else None
+
+
+def _exactly_one(database: str, table: str, sql: str, params: list, action: str) -> int:
+    """Run a single-row UPDATE/DELETE inside a transaction and roll back if it
+    touches anything other than exactly one row."""
+    conn, cur = connect(database)
+    conn.autocommit(False)
+    try:
+        cur.execute(sql, params)
+        n = cur.rowcount
+        if n != 1:
+            conn.rollback()
+            raise ValueError(f"{action} would affect {n} rows in {table}; rolled back.")
+        conn.commit()
+        return n
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
+def update_row(database: str, table: str, pk: dict, updates: dict):
+    if not updates:
+        return 0
+    clause, pk_params = _pk_where(pk)
+    set_clause = ", ".join(f"[{c}] = %s" for c in updates)
+    return _exactly_one(
+        database, table,
+        f"UPDATE [{table}] SET {set_clause} WHERE {clause}",
+        list(updates.values()) + pk_params, "Update",
+    )
 
 
 def insert_row(database: str, table: str, values: dict):
@@ -235,44 +334,53 @@ def insert_row(database: str, table: str, values: dict):
     conn.close()
 
 
-def duplicate_row(database: str, table: str, pk_col: str, pk_val):
-    """Clone a row. If the PK is an IDENTITY column, SQL Server assigns the
-    new ID automatically. Otherwise we compute the next integer PK ourselves."""
-    row = get_row(database, table, pk_col, pk_val)
+def duplicate_row(database: str, table: str, pk_cols: list, pk: dict):
+    """Clone one row and return the new row's pk dict (None for IDENTITY PKs,
+    where SQL Server picks the value).
+
+    Single int PK -> MAX+1. Composite PK -> the LAST integer key column gets
+    MAX+1 scoped to the other key columns (e.g. DetObjReprMapItems keeps Key and
+    gets the next Order), so the copy lands in the same parent group."""
+    row = get_row(database, table, pk)
     if not row:
         return None
+    columns = {c["COLUMN_NAME"]: c["DATA_TYPE"] for c in get_columns(database, table)}
+    int_types = ("int", "bigint", "smallint", "tinyint")
 
-    conn, cur = connect(database)
-    identity = is_identity_column(database, table, pk_col)
+    if len(pk_cols) == 1 and is_identity_column(database, table, pk_cols[0]):
+        cols = [c for c in row.keys() if c != pk_cols[0]]
+        insert_row(database, table, {c: row[c] for c in cols})
+        return None
 
-    if identity or not pk_col:
-        cols = [c for c in row.keys() if c != pk_col] if pk_col else list(row.keys())
-        values = [row[c] for c in cols]
-        col_list = ", ".join(f"[{c}]" for c in cols)
-        placeholders = ", ".join(["%s"] * len(cols))
-        cur.execute(f"INSERT INTO [{table}] ({col_list}) VALUES ({placeholders})", values)
-        new_id = None
-    else:
-        cur.execute(f"SELECT MAX([{pk_col}]) AS max_id FROM [{table}]")
-        max_id = cur.fetchone()["max_id"] or 0
-        new_id = max_id + 1
-        cols = [c for c in row.keys() if c != pk_col]
-        values = [row[c] for c in cols]
-        col_list = ", ".join(f"[{c}]" for c in [pk_col] + cols)
-        placeholders = ", ".join(["%s"] * (len(cols) + 1))
-        cur.execute(
-            f"INSERT INTO [{table}] ({col_list}) VALUES ({placeholders})",
-            [new_id] + values,
+    bump = None
+    for c in reversed(pk_cols):
+        if columns.get(c) in int_types:
+            bump = c
+            break
+    if bump is None:
+        raise ValueError(
+            f"Can't auto-number a copy: no integer column in key ({', '.join(pk_cols)})."
         )
-
-    conn.close()
-    return new_id
-
-
-def delete_row(database: str, table: str, pk_col: str, pk_val):
+    scope = {c: row[c] for c in pk_cols if c != bump}
     conn, cur = connect(database)
-    cur.execute(f"DELETE FROM [{table}] WHERE [{pk_col}] = %s", (pk_val,))
+    if scope:
+        clause, params = _pk_where(scope)
+        cur.execute(f"SELECT MAX([{bump}]) AS m FROM [{table}] WHERE {clause}", params)
+    else:
+        cur.execute(f"SELECT MAX([{bump}]) AS m FROM [{table}]")
+    new_val = (cur.fetchone()["m"] or 0) + 1
     conn.close()
+
+    values = dict(row)
+    values[bump] = new_val
+    insert_row(database, table, values)
+    new_pk = {c: values[c] for c in pk_cols}
+    return new_pk
+
+
+def delete_row(database: str, table: str, pk: dict):
+    clause, params = _pk_where(pk)
+    return _exactly_one(database, table, f"DELETE FROM [{table}] WHERE {clause}", params, "Delete")
 
 
 # --------------------------------------------------------------------------
@@ -334,6 +442,9 @@ def guess_catalog_type(database: str) -> str:
         return "anchor"
     if "SetBolts" in tables:
         return "bolt"
+    # Drawing-style exports from the Drawing Style Manager (AstorDetails shape).
+    if "DetailStyle" in tables and "DetObjReprMapItems" in tables:
+        return "drawing style"
     return "unknown"
 
 
