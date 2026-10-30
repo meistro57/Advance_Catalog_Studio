@@ -32,12 +32,15 @@ and display-name token replacement.
 - Python 3.12 venv already exists at repo root (`venv/`); deps are
   `catalog_studio/requirements.txt` (only `Flask` and `pymssql`).
 - Dev-only test dependency (`pytest`) is in `requirements-dev.txt`; run the
-  suite with `venv/bin/python -m pytest tests/`. Tests are pure unit tests for
-  the bolt-set view-model mapping plus route smoke tests — no database needed.
+  suite with `venv/bin/python -m pytest tests/`. All tests are unit/route tests
+  (bolt-set view model and profile drawing, drawing-style label parsing and
+  figures, fabrication sheet model, staging cleanup, connection timeouts) —
+  no database needed.
 - **No linter, no CI, no Makefile, no packaging config exist.** Verification
   is manual against the Docker SQL Server (plus the pytest suite).
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
-  and be running. SQL Server `sa` password is hardcoded in
+  and be running (`docker start hilti-scratch-sql`; it is configured with
+  `--restart unless-stopped`). SQL Server `sa` password is hardcoded in
   `catalog_studio/config.py` (`Scratch2026!Pw`) and duplicated in every
   root-level CLI script.
 - Start the web app (port **5050**): `python catalog_studio/app.py`
@@ -61,9 +64,13 @@ and display-name token replacement.
 
 - `catalog_studio/app.py` — all Flask routes; entry point.
 - `catalog_studio/config.py` — paths, SQL connection, container name, AS version
-  (2026 only; `SUPPORTED_AS_VERSIONS = {2026}`).
+  (2026 only; `SUPPORTED_AS_VERSIONS = {2026}`), plus `DB_LOGIN_TIMEOUT` (5 s).
 - `catalog_studio/utils/db.py` — every SQL Server operation, generic table
-  browsing/editing, find & replace, and the diameter clone engine.
+  browsing/editing, find & replace, and the diameter clone engine. All
+  pymssql connections go through `_open_connection()` so a stopped container
+  fails in seconds instead of pymssql's 60 s default; never add a raw
+  `pymssql.connect` elsewhere. The dashboard checks the container first and
+  skips the database query when it is down.
 - `catalog_studio/utils/docker_ops.py` — shells out to `docker cp`/`exec`/
   `inspect` to move files in/out of the container.
 - `catalog_studio/utils/metadata.py` — per-database `catalog_type` and
@@ -87,8 +94,21 @@ and display-name token replacement.
   and runs `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
+- `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
+  schematic SVG figures (style overview, print-scale ruler, view box, length
+  clipping, dimension chain, hatch swatches) plus the page-level
+  `decorate_tree()` helper. Builders are pure and unit-tested; the page embeds them and redraws
+  live through `POST /db/<db>/drawing-style/diagram`, which reuses the same
+  builders so there is one geometry implementation (no JS twin). Keep the
+  "unverified" notes in the figures when touching them.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
+- `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the
+  same assembly (head/shank/hardware/clamped material, numbered balloons, part
+  legend, inch dimensions). Pure and unit-tested; the browser posts its current
+  layout to `POST /db/<db>/bolt-set-viewer/sketch` so the drawing always matches
+  the 3D preview, and the payload embeds the initial profile. Keep it schematic
+  and keep the "unverified" footer wording.
 - `catalog_studio/utils/bolt_sets.py` — bolt-set view model for the graphical
   bolt-set viewer (issue #1). Pure mapping functions (slot parsing,
   SetNutsBolts matching, Position interpretation, stack/grip layout, screw-rule
@@ -110,7 +130,11 @@ and display-name token replacement.
   keys); never switch to a CDN.
 - `catalog_studio/static/js/bolt-set-viewer.js`, `static/js/bolt-set-layout.js`,
   `static/css/bolt-set-viewer.css`, `templates/bolt_set_viewer.html` — the
-  Three.js viewer (Phase 1) + client-side assembly editor (Phase 2).
+  Three.js viewer (Phase 1) + client-side assembly editor (Phase 2). The page
+  is organised as 3D schematic / dimensioned profile / component table, with
+  perspective-orthographic toggle, part labels, an exploded slider, and
+  hover/selection sync between the 3D scene and the table (table↔3D sync lives
+  in `highlightSlot`/`selectSlot`).
 - `catalog_studio/static/js/anchor-configurator.js`,
   `templates/anchor_configurator.html` — the graphical anchor viewer
   (read-only; shares the bolt viewer CSS/import-map/Three.js vendor files).
@@ -165,8 +189,11 @@ which returns the normalized view model: bolt record, component stacks with
 server-computed y positions, side ("head"/"nut") and layer tags, schematic
 grip, screw rules, warnings, plus `catalog_parts` (every deduplicated
 SetNutsBolts record, keyed by Standard/Material/Diameter, for editor
-dropdowns). The page always shows a component table as an accessibility
-fallback; WebGL is optional.
+dropdowns) and `profile_svg`. The page always shows a component table as an
+accessibility fallback; WebGL is optional. The dimensioned profile is redrawn
+from the browser's draft layout through
+`POST /db/<db>/bolt-set-viewer/sketch` (CSRF-checked JSON, values clamped by
+`bolt_profile.sanitize_layout`), so the drawing has one implementation.
 
 Phase 2 (assembly editor) is a client-side preview layer: the viewer keeps a
 draft copy of the assembly and lets the user swap the component in each

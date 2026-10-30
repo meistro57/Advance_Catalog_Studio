@@ -11,23 +11,33 @@
     }
 }
 </script>
-<script>window.BOLT_DATABASE = {{ database|tojson }};</script>
+<script>
+    window.BOLT_DATABASE = {{ database|tojson }};
+    window.BOLT_CSRF = {{ csrf_token|tojson }};
+</script>
 
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
         <h4 class="mb-0">&#128295; Bolt-Set Viewer <span class="text-muted fs-6">(read-only)</span></h4>
-        <span class="text-muted small">Schematic assembly from catalog records &mdash; bolt, washers, nut, and clamped-material grip zone.</span>
+        <span class="text-muted small">One bolt set from <code>SetOfBolts</code>, its hardware records, and the clamped-material grip.</span>
     </div>
-    <span class="badge bg-secondary text-uppercase">bolt catalog</span>
+    <span class="badge bg-secondary text-uppercase align-self-center">bolt catalog</span>
 </div>
 
-<!-- Selection toolbar -->
+<div class="bs-help mb-3">
+    <div class="row g-2 small">
+        <div class="col-lg-4"><strong>3D schematic</strong><br>Shows how the parts stack: head, shank, washers, nut and the clamped material. Orbit, zoom, and hover a part to identify it.</div>
+        <div class="col-lg-4"><strong>Dimensioned profile</strong><br>A flat, dimensioned view of the same layout, in inches, with numbered part balloons. It follows your preview edits.</div>
+        <div class="col-lg-4"><strong>Assembly editor</strong><br>Swap or move components locally to try a different build. Nothing is written to the catalog: this is a preview.</div>
+    </div>
+</div>
+
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-body py-3">
         <div class="row g-2 align-items-end">
-            <div class="col-lg-4">
+            <div class="col-lg-5">
                 <label class="form-label small fw-semibold text-muted mb-1">Bolt Set</label>
                 <select id="comboSelect" class="form-select form-select-sm">
                     {% for c in combos %}
@@ -43,25 +53,143 @@
                 <label class="form-label small fw-semibold text-muted mb-1">Bolt Length</label>
                 <select id="lengthSelect" class="form-select form-select-sm"></select>
             </div>
-            <div class="col-lg-2">
-                <label class="form-label small fw-semibold text-muted mb-1">Display</label>
-                <select id="modeSelect" class="form-select form-select-sm">
-                    <option value="assembled">Assembled</option>
-                    <option value="exploded">Exploded</option>
-                </select>
-            </div>
-            <div class="col-lg-3 d-flex gap-2 justify-content-end">
-                <button id="resetViewBtn" class="btn btn-sm btn-outline-secondary">&#10021; Reset View</button>
-                <button id="fitViewBtn" class="btn btn-sm btn-outline-secondary">Fit</button>
+            <div class="col-lg-4">
+                <label class="form-label small fw-semibold text-muted mb-1">
+                    Exploded view <span id="explodeValue" class="text-muted">0%</span>
+                </label>
+                <input type="range" id="explodeRange" class="form-range" min="0" max="100" step="5" value="0">
             </div>
         </div>
     </div>
 </div>
 
 <div class="row g-3">
-    <!-- Assembly editor (client-side preview, no SQL writes) -->
-    <div class="col-12">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white small d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-bold">3D Schematic Assembly</span>
+                <span id="sceneCaption" class="text-white-50">select a bolt set to begin</span>
+            </div>
+            <div class="card-body py-2 border-bottom d-flex flex-wrap gap-3 align-items-center">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="labelsToggle" checked>
+                    <label class="form-check-label small" for="labelsToggle">Part labels</label>
+                </div>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="orthoToggle">
+                    <label class="form-check-label small" for="orthoToggle">Orthographic</label>
+                </div>
+                <div class="ms-auto d-flex gap-2">
+                    <button id="fitViewBtn" class="btn btn-sm btn-outline-secondary">Fit</button>
+                    <button id="resetViewBtn" class="btn btn-sm btn-outline-secondary">&#10021; Reset view</button>
+                </div>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div id="viewer3d"></div>
+                <div id="webglFallback" class="d-none p-4 text-center text-muted">
+                    WebGL is not available in this browser. The dimensioned profile and the component table below show the same assembly.
+                </div>
+                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center d-none">
+                    <span class="spinner-border text-primary"></span>
+                </div>
+            </div>
+            <div class="card-footer bg-white py-2">
+                <div class="d-flex flex-wrap gap-3 small">
+                    <span class="legend-chip"><span class="chip-swatch swatch-bolt"></span>Bolt / head</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-nut"></span>Nut</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-washer"></span>Washer</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-grip"></span>Clamped material (schematic grip)</span>
+                    <span class="legend-chip"><span class="chip-swatch swatch-unmatched"></span>Unmatched record</span>
+                    <span class="legend-chip text-muted">drag to orbit &middot; scroll to zoom &middot; click a part</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-light small fw-bold d-flex justify-content-between align-items-center">
+                <span>Dimensioned profile <span class="text-muted fw-normal">(inches, schematic)</span></span>
+                <span id="profileBadge" class="badge bg-secondary">catalog records</span>
+            </div>
+            <div class="card-body py-2">
+                <div id="profileHost" class="bp-host">
+                    <div class="text-muted small">Select a bolt set to draw its profile.</div>
+                </div>
+            </div>
+            <div class="card-footer bg-white py-2 small text-muted">
+                Balloons follow the component table order. Distances come from the catalog records; the side split
+                (head vs nut) is still an unverified reading of the <code>Position</code> field.
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-light small fw-bold d-flex justify-content-between">
+                <span>Component Records <span class="text-muted fw-normal">(SetOfBolts slots matched to SetNutsBolts)</span></span>
+                <span class="text-muted fw-normal">hover a row to highlight it in 3D</span>
+            </div>
+            <div class="table-wrap">
+                <table class="table table-sm table-striped mb-0" id="componentTable">
+                    <thead><tr>
+                        <th>Slot</th><th>Role</th><th>Side</th><th class="text-end">Stack</th>
+                        <th>Standard (DIN)</th><th>Material</th>
+                        <th class="text-end">Dia (in)</th><th class="text-end">Height (in)</th>
+                        <th class="text-end">Width (in)</th><th class="text-end">Pos</th>
+                        <th>Name</th><th>Match</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
         <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Assembly Summary</div>
+            <div class="card-body py-2" id="summaryPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold d-flex justify-content-between align-items-center">
+                <span>Warnings &amp; Notes</span>
+                <span class="badge bg-secondary" id="warningCount">0</span>
+            </div>
+            <div class="card-body py-2" id="warningsPanel">
+                <div class="text-muted small">Warnings will appear here.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Component Details <span class="text-muted fw-normal">(hover / click)</span></div>
+            <div class="card-body py-2" id="detailPanel">
+                <div class="text-muted small">Hover a rendered component to identify its source record.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Bolt Record (source: SetBolts)</div>
+            <div class="card-body py-2" id="boltInfoPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light small fw-bold">Length Rules (source: ScrewNew)</div>
+            <div class="card-body py-2" id="screwRulesPanel">
+                <div class="text-muted small">No selection yet.</div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light small fw-bold">Interpretation Notes</div>
+            <div class="card-body py-2" id="notesPanel">
+                <div class="text-muted small">No notes.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <span class="fw-bold">&#9998; Assembly Editor <span class="badge bg-info text-dark ms-1">preview only</span></span>
                 <span class="d-flex align-items-center gap-2">
@@ -70,6 +198,9 @@
                 </span>
             </div>
             <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-end mb-1">
+                    <div class="small text-muted">Each row is one <code>SetOfBolts</code> slot. Change the part, the side, or the stack order; the 3D view and the profile follow immediately.</div>
+                </div>
                 <div id="editorRows" class="d-grid editor-grid"></div>
                 <hr class="my-2">
                 <div class="row g-2 align-items-end">
@@ -93,88 +224,6 @@
                     Edits below are a local preview. They are <strong>not written to the database</strong>;
                     a server-side review step will be added with Phase 3.
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3D canvas -->
-    <div class="col-lg-7">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-dark text-white small d-flex justify-content-between">
-                <span class="fw-bold">Schematic Assembly</span>
-                <span id="sceneCaption" class="text-white-50">select a bolt set to begin</span>
-            </div>
-            <div class="card-body p-0 position-relative">
-                <div id="viewer3d"></div>
-                <div id="webglFallback" class="d-none p-4 text-center text-muted">
-                    WebGL is not available in this browser. Use the component table below to review the catalog records.
-                </div>
-                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center d-none">
-                    <span class="spinner-border text-primary"></span>
-                </div>
-            </div>
-            <div class="card-footer bg-white py-2">
-                <div class="d-flex flex-wrap gap-3 small">
-                    <span class="legend-chip"><span class="chip-swatch swatch-bolt"></span>Bolt / head</span>
-                    <span class="legend-chip"><span class="chip-swatch swatch-nut"></span>Nut</span>
-                    <span class="legend-chip"><span class="chip-swatch swatch-washer"></span>Washer</span>
-                    <span class="legend-chip"><span class="chip-swatch swatch-grip"></span>Clamped material (schematic grip)</span>
-                    <span class="legend-chip"><span class="chip-swatch swatch-unmatched"></span>Unmatched record</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Component data table (accessibility fallback + detail) -->
-        <div class="card shadow-sm border-0 mt-3">
-            <div class="card-header bg-light small fw-bold">Component Records (source: SetOfBolts / SetNutsBolts)</div>
-            <div class="table-wrap">
-                <table class="table table-sm table-striped mb-0" id="componentTable">
-                    <thead><tr>
-                        <th>Slot</th><th>Role</th><th>Standard (DIN)</th><th>Material</th>
-                        <th class="text-end">Dia (in)</th><th class="text-end">Height (in)</th>
-                        <th class="text-end">Width (in)</th><th class="text-end">Pos</th>
-                        <th>Name</th><th>Match</th>
-                    </tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Side panels -->
-    <div class="col-lg-5">
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-light small fw-bold">Bolt Record (source: SetBolts)</div>
-            <div class="card-body py-2" id="boltInfoPanel">
-                <div class="text-muted small">No selection yet.</div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-light small fw-bold">Component Details <span class="text-muted fw-normal">(hover / click a part &mdash; hover details reflect preview edits)</span></div>
-            <div class="card-body py-2" id="detailPanel">
-                <div class="text-muted small">Hover a rendered component to identify its source record.</div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-light small fw-bold">Length Rules (source: ScrewNew)</div>
-            <div class="card-body py-2" id="screwRulesPanel">
-                <div class="text-muted small">No selection yet.</div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-light small fw-bold">Interpretation Notes</div>
-            <div class="card-body py-2" id="notesPanel">
-                <div class="text-muted small">No notes.</div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-light small fw-bold">Warnings &amp; Notes</div>
-            <div class="card-body py-2" id="warningsPanel">
-                <div class="text-muted small">Warnings will appear here.</div>
             </div>
         </div>
     </div>

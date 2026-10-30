@@ -6,6 +6,7 @@ conn = pymssql.connect(
     user="sa",
     password="Scratch2026!Pw",
     database="HiltiHY200",
+    login_timeout=5,
 )
 cur = conn.cursor(as_dict=True)
 

@@ -5,13 +5,13 @@ import secrets
 
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, send_from_directory,
-    jsonify, session, abort,
+    jsonify, session, abort, Response,
 )
 from werkzeug.utils import secure_filename
 
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
-from utils import staging_cleanup, drawing_styles
+from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -50,13 +50,21 @@ os.makedirs(config.EXPORT_DIR, exist_ok=True)
 @app.route("/")
 def index():
     staged_status = staging_cleanup.scan_upload_dir(config.UPLOAD_DIR)
-    try:
-        attached = db.list_databases()
-    except Exception as e:
-        attached = []
-        flash(f"Could not reach the scratch SQL Server container: {e}", "danger")
-    exports = staging.list_exports()
     container_up = docker_ops.container_is_running()
+    attached = []
+    if not container_up:
+        flash(
+            f"SQL Server container '{config.CONTAINER_NAME}' is not running, so no "
+            "catalogs can be attached or browsed. Start it with: "
+            f"docker start {config.CONTAINER_NAME}",
+            "danger",
+        )
+    else:
+        try:
+            attached = db.list_databases()
+        except Exception as e:
+            flash(f"Could not reach the scratch SQL Server container: {e}", "danger")
+    exports = staging.list_exports()
     meta = metadata.all_meta()
     return render_template(
         "index.html",
@@ -311,7 +319,22 @@ def bolt_set_viewer_payload(database):
         )
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+    if view.get("ok"):
+        view["profile_svg"] = bolt_profile.profile_svg(view)
     return jsonify(view)
+
+
+@app.route("/db/<database>/bolt-set-viewer/sketch", methods=["POST"])
+def bolt_set_viewer_sketch(database):
+    """Re-draw the 2D profile for the browser's current (unsaved) layout."""
+    payload = request.get_json(silent=True) or {}
+    token = str(payload.get("csrf_token") or "")
+    if not token or token != session.get("_csrf"):
+        abort(400, description="Invalid CSRF token.")
+    return Response(
+        bolt_profile.profile_svg(bolt_profile.sanitize_layout(payload)),
+        mimetype="image/svg+xml",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -729,7 +752,7 @@ def drawing_style(database):
         flash("This database isn't a drawing-style export.", "warning")
         return redirect(url_for("show_database", database=database))
     rels = drawing_styles.load_relations(database)
-    tree = drawing_styles.style_tree(database)
+    tree = style_diagrams.decorate_tree(drawing_styles.style_tree(database))
     from collections import defaultdict
     options = defaultdict(lambda: defaultdict(list))
     for t, cols in drawing_styles.all_relation_options(database, rels).items():
@@ -744,6 +767,9 @@ def drawing_style(database):
         report=report, meta=metadata.get(database), scale_choices=scale_choices,
         length_cols=drawing_styles.LENGTH_COLUMNS, ftin=drawing_styles.format_ft_in,
         scale_denom=drawing_styles.scale_denominator,
+        label_tokens=sorted(drawing_styles.KNOWN_FIELDS),
+        label_commands=["#Newline", "#Height(6.40)", "#Bold(1)", "#Underline(1)",
+                        "#Color(2)", "#Italic(1)", "#Rounded", "#End"],
     )
 
 
@@ -807,6 +833,24 @@ def drawing_style_rule(database):
 def drawing_style_label_preview(database):
     content = request.form.get("content", "")
     return render_template("_label_preview.html", p=drawing_styles.parse_label_format(content))
+
+
+@app.route("/db/<database>/drawing-style/diagram", methods=["POST"])
+def drawing_style_diagram(database):
+    """Re-draw one schematic figure from the form's current (unsaved) values."""
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    table = request.form.get("table", "")
+    points = [p for p in request.form.get("points", "").split("\n") if p]
+    try:
+        svg = style_diagrams.diagram(
+            request.form.get("kind", ""),
+            style_diagrams.row_from_form(table, request.form.items()),
+            points,
+        )
+    except ValueError as e:
+        return Response(f'<div class="sd-note">{e}</div>', mimetype="text/html")
+    return Response(svg, mimetype="text/html")
 
 
 def _resolve_row(database, table, pk_val):

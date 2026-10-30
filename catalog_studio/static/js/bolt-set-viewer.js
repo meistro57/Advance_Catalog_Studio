@@ -28,6 +28,7 @@ const COLORS = {
     centerline: 0x94a3b8,
     dimline: 0x64748b,
     highlight: 0xffe08a,
+    selected: 0x63c8ff,
 };
 
 const DATABASE = window.BOLT_DATABASE;
@@ -39,7 +40,10 @@ const $ = (id) => document.getElementById(id);
 const els = {
     combo: $('comboSelect'),
     length: $('lengthSelect'),
-    mode: $('modeSelect'),
+    explode: $('explodeRange'),
+    explodeValue: $('explodeValue'),
+    labels: $('labelsToggle'),
+    ortho: $('orthoToggle'),
     resetView: $('resetViewBtn'),
     fitView: $('fitViewBtn'),
     caption: $('sceneCaption'),
@@ -47,9 +51,13 @@ const els = {
     fallback: $('webglFallback'),
     loading: $('loadingOverlay'),
     boltInfo: $('boltInfoPanel'),
+    summary: $('summaryPanel'),
     detail: $('detailPanel'),
     rules: $('screwRulesPanel'),
     warnings: $('warningsPanel'),
+    warningCount: $('warningCount'),
+    profile: $('profileHost'),
+    profileBadge: $('profileBadge'),
     tableBody: document.querySelector('#componentTable tbody'),
     editorRows: $('editorRows'),
     editorBadge: $('editorBadge'),
@@ -63,14 +71,23 @@ const els = {
 let serverView = null;   // last payload from the server (original catalog state)
 let draft = null;        // client-side editable copy
 let display = null;      // draft run through layoutAssembly (what is rendered)
-let scene, camera, renderer, controls;
-let assemblyGroup;
+let scene, renderer, controls;
+let perspCamera, orthoCamera, camera;
+let assemblyGroup, labelGroup;
 let partMeshes = [];
+let labelSprites = [];
+let labelOffsetX = 24;
 let gripMesh = null;
 let raycaster = new THREE.Raycaster();
 let pointer = new THREE.Vector2(1e4, 1e4);
 let hovered = null;
+let selected = null;
+let explodeFactor = 0;
+let showLabels = true;
+let useOrtho = false;
 let fitNeeded = true;
+let profileTimer = null;
+let profileClean = false;
 const clock = new THREE.Clock();
 
 /* ------------------------------------------------------------------ helpers */
@@ -177,7 +194,10 @@ function initScene() {
     container.appendChild(renderer.domElement);
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 1, 20000);
+    const aspect = container.clientWidth / Math.max(container.clientHeight, 1);
+    perspCamera = new THREE.PerspectiveCamera(40, aspect, 1, 20000);
+    orthoCamera = new THREE.OrthographicCamera(-100 * aspect, 100 * aspect, 100, -100, -5000, 20000);
+    camera = perspCamera;
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa7b4, 1.15));
     const dir = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -190,7 +210,8 @@ function initScene() {
     controls.target.set(0, 50, 0);
 
     assemblyGroup = new THREE.Group();
-    scene.add(assemblyGroup);
+    labelGroup = new THREE.Group();
+    scene.add(assemblyGroup, labelGroup);
 
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', () => { pointer.set(1e4, 1e4); });
@@ -201,10 +222,42 @@ function initScene() {
 
 function onResize() {
     if (!renderer || !camera) return;
-    const w = els.canvasHost.clientWidth, h = els.canvasHost.clientHeight;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    const w = els.canvasHost.clientWidth;
+    const h = Math.max(els.canvasHost.clientHeight, 1);
+    const aspect = w / h;
+    perspCamera.aspect = aspect;
+    perspCamera.updateProjectionMatrix();
+    applyOrthoExtent(orthoCamera, aspect);
     renderer.setSize(w, h);
+}
+
+function applyOrthoExtent(cam, aspect) {
+    const halfH = (cam.userData.halfHeight || 100);
+    cam.left = -halfH * aspect;
+    cam.right = halfH * aspect;
+    cam.top = halfH;
+    cam.bottom = -halfH;
+    cam.updateProjectionMatrix();
+}
+
+function setOrthographic(on) {
+    if (!renderer) return;
+    const aspect = perspCamera.aspect || 1;
+    const target = controls ? controls.target.clone() : new THREE.Vector3(0, 50, 0);
+    const distance = camera.position.distanceTo(target);
+    useOrtho = !!on;
+    camera = useOrtho ? orthoCamera : perspCamera;
+    if (useOrtho) {
+        orthoCamera.userData.halfHeight = Math.max(
+            Math.tan(THREE.MathUtils.degToRad(perspCamera.fov / 2)) * distance, 5,
+        );
+        applyOrthoExtent(orthoCamera, aspect);
+    }
+    camera.position.copy(perspCamera.position);
+    camera.up.copy(perspCamera.up);
+    controls.object = camera;
+    controls.update();
+    fitNeeded = true;
 }
 
 /* ------------------------------------------------------------------ model building */
@@ -230,11 +283,17 @@ function clearModel() {
         els.canvasHost.style.cursor = 'grab';
     }
     hovered = null;
+    selected = null;
     while (assemblyGroup.children.length) {
         disposeObject(assemblyGroup.children[0]);
         assemblyGroup.remove(assemblyGroup.children[0]);
     }
+    while (labelGroup.children.length) {
+        disposeObject(labelGroup.children[0]);
+        labelGroup.remove(labelGroup.children[0]);
+    }
     partMeshes = [];
+    labelSprites = [];
     gripMesh = null;
 }
 
@@ -337,8 +396,22 @@ function buildModel(view) {
         assemblyGroup.add(mesh);
         partMeshes.push({ mesh, bottom, h, top: bottom + h, part });
     }
+
+    // --- part labels (toggle) ----------------------------------------------
+    labelOffsetX = -(maxR + 26);
+    partMeshes.forEach((pm, index) => {
+        const stagger = (index % 2) * 16;
+        const label = makeLabel(`DIN${pm.part.slot} ${pm.part.role}`);
+        label.userData.slot = pm.part.slot;
+        label.position.set(labelOffsetX - stagger, pm.mesh.position.y, 0);
+        label.visible = showLabels;
+        labelGroup.add(label);
+        labelSprites.push({ sprite: label, pm, stagger });
+    });
+
     els.caption.textContent = caption;
     fitNeeded = true;
+    partTargets();
 }
 
 /* ------------------------------------------------------------------ exploded / assembled */
@@ -348,19 +421,14 @@ function explodeGap() {
     return Math.max(6, Math.min(28, L * 0.09));
 }
 
-function partTargets(exploded) {
+function partTargets() {
     if (!display || !display.ok) return;
     const grip = display.grip || {};
     const gripBottom = Number(grip.bottom) || 0;
-    const gripTop = Number(grip.top) || 1e9;
     const gripH = Math.max(Number(grip.thickness) || 0, 0);
-
-    if (!exploded) {
-        for (const pm of partMeshes) pm.mesh.userData.targetBottom = pm.bottom;
-        if (gripMesh) gripMesh.userData.targetBottom = gripBottom;
-        return;
-    }
+    const factor = Math.max(0, Math.min(explodeFactor, 1));
     const gap = explodeGap();
+
     const bySide = { head: [], nut: [] };
     for (const pm of partMeshes) {
         const side = pm.part.side || (pm.top <= gripBottom + 0.001 ? 'head' : 'nut');
@@ -369,21 +437,27 @@ function partTargets(exploded) {
     bySide.head.sort((a, b) => a.bottom - b.bottom);
     bySide.nut.sort((a, b) => a.bottom - b.bottom);
 
-    let cur = 0; // head stack starts directly on the head (y = 0)
+    let cursor = 0;
     for (const pm of bySide.head) {
-        cur += gap;
-        pm.mesh.userData.targetBottom = cur;
-        cur += pm.h;
+        cursor += gap;
+        pm.explodedBottom = cursor;
+        cursor += pm.h;
     }
-    const materialBottom = cur + (bySide.head.length ? gap : 0);
-    if (gripMesh) gripMesh.userData.targetBottom = materialBottom;
-    cur = materialBottom + gripH;
+    const materialBottom = cursor + (bySide.head.length ? gap : 0);
+    cursor = materialBottom + gripH;
     for (const pm of bySide.nut) {
-        cur += gap;
-        pm.mesh.userData.targetBottom = cur;
-        cur += pm.h;
+        cursor += gap;
+        pm.explodedBottom = cursor;
+        cursor += pm.h;
     }
-    fitNeeded = true;
+
+    for (const pm of partMeshes) {
+        const exploded = pm.explodedBottom == null ? pm.bottom : pm.explodedBottom;
+        pm.mesh.userData.targetBottom = pm.bottom + (exploded - pm.bottom) * factor;
+    }
+    if (gripMesh) {
+        gripMesh.userData.targetBottom = gripBottom + (materialBottom - gripBottom) * factor;
+    }
 }
 
 /* ------------------------------------------------------------------ draft state */
@@ -520,6 +594,87 @@ function renderBoltPanel() {
     ]);
 }
 
+function renderSummary() {
+    if (!els.summary) return;
+    if (!display || !display.ok) {
+        els.summary.innerHTML = '<div class="text-muted small">No selection yet.</div>';
+        return;
+    }
+    const b = display.bolt || {};
+    const parts = display.components || [];
+    const headSide = parts.filter((p) => p.side === 'head');
+    const nutSide = parts.filter((p) => p.side === 'nut');
+    const stack = (list) => list.reduce(
+        (sum, p) => sum + Math.max(Number(p.stack_top) - Number(p.stack_bottom), 0), 0);
+    const headUsed = stack(headSide);
+    const nutUsed = stack(nutSide);
+    const nutTop = nutSide.length ? Math.max(...nutSide.map((p) => Number(p.stack_top))) : null;
+    const protrusion = nutTop == null ? null : Number(b.length) - nutTop;
+    const unmatched = parts.filter((p) => !p.matched).length;
+    const schematic = parts.filter((p) => p.schematic_height).length;
+    const gripMode = draft && draft.gripMode === 'fixed' ? 'fixed' : 'auto';
+
+    infoRows(els.summary, [
+        ['Bolt', `${b.standard || '\u2013'} &middot; &#8960; ${fin(b.diameter)} &times; ${fin(b.length)} in`],
+        ['Head', `${fin(b.head_width)} across flats &times; ${fin(b.head_height)} high${b.head_corners_assumed ? ' (6 sides assumed)' : ''}`],
+        ['Overall with head', `${fin((Number(b.length) || 0) + (Number(b.head_height) || 0))} in`],
+        ['Clamped material', `${fin(display.grip ? display.grip.thickness : 0)} in (${gripMode})`],
+        ['Head-side hardware', `${headSide.length} part(s) &middot; ${fin(headUsed)} in`],
+        ['Nut-side hardware', `${nutSide.length} part(s) &middot; ${fin(nutUsed)} in`],
+        ['Thread past nut', protrusion == null ? '\u2013' : `${fin(protrusion)} in`],
+        ['Records', `${parts.length} slot(s) &middot; ${unmatched} unmatched &middot; ${schematic} schematic`],
+    ]);
+}
+
+function updateProfileBadge() {
+    if (!els.profileBadge) return;
+    const dirty = display && display.dirty;
+    els.profileBadge.textContent = dirty ? 'your preview' : 'catalog records';
+    els.profileBadge.className = `badge ${dirty ? 'bg-info text-dark' : 'bg-secondary'}`;
+}
+
+function profilePayload() {
+    if (!display || !display.ok) return null;
+    return {
+        csrf_token: window.BOLT_CSRF || '',
+        bolt: display.bolt || {},
+        grip: display.grip || {},
+        components: (display.components || []).map((p) => ({
+            slot: p.slot, role: p.role, standard: p.standard, height: p.height,
+            width: p.width, diameter: p.diameter,
+            stack_bottom: p.stack_bottom, stack_top: p.stack_top,
+            matched: p.matched, schematic_height: p.schematic_height,
+        })),
+    };
+}
+
+function scheduleProfile() {
+    if (!els.profile) return;
+    updateProfileBadge();
+    if (!display || !display.ok) {
+        els.profile.innerHTML = '';
+        return;
+    }
+    clearTimeout(profileTimer);
+    if (!display.dirty && profileClean) return;
+    profileTimer = setTimeout(async () => {
+        const payload = profilePayload();
+        if (!payload) return;
+        try {
+            const resp = await fetch(`/db/${encodeURIComponent(DATABASE)}/bolt-set-viewer/sketch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            els.profile.innerHTML = await resp.text();
+            profileClean = !display.dirty;
+        } catch (err) {
+            els.profile.innerHTML = '<div class="text-muted small">Profile could not be drawn for this preview.</div>';
+        }
+    }, 250);
+}
+
 function describePart(p) {
     const rows = [
         ['Role', p.role],
@@ -548,6 +703,11 @@ function renderWarnings(view) {
     const warnings = [...(view.warnings || [])];
     if (!view.ok) warnings.length = 0;
     els.warnings.innerHTML = '';
+    if (els.warningCount) {
+        const severe = warnings.filter((w) => w.severity === 'danger').length;
+        els.warningCount.textContent = String(warnings.length);
+        els.warningCount.className = `badge ${severe ? 'bg-danger' : (warnings.length ? 'bg-warning text-dark' : 'bg-secondary')}`;
+    }
     if (!warnings.length) {
         els.warnings.innerHTML = '<div class="text-muted small">No warnings.</div>';
         return;
@@ -613,30 +773,48 @@ function renderRules(view) {
     els.rules.appendChild(tip);
 }
 
+const ROLE_SWATCH = {
+    bolt: '#5c6f83', nut: '#5b6ee1', washer: '#e8a13c', part: '#b48be0',
+};
+
 function renderTable(view) {
     const rows = view.components || [];
     els.tableBody.innerHTML = '';
     if (!rows.length) {
-        els.tableBody.innerHTML = '<tr><td colspan="10" class="text-muted">No components defined in SetOfBolts for this set.</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="12" class="text-muted">No components defined in SetOfBolts for this set.</td></tr>';
         return;
     }
     for (const p of rows) {
         const tr = document.createElement('tr');
+        tr.dataset.slot = String(p.slot);
+        tr.className = 'component-row';
         const badge = !p.matched
             ? '<span class="badge bg-danger">unmatched</span>'
             : (p.changed ? '<span class="badge bg-info text-dark">preview</span>' : '<span class="badge bg-success">ok</span>');
+        const height = p.height != null
+            ? `${fin(p.height)}${p.schematic_height ? ' <span class="text-muted" title="No height in SetNutsBolts; a schematic thickness is drawn.">*</span>' : ''}`
+            : '<span class="text-muted">–</span>';
+        const swatch = ROLE_SWATCH[p.role] || ROLE_SWATCH.part;
         tr.innerHTML = [
-            `<td><code>DIN${p.slot}</code></td>`,
+            `<td><span class="role-swatch" style="background:${p.matched ? swatch : '#e05d5d'}"></span><code>DIN${p.slot}</code></td>`,
             `<td>${p.role}</td>`,
+            `<td>${p.side === 'head' ? 'head' : 'nut'}</td>`,
+            `<td class="text-end">${p.layer != null ? Number(p.layer) + 1 : '\u2013'}</td>`,
             `<td>${p.standard}${p.changed && p.standard !== p.orig_din ? ` <span class="text-muted small" title="original: ${p.orig_din}">(orig ${p.orig_din})</span>` : ''}</td>`,
             `<td>${p.material || '\u2013'}</td>`,
             `<td class="text-end">${fin(p.diameter)}</td>`,
-            `<td class="text-end">${fin(p.height)}</td>`,
+            `<td class="text-end">${height}</td>`,
             `<td class="text-end">${fin(p.width)}</td>`,
             `<td class="text-end">${p.position != null ? p.position : '\u2013'}</td>`,
             `<td>${p.name || p.standard}</td>`,
             `<td>${badge}</td>`,
         ].join('');
+        tr.addEventListener('mouseenter', () => highlightSlot(Number(p.slot), 'hover'));
+        tr.addEventListener('mouseleave', () => highlightSlot(null, 'hover'));
+        tr.addEventListener('click', () => {
+            selectSlot(Number(p.slot));
+            showDetail(describePart(p));
+        });
         els.tableBody.appendChild(tr);
     }
 }
@@ -648,22 +826,61 @@ function raycastMeshes() {
     return raycaster.intersectObjects(partMeshes.map((pm) => pm.mesh), false);
 }
 
+function meshForSlot(slot) {
+    return partMeshes.find((pm) => Number(pm.part.slot) === Number(slot));
+}
+
+function pulseMesh(mesh, color, intensity) {
+    if (!mesh || !mesh.material) return;
+    mesh.material.emissive.setHex(color);
+    mesh.material.emissiveIntensity = intensity;
+}
+
+function clearPulse(mesh) {
+    if (!mesh || !mesh.material) return;
+    mesh.material.emissive.setHex(0x000000);
+    mesh.material.emissiveIntensity = 0;
+}
+
+function highlightSlot(slot, source) {
+    for (const pm of partMeshes) {
+        if (pm.mesh === hovered || pm.mesh === selected) continue;
+        clearPulse(pm.mesh);
+    }
+    const pm = slot == null ? null : meshForSlot(slot);
+    if (pm) {
+        pulseMesh(pm.mesh, COLORS.highlight, source === 'select' ? 0.55 : 0.35);
+    }
+    els.tableBody.querySelectorAll('tr.component-row').forEach((tr) => {
+        tr.classList.toggle('is-highlighted', slot != null && tr.dataset.slot === String(slot));
+    });
+    labelSprites.forEach(({ sprite }) => {
+        sprite.material.opacity = slot == null || sprite.userData.slot === slot ? 1 : 0.35;
+    });
+}
+
+function selectSlot(slot) {
+    if (selected) clearPulse(selected);
+    const pm = meshForSlot(slot);
+    selected = pm ? pm.mesh : null;
+    if (selected) pulseMesh(selected, COLORS.selected, 0.6);
+    highlightSlot(slot, 'select');
+}
+
 function setHovered(mesh) {
     if (hovered === mesh) return;
-    if (hovered) {
-        hovered.material.emissive.setHex(0x000000);
-        hovered.material.emissiveIntensity = 0;
-    }
+    if (hovered && hovered !== selected) clearPulse(hovered);
     hovered = mesh;
     if (mesh) {
-        mesh.material.emissive.setHex(COLORS.highlight);
-        mesh.material.emissiveIntensity = 0.4;
+        pulseMesh(mesh, COLORS.highlight, 0.4);
         showDetail(describePart(mesh.userData.part));
         els.canvasHost.style.cursor = 'pointer';
+        highlightSlot(mesh.userData.part.slot, 'hover');
     } else {
         els.canvasHost.style.cursor = 'grab';
         showDetail(null);
         els.detail.innerHTML = '<div class="text-muted small">Hover a rendered component to identify its source record.</div>';
+        highlightSlot(selected ? selected.userData.part.slot : null, 'hover');
     }
 }
 
@@ -679,7 +896,12 @@ function onPointerClick() {
     const hits = raycastMeshes();
     if (hits.length) {
         const p = hits[0].object.userData.part;
-        if (p) showDetail(describePart(p));
+        if (p) {
+            selectSlot(p.slot);
+            showDetail(describePart(p));
+            const row = els.tableBody.querySelector(`tr.component-row[data-slot="${p.slot}"]`);
+            if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
     }
 }
 
@@ -703,15 +925,29 @@ function frameScene() {
     if (!display || !display.ok || !renderer) return;
     const { minY, maxY } = currentBounds();
     const dia = Number(display.bolt.diameter) || 10;
-    const width = Math.max(dia * 4, 90) + DIM_RIGHT_MARGIN;
+    const width = Math.max(dia * 4, 90) + DIM_RIGHT_MARGIN + 40;
     const centerY = (minY + maxY) / 2;
-    const halfH = (maxY - minY) / 2;
+    const halfH = Math.max((maxY - minY) / 2, 8);
     const halfW = width / 2;
+    const aspect = perspCamera.aspect || 1;
     controls.target.set(0, centerY, 0);
-    const aspect = camera.aspect || 1;
-    const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const dist = Math.max(halfH / tan, halfW / (aspect * tan)) * 1.18;
-    camera.position.set(dist * 0.42, centerY + dist * 0.12, dist);
+
+    if (useOrtho) {
+        const halfOrtho = Math.max(halfH, halfW / aspect) * 1.22;
+        orthoCamera.userData.halfHeight = halfOrtho;
+        applyOrthoExtent(orthoCamera, aspect);
+        const distance = Math.max(halfH, halfW / aspect) * 4;
+        orthoCamera.position.set(distance * 0.42, centerY + distance * 0.12, distance);
+        perspCamera.position.copy(orthoCamera.position);
+    } else {
+        const tan = Math.tan(THREE.MathUtils.degToRad(perspCamera.fov / 2));
+        const dist = Math.max(halfH / tan, halfW / (aspect * tan)) * 1.18;
+        perspCamera.position.set(dist * 0.42, centerY + dist * 0.12, dist);
+        orthoCamera.position.copy(perspCamera.position);
+    }
+    camera = useOrtho ? orthoCamera : perspCamera;
+    camera.up.set(0, 1, 0);
+    controls.object = camera;
     controls.update();
 }
 
@@ -728,6 +964,9 @@ function animate() {
         if (gripMesh && gripMesh.userData.targetBottom != null) {
             const h = (gripMesh.geometry && gripMesh.geometry.parameters && gripMesh.geometry.parameters.height) || 0;
             gripMesh.position.y = THREE.MathUtils.lerp(gripMesh.position.y, gripMesh.userData.targetBottom + h / 2, 1 - Math.exp(-8 * dt));
+        }
+        for (const entry of labelSprites) {
+            entry.sprite.position.set(labelOffsetX - entry.stagger, entry.pm.mesh.position.y, 0);
         }
         controls.update();
         if (fitNeeded) {
@@ -855,13 +1094,14 @@ function commit() {
     normalizeOrders(draft);
     display = buildDisplay(draft);
     display.ok = true;
-    const mode = els.mode.value;
     buildModel(display);
     renderWarnings(display);
     renderTable(display);
+    renderSummary();
     renderEditor();
     updateDirtyUI();
-    partTargets(mode === 'exploded');
+    partTargets();
+    scheduleProfile();
     els.detail.innerHTML = '<div class="text-muted small">Hover a rendered component to identify its source record.</div>';
 }
 
@@ -925,6 +1165,10 @@ async function loadSelection(preserveLength = true) {
         }
 
         serverView = view;
+        if (els.profile) {
+            els.profile.innerHTML = view.profile_svg || '';
+            profileClean = true;
+        }
         renderBoltPanel();
         renderRules(view);
         renderNotes(view);
@@ -946,12 +1190,31 @@ function wire() {
         loadSelection(false);
     });
     els.length.addEventListener('change', () => loadSelection(true));
-    els.mode.addEventListener('change', () => {
-        partTargets(els.mode.value === 'exploded');
+    if (els.explode) {
+        els.explode.addEventListener('input', () => {
+            explodeFactor = Number(els.explode.value) / 100;
+            if (els.explodeValue) els.explodeValue.textContent = `${Math.round(explodeFactor * 100)}%`;
+            partTargets();
+        });
+        els.explode.addEventListener('change', () => { fitNeeded = true; });
+    }
+    if (els.labels) {
+        els.labels.addEventListener('change', () => {
+            showLabels = els.labels.checked;
+            labelSprites.forEach(({ sprite }) => { sprite.visible = showLabels; });
+        });
+    }
+    if (els.ortho) {
+        els.ortho.addEventListener('change', () => setOrthographic(els.ortho.checked));
+    }
+    els.resetView.addEventListener('click', () => {
+        explodeFactor = 0;
+        if (els.explode) els.explode.value = '0';
+        if (els.explodeValue) els.explodeValue.textContent = '0%';
+        partTargets();
         fitNeeded = true;
     });
-    els.resetView.addEventListener('click', () => frameScene());
-    els.fitView.addEventListener('click', () => frameScene());
+    els.fitView.addEventListener('click', () => { fitNeeded = true; });
     els.resetDraft.addEventListener('click', resetDraft);
 
     els.gripAuto.addEventListener('change', () => {

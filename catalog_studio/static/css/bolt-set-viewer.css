@@ -45,3 +45,52 @@
 #boltInfoPanel .row-item .k, #detailPanel .row-item .k {
     color: #6c757d; font-size: .72rem; text-transform: uppercase; letter-spacing: .02em;
 }
+
+/* ---- page-level help + profile ------------------------------------------- */
+.bs-help {
+    background: #eef4ff;
+    border-left: 3px solid #0d6efd;
+    border-radius: .3rem;
+    padding: .55rem .75rem;
+}
+.bs-help strong { color: #0b3d91; }
+
+#viewer3d { height: 460px; }
+
+.bp-host { width: 100%; overflow-x: auto; }
+.bp-svg {
+    display: block;
+    width: 100%;
+    max-width: 760px;
+    height: auto;
+    margin: 0 auto;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.bp-svg .bp-label { font-size: 11px; fill: #212529; }
+.bp-svg .bp-dim-label { font-size: 9.5px; fill: #495057; }
+.bp-svg .bp-note { font-size: 8.5px; fill: #6c757d; }
+.bp-svg .bp-legend { font-size: 8.5px; fill: #343a40; }
+.bp-svg .bp-inside { font-size: 8px; fill: #fff; }
+.bp-svg .bp-head { fill: #5c6f83; stroke: #212529; stroke-width: .8; }
+.bp-svg .bp-shank { fill: #9fb0c0; stroke: #212529; stroke-width: .8; }
+.bp-svg .bp-part { stroke: #212529; stroke-width: .8; }
+.bp-svg .bp-unmatched { stroke: #b02a37; stroke-width: 1.2; }
+.bp-svg .bp-grip { fill: #dff1fb; fill-opacity: .55; stroke: #38bdf8; stroke-width: .9; }
+.bp-svg .bp-center { stroke: #94a3b8; stroke-width: .8; stroke-dasharray: 7 3 2 3; }
+.bp-svg .bp-dim { stroke: #495057; stroke-width: .9; }
+.bp-svg .bp-leader { stroke: #94a3b8; stroke-width: .7; }
+.bp-svg .bp-balloon { fill: #fff; stroke: #212529; stroke-width: .9; }
+.bp-svg .bp-balloon-text { font-size: 9px; font-weight: 700; fill: #212529; }
+
+/* ---- component table ----------------------------------------------------- */
+#componentTable tbody tr.component-row { cursor: pointer; }
+#componentTable tbody tr.component-row.is-highlighted > td { background: #fff3cd; }
+.role-swatch {
+    display: inline-block;
+    width: .65rem;
+    height: .65rem;
+    border-radius: 2px;
+    margin-right: .35rem;
+    vertical-align: middle;
+    border: 1px solid rgba(0, 0, 0, .15);
+}

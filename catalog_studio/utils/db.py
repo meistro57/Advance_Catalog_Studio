@@ -7,7 +7,7 @@ import re
 
 import pymssql
 
-from config import DB_CONFIG, CONTAINER_ATTACH_PATH
+from config import DB_CONFIG, DB_LOGIN_TIMEOUT, CONTAINER_ATTACH_PATH
 
 VALID_IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -16,15 +16,22 @@ def valid_identifier(name: str) -> bool:
     return bool(VALID_IDENTIFIER.match(name or ""))
 
 
-def connect(database=None):
-    conn = pymssql.connect(
+def _open_connection(database=None, autocommit=True):
+    """Every pymssql connection goes through here so a stopped container
+    fails in DB_LOGIN_TIMEOUT seconds instead of pymssql's 60s default."""
+    return pymssql.connect(
         server=DB_CONFIG["server"],
         port=DB_CONFIG["port"],
         user=DB_CONFIG["user"],
         password=DB_CONFIG["password"],
         database=database,
-        autocommit=True,
+        autocommit=autocommit,
+        login_timeout=DB_LOGIN_TIMEOUT,
     )
+
+
+def connect(database=None):
+    conn = _open_connection(database=database, autocommit=True)
     cur = conn.cursor(as_dict=True)
     return conn, cur
 
@@ -841,14 +848,7 @@ def apply_clone_diameter(
     include_tables: list = None,
     cleanup_keys: list = None,
 ) -> dict:
-    conn = pymssql.connect(
-        server=DB_CONFIG["server"],
-        port=DB_CONFIG["port"],
-        user=DB_CONFIG["user"],
-        password=DB_CONFIG["password"],
-        database=database,
-        autocommit=False,
-    )
+    conn = _open_connection(database=database, autocommit=False)
     cur = conn.cursor(as_dict=True)
     tables = set(list_tables(database))
     catalog_type = guess_catalog_type(database)

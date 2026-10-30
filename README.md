@@ -39,7 +39,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Catalog types | Bolt and anchor, plus drawing-style exports |
 | Table editor raw row operations | Implemented |
 | Guided bolt-diameter cloning | Implemented |
-| Bolt-set visualizer (read-only) | Phase 1 implemented |
+| Bolt-set visualizer (read-only) | 3D schematic + dimensioned 2D profile implemented |
 | Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
@@ -48,7 +48,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
-| Drawing-style editor (Drawing Style Manager exports) | First slice: style tree, representation rules, label formulas, integrity check |
+| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules, label formulas, integrity check, schematic figures (scale, view box, clipping, dimension chains) |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -91,6 +91,16 @@ Confirm it is running:
 docker ps --filter name=hilti-scratch-sql
 ```
 
+If it keeps stopping after a Docker or host restart, give it a restart policy
+so it comes back up on its own:
+
+```bash
+docker update --restart unless-stopped hilti-scratch-sql
+```
+
+While the container is stopped the dashboard still loads and says so; no
+catalog can be attached or browsed until it is running again.
+
 ### 3. Run Catalog Studio
 
 ```bash
@@ -101,7 +111,9 @@ Open [http://localhost:5050](http://localhost:5050).
 
 ### Run the tests
 
-The bolt-set view-model mapping and route smoke tests do not need the SQL Server:
+The suite needs no SQL Server. It covers the bolt-set view model and the dimensioned
+assembly profile, drawing-style label parsing and schematic figures, the fabrication
+sheet model, staging cleanup, connection timeouts, and route smoke tests:
 
 ```bash
 pip install -r requirements-dev.txt   # adds pytest
@@ -182,11 +194,19 @@ Raw editing intentionally remains available, but relationship-dependent changes 
 
 ### Bolt-set viewer (Phase 1 — read-only)
 
-Bolt catalogs get a schematic Three.js visualizer that renders a selected bolt set as physical hardware: bolt head and shank, configured washers, nut, and the clamped-material grip zone, with assembled and exploded views, dimension callouts, and hover-to-identify source records. All on-screen dimensions are shown in **inches** (the catalog stores millimetres internally, exactly as Advance Steel does). Component positions come from the catalog rows (see the verified/assumed mapping notes in `AGENTS.md`); a component table is always available as an accessibility fallback. Nothing in the viewer writes to SQL — editing controls are a later phase.
+Bolt catalogs get a schematic Three.js visualizer that renders a selected bolt set as physical hardware: bolt head and shank, configured washers, nut, and the clamped-material grip zone. The page is built around three views of the same assembly:
+
+- **3D schematic** — orbit/zoom, part labels on/off, perspective or orthographic, exploded slider, and click-a-part identification that highlights the matching row in the component table (and vice versa).
+- **Dimensioned profile** — a flat elevation drawn from the same layout numbers: head, shank, hardware and clamped material in order, numbered balloons into a part legend, and dimensions (overall, shank under head, grip) in inches. It re-draws from the browser's preview edits, and it is the WebGL-free fallback.
+- **Component table** — slot, role, side, stack order, catalogue match, and sizes.
+
+All on-screen dimensions are shown in **inches** (the catalog stores millimetres internally, exactly as Advance Steel does). Component positions come from the catalog rows (see the verified/assumed mapping notes in `AGENTS.md`); anything unverified (the `Position`-sign side split, assumed hex heads, schematic thicknesses) stays labelled in the warnings/notes panels and in the profile footer. Nothing in the viewer writes to SQL — editing controls are a later phase.
+
+The profile is redrawn from the browser's unsaved preview through `POST /db/<db>/bolt-set-viewer/sketch`, which re-renders the same server-side drawing from the posted layout (CSRF-checked, numbers clamped), so the 2D view and the 3D scene cannot drift apart.
 
 ### Assembly editor (Phase 2 — client-side preview)
 
-Next to the viewer, the assembly editor lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only — handing them to the server-side preview/transaction flow is Phase 3, once the `Position`-field semantics are verified.
+The assembly editor at the bottom of the same page lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only — handing them to the server-side preview/transaction flow is Phase 3, once the `Position`-field semantics are verified.
 
 ### Anchor configurator (graphical)
 
@@ -202,8 +222,9 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 
 - **Style identity** — picker name, help text, owner, title and cut-view title formulas with a live rendered preview.
 - **Each view** — scale (shown as `1:16 (3/4" = 1'-0")`), representation map, dimension strategy, view-box depth, length clipping. Lengths display in feet-inches and accept either mm or ft-in (`2'-6 1/2"`).
-- **Representation rules** — every rule as a row with dropdowns for object set, appearance, label strategy and linetype, a preview of the label each rule prints, and move up / move down / copy below / delete.
-- **Libraries** — label formulas (with token preview), label strategies, appearances, object sets and their model roles.
+- **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension-chain sketch for each dimension request (collapsed behind a summary once a view has more than six). They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
+- **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
+- **Libraries** — label formulas (live preview plus a click-to-insert token palette), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
 - **Integrity check** — every in-file reference is checked before you export.
 
 Dropdowns come from the export's own `InfoTableRelations` table (Autodesk's column → lookup map) plus a few verified fixes. References to Autodesk's built-in databases aren't in the export, so those stay as raw numbers. Schema notes: [`docs/drawing-style-schema.md`](docs/drawing-style-schema.md).
@@ -315,16 +336,21 @@ Advance_Catalog_Studio/
 │   └── utils/
 │       ├── anchor_sets.py      # Anchor view model for the configurator
 │       ├── bolt_sets.py        # Bolt-set view model for the viewer
+│       ├── bolt_profile.py     # Dimensioned 2D assembly profile (SVG)
 │       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG
+│       ├── drawing_styles.py   # Drawing-style tree, label parsing, relations
+│       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
 │       ├── db.py               # SQL inspection and catalog operations
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
 │       ├── metadata.py         # Catalog type/version metadata
 │       ├── schema_templates.py # New bolt and anchor database templates
-│       └── staging.py          # Upload/export file pairing
-├── tests/                     # Pytest: view-model mapping + route smoke tests
+│       ├── staging.py          # Upload/export file pairing
+│       └── staging_cleanup.py  # Safe removal of staged uploads
+├── tests/                     # Pytest: models, SVG figures, routes (no DB needed)
 ├── samples/                   # Example mdf/ldf catalog pairs (tracked)
 ├── docs/
 │   ├── images/
+│   ├── drawing-style-schema.md # Drawing Style Manager export investigation
 │   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
 ├── db_inspect.py
 ├── diagnose_sets.py

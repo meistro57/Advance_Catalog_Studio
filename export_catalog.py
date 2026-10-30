@@ -66,6 +66,7 @@ def main():
         user="sa",
         password="Scratch2026!Pw",
         database=database,
+        login_timeout=5,
     )
     cur = conn.cursor(as_dict=True)
     cur.execute(QUERY)

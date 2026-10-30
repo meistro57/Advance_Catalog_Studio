@@ -244,7 +244,7 @@ def parse_label_format(content):
     where seg is {"kind": "text"|"field"|"frame_open"|"frame_close"|"cmd", ...}
     carrying the current style (height mm, bold, underline, color)."""
     content = content or ""
-    style = {"height": None, "bold": False, "underline": False, "color": None}
+    style = {"height": None, "bold": False, "underline": False, "color": None, "italic": False}
     lines = [[]]
     fields, commands = [], []
     frame_open = False
@@ -281,7 +281,7 @@ def parse_label_format(content):
                 style["height"] = float(arg)
             except (TypeError, ValueError):
                 emit("cmd", text=m.group(0))
-        elif cmd in ("Bold", "Underline"):
+        elif cmd in ("Bold", "Underline", "Italic"):
             style[cmd.lower()] = (str(arg).strip() != "0") if arg is not None else True
         elif cmd == "Color":
             try:

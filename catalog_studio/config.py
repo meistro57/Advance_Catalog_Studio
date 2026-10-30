@@ -20,6 +20,11 @@ DB_CONFIG = {
     "password": "Scratch2026!Pw",
 }
 
+# Seconds to wait for a login handshake with the scratch container. pymssql
+# defaults to 60s, which makes every page look frozen while the container is
+# stopped; failing fast lets the UI report the problem instead.
+DB_LOGIN_TIMEOUT = 5
+
 SECRET_KEY = "catalog-studio-dev-key"  # only used for flash messages, local tool
 
 # Max upload size (mdf/ldf pairs can run a few hundred MB for larger catalogs)

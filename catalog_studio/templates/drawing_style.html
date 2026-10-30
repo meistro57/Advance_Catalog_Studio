@@ -25,6 +25,36 @@
   #saveBar { position:sticky; bottom:0; z-index:20; }
   .ds-toc a { text-decoration:none; }
   textarea.formula { font-family:monospace; font-size:.8rem; }
+  .ds-help { background:#eef4ff; border-left:3px solid #0d6efd; border-radius:.3rem; padding:.55rem .75rem; font-size:.84rem; }
+  .sd-figure-card { border:1px solid #dee2e6; border-radius:.4rem; background:#fff; padding:.5rem .6rem; height:100%; }
+  .sd-figure-card .sd-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#495057; font-weight:700; margin-bottom:.25rem; }
+  .sd-figure-card .sd-caption { font-size:.72rem; color:#6c757d; }
+  .sd-svg { display:block; width:100%; max-width:640px; height:auto; }
+  .sd-svg text { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; fill:#212529; font-size:11px; }
+  .sd-svg .sd-head { font-size:11px; font-weight:700; fill:#495057; }
+  .sd-svg .sd-label-sm { font-size:9.5px; fill:#495057; }
+  .sd-svg .sd-note { font-size:8.5px; fill:#6c757d; }
+  .sd-svg .sd-box { fill:none; stroke:#212529; stroke-width:1; stroke-dasharray:4 3; }
+  .sd-svg .sd-part { fill:#dee2e6; stroke:#212529; stroke-width:1; }
+  .sd-svg .sd-part-dark { fill:#212529; opacity:.75; }
+  .sd-svg .sd-keep { fill:#dbe9ff; }
+  .sd-svg .sd-center { stroke:#adb5bd; stroke-width:.8; stroke-dasharray:9 3 2 3; }
+  .sd-svg .sd-dim { stroke:#0d6efd; stroke-width:1; }
+  .sd-svg .sd-rule { stroke:#212529; stroke-width:.8; }
+  .sd-svg .sd-plane { stroke:#fd7e14; stroke-width:1.2; stroke-dasharray:5 3; }
+  .sd-svg .sd-scale-bed { fill:#fff; }
+  .sd-svg .sd-overview-bar { fill:#0d6efd; opacity:.75; }
+  .sd-ladder { display:flex; flex-direction:column; gap:.15rem; margin:.35rem 0 .5rem; }
+  .sd-ladder-scroll { max-height:14rem; overflow-y:auto; border:1px solid #f1f3f5; border-radius:.35rem; padding:.2rem; }
+  .sd-step { display:flex; align-items:center; gap:.45rem; font-size:.75rem; background:#f8f9fa; border:1px solid #e9ecef; border-radius:.3rem; padding:.15rem .45rem; }
+  .sd-step .sd-idx { width:1.4rem; text-align:center; font-weight:700; color:#fff; background:#6c757d; border-radius:.25rem; }
+  .sd-step:first-child .sd-idx { background:#198754; }
+  .sd-step .sd-arrow { color:#adb5bd; }
+  .sd-step .sd-fallback { color:#6c757d; font-style:italic; margin-left:auto; }
+  .token-palette { display:flex; flex-wrap:wrap; gap:.25rem; align-items:center; }
+  .token-palette button { font-family:monospace; font-size:.72rem; }
+  .hatch-cell { width:64px; }
+  .hatch-cell .sd-svg { width:54px; }
 </style>
 
 {% macro fld(table, token, col, value, kind='text', opts=None, rows=2, help=None, label=None, cls='', compact=false) -%}
@@ -62,6 +92,20 @@
   </div>
 {%- endmacro %}
 
+{% macro dims_figures(r) -%}
+  <div class="row g-2 mt-2">
+    {% for d in r.diagrams.dims %}
+    <div class="col-lg-6">
+      <div class="sd-figure-card">
+        <div class="sd-title">{{ d.name }}</div>
+        <div data-diagram="dims" data-table="DetViewDimRequestLinear" data-block="#req-{{ r.row.Key }}" data-points="{{ d.points|join('\n') }}">{{ d.svg|safe }}</div>
+        <div class="sd-caption">Points: {{ d.points|join(' · ') if d.points else 'none listed' }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <h4 class="mb-0">&#128208; Drawing Style Editor <small class="text-muted">{{ database }}</small>
@@ -87,6 +131,22 @@
 {% else %}
 <div class="alert alert-success py-2 small mb-3">&#10004; Integrity check: {{ report.checked }} in-file relations checked, no dangling references. Safe to export.</div>
 {% endif %}
+
+<div class="ds-help mb-3">
+  <strong>How to read this page</strong>
+  <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+    <span class="badge bg-dark">1 · Style</span> picker name, title formulas
+    <span class="text-muted">&rarr;</span>
+    <span class="badge bg-dark">2 · Views</span> one drawing each, with print scale and view box
+    <span class="text-muted">&rarr;</span>
+    <span class="badge bg-dark">3 · Representation rules</span> first matching rule draws the object
+    <span class="text-muted">&rarr;</span>
+    <span class="badge bg-dark">4 · Dimensions</span> which points get chained, on which axis
+  </div>
+  <div class="mt-2">Each view carries a picture of what its numbers mean. The pictures are
+    schematic &mdash; drawn from the row values, not Advance Steel's own output &mdash; and they
+    label anything that is still unverified.</div>
+</div>
 
 <div class="ds-toc small mb-3">
   Jump to:
@@ -117,6 +177,13 @@
       &#128161; Want a variant instead of overwriting? Rename it here before exporting, then import the copy beside your original.
       (How Advance Steel's importer treats a same-name style hasn't been tested yet &mdash; renaming avoids the question.)
     </div>
+    {% if m.style %}
+    <div class="sd-figure-card mb-3">
+      <div class="sd-title">Style at a glance &mdash; every view this style produces</div>
+      {{ m.style.overview_svg|safe }}
+      <div class="sd-caption">Bar length is how wide one foot of building prints at that view's scale, so you can see which views are the detailed ones.</div>
+    </div>
+    {% endif %}
     <div class="ds-grid">
       {{ fld('DetailMasterTable', m.token, 'RunName', m.row.RunName, label='Name in style picker') }}
       {{ fld('DetailMasterTable', m.token, 'OwnerText', m.row.OwnerText, label='Owner') }}
@@ -157,6 +224,32 @@
         {{ fld('DetViewRequest', r.token, 'DimStrategy', r.row.DimStrategy, 'select', options.DetViewRequest.DimStrategy, label='Dimension strategy') }}
       </div>
 
+      <div class="row g-2 mt-2">
+        <div class="col-lg-4">
+          <div class="sd-figure-card">
+            <div class="sd-title">Print scale</div>
+            <div data-diagram="scale" data-table="DetViewRequest" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.scale|safe }}</div>
+            <div class="sd-caption">{{ r.scale_label }}</div>
+          </div>
+        </div>
+        {% if r.diagrams.viewbox %}
+        <div class="col-lg-8">
+          <div class="sd-figure-card">
+            <div class="sd-title">View box &mdash; what the view captures</div>
+            <div data-diagram="viewbox" data-table="DetViewSystemAndBox" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.viewbox|safe }}</div>
+            <div class="sd-caption">Extents are measured from the view's own coordinate system; depth is split in front of and behind the view plane.</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% if r.diagrams.clip %}
+      <div class="sd-figure-card mt-2">
+        <div class="sd-title">Length clipping &mdash; where the break lines sit</div>
+        <div data-diagram="clip" data-table="DetViewLengthClip" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.clip|safe }}</div>
+        <div class="sd-caption">The member is drawn once; the brackets show which distance each column measures.</div>
+      </div>
+      {% endif %}
+
       {% if r.sysbox %}{% set b = r.sysbox %}
       <div class="ds-sub">View box &mdash; {{ b.row.RunName }}</div>
       <div class="ds-grid">
@@ -190,6 +283,23 @@
       </div>
       <div class="ds-hint mb-1">Rules run top to bottom; each object set is drawn by the first rule that matches it. Repeated sets with a different
         geometric restriction (AS built-in enum, shown as a number) handle the special cases before the catch-all.</div>
+      {% if r.repr_items %}
+      <div class="sd-ladder{% if r.repr_items|length > 10 %} sd-ladder-scroll{% endif %}">
+        {% for it in r.repr_items %}
+        <div class="sd-step">
+          <span class="sd-idx">{{ it.row.Order }}</span>
+          <span class="fw-semibold">{{ it.qset_name }}</span>
+          <span class="sd-arrow">&rarr;</span>
+          <span>{{ it.appearance_name }}</span>
+          <span class="sd-arrow">&rarr;</span>
+          <span>{{ it.strategy_name }}</span>
+          {% if it.linetype_name and not it.linetype_name.startswith('#-') %}<span class="badge bg-light text-dark border">{{ it.linetype_name }}</span>{% endif %}
+          {% if loop.first %}<span class="badge bg-success-subtle text-success-emphasis ms-auto">first match wins</span>{% endif %}
+          {% if loop.last %}<span class="sd-fallback">last rule</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
       <div class="table-responsive">
       <table class="table table-sm table-hover ds-rules mb-0">
         <thead class="table-light"><tr>
@@ -236,6 +346,16 @@
         {% endfor %}
         </tbody>
       </table>
+      {% if r.diagrams.dims %}
+      {% if r.diagrams.dims|length > 6 %}
+      <details class="mt-2">
+        <summary class="small">Dimension chains ({{ r.diagrams.dims|length }})</summary>
+        {{ dims_figures(r) }}
+      </details>
+      {% else %}
+      {{ dims_figures(r) }}
+      {% endif %}
+      {% endif %}
       {% endif %}
     </div>
     {% endif %}
@@ -257,6 +377,11 @@
     </ul>
     <div class="tab-content pt-3">
       <div class="tab-pane fade show active" id="t-labels">
+        <div class="ds-hint mb-1">Click a token to insert it into the formula you last clicked in:</div>
+        <div class="token-palette mb-2">
+          {% for t in label_tokens %}<button type="button" class="btn btn-sm btn-outline-primary py-0 token-insert" data-token="%{{ t }}">%{{ t }}</button>{% endfor %}
+          {% for c in label_commands %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="{{ c }}">{{ c }}</button>{% endfor %}
+        </div>
         <div class="ds-hint mb-2">
           Tokens: <code>%Field</code> = model property &middot; <code>#Newline</code> &middot; <code>#Height(mm)</code> &middot;
           <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed.
@@ -297,7 +422,7 @@
       <div class="tab-pane fade" id="t-app">
         <div class="ds-hint mb-2">Body/axis/symbol columns are AS built-in display settings (numbers). Hatch columns resolve to this file's hatch presets.</div>
         <table class="table table-sm small">
-          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th></th></tr></thead>
+          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th>Swatches</th><th></th></tr></thead>
           <tbody>
           {% for e in tree.libraries.get('DetObjAppearance', []) %}
             <tr>
@@ -306,6 +431,12 @@
               <td>{{ e.row.BodyVisible }}</td><td>{{ e.row.BodyHidden }}</td><td>{{ e.row.Axis }}</td><td>{{ e.row.CutFacesFront }}</td>
               <td>{{ fld('DetObjAppearance', e.token, 'HatchVisible', e.row.HatchVisible, 'select', options.DetObjAppearance.HatchVisible) }}</td>
               <td>{{ fld('DetObjAppearance', e.token, 'HatchHidden', e.row.HatchHidden, 'select', options.DetObjAppearance.HatchHidden) }}</td>
+              <td class="hatch-cell">
+                <div class="d-flex gap-1">
+                  <figure class="mb-0 text-center">{{ e.hatch_visible_svg|safe }}<figcaption class="ds-hint">vis.</figcaption></figure>
+                  <figure class="mb-0 text-center">{{ e.hatch_hidden_svg|safe }}<figcaption class="ds-hint">hid.</figcaption></figure>
+                </div>
+              </td>
               <td><a href="/db/{{ database }}/DetObjAppearance/{{ e.token }}/edit?return_to=/db/{{ database }}/drawing-style">all &rarr;</a></td>
             </tr>
           {% endfor %}
@@ -381,6 +512,62 @@
   document.querySelectorAll('.live-label').forEach(ta => {
     let t; preview(ta);
     ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => preview(ta), 250); });
+  });
+
+  // live schematic figures: redraw only the figures whose table was edited
+  const diagramUrl = '{{ url_for("drawing_style_diagram", database=database) }}';
+  const figures = [...document.querySelectorAll('[data-diagram]')].map(el => ({
+    el,
+    block: document.querySelector(el.dataset.block),
+    table: el.dataset.table,
+    kind: el.dataset.diagram,
+    points: el.dataset.points || '',
+    timer: null,
+  })).filter(f => f.block);
+  const drawFigure = f => {
+    const body = new URLSearchParams({
+      kind: f.kind, table: f.table, points: f.points, csrf_token: csrf,
+    });
+    f.block.querySelectorAll('.ds-in').forEach(el => {
+      if (el.name && el.name.indexOf('f::' + f.table + '::') === 0) {
+        body.append(el.name, el.value);
+      }
+    });
+    fetch(diagramUrl, {method: 'POST', body})
+      .then(r => r.text()).then(html => { f.el.innerHTML = html; });
+  };
+  const scheduleFigure = ev => {
+    const name = (ev.target && ev.target.name) || '';
+    const match = /^f::([^:]+)::/.exec(name);
+    const table = match ? match[1] : null;
+    figures.forEach(f => {
+      if (table && f.table !== table) return;
+      if (f.kind === 'dims' && ev.type === 'input') return;
+      clearTimeout(f.timer);
+      f.timer = setTimeout(() => drawFigure(f), 250);
+    });
+  };
+  document.querySelectorAll('#styleForm .ds-in').forEach(el => {
+    el.addEventListener('input', scheduleFigure);
+    el.addEventListener('change', scheduleFigure);
+  });
+
+  // token palette: insert into the formula field last focused
+  let target = null;
+  document.querySelectorAll('.live-label').forEach(ta => {
+    ta.addEventListener('focus', () => { target = ta; });
+  });
+  document.querySelectorAll('.token-insert').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!target) return;
+      const start = target.selectionStart == null ? target.value.length : target.selectionStart;
+      const end = target.selectionEnd == null ? start : target.selectionEnd;
+      const token = btn.dataset.token || '';
+      target.value = target.value.slice(0, start) + token + target.value.slice(end);
+      target.focus();
+      target.selectionStart = target.selectionEnd = start + token.length;
+      target.dispatchEvent(new Event('input', {bubbles: true}));
+    });
   });
 })();
 </script>

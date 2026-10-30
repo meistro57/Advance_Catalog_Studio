@@ -123,6 +123,14 @@ def test_label_parse_styles_and_frame():
     assert [s for s in l3 if s["kind"] == "field"][0]["height"] == 1.6
 
 
+def test_label_parse_italic_flag():
+    p = ds.parse_label_format("#Italic(1)%Name#Newline#Italic(0)%Note")
+    name = [s for s in p["lines"][0] if s["kind"] == "field"][0]
+    note = [s for s in p["lines"][1] if s["kind"] == "field"][0]
+    assert name["italic"] and not note["italic"]
+    assert not [s for line in p["lines"] for s in line if s["kind"] == "cmd"]
+
+
 def test_label_parse_frame_across_newline_stays_balanced():
     p = ds.parse_label_format("#Rounded%Position#Newline%Name#End")
     for line in p["lines"]:

@@ -9,7 +9,7 @@
     {%- else -%}
       {%- set fs = (s.height * 3.4) if s.height else 14 -%}
       <span class="lp-{{ s.kind }}{% if s.kind == 'field' and not s.known %} lp-unknown{% endif %}"
-            style="font-size:{{ [fs, 9]|max }}px;{% if s.bold %}font-weight:700;{% endif %}{% if s.underline %}text-decoration:underline;{% endif %}{% if s.color %}color:{{ s.color }};{% endif %}"
+            style="font-size:{{ [fs, 9]|max }}px;{% if s.bold %}font-weight:700;{% endif %}{% if s.underline %}text-decoration:underline;{% endif %}{% if s.italic %}font-style:italic;{% endif %}{% if s.color %}color:{{ s.color }};{% endif %}"
             {% if s.kind == 'field' %}title="%{{ s.field }}"{% endif %}>
         {%- if s.kind == 'field' %}{{ s.sample }}{% else %}{{ s.text }}{% endif -%}
       </span>
