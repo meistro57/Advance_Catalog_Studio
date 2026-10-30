@@ -1,0 +1,84 @@
+{% from "_drawing_macros.html" import fld with context %}
+{#- One representation map's rules (ladder + editable table). Rendered inside
+    the editor page and re-rendered on its own by the rule actions, so a
+    reorder never costs a full page load. Needs: block (map_key, repr_map,
+    repr_items, options), database, csrf_token. Optional: rule_error. -#}
+<div id="repr-{{ block.map_key }}" class="repr-block">
+  {% if rule_error %}<div class="alert alert-danger py-1 px-2 small mb-2">{{ rule_error }}</div>{% endif %}
+  <div class="ds-sub d-flex justify-content-between align-items-end" id="rules-{{ block.map_key }}">
+    <span>Representation rules &mdash; {{ block.repr_map.row.RunName if block.repr_map and block.repr_map.row else '?' }} ({{ block.repr_items|length }})</span>
+    <button type="submit" form="ruleForm" name="op" value="renumber:{{ block.map_key }}:0"
+            class="btn btn-sm btn-outline-secondary py-0"
+            hx-post="{{ url_for('drawing_style_rule', database=database) }}"
+            hx-vals='{"op": "renumber:{{ block.map_key }}:0"}'
+            hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+            hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">Renumber</button>
+  </div>
+  <div class="ds-hint mb-1">Rules run top to bottom; each object set is drawn by the first rule that matches it. Repeated sets with a different
+    geometric restriction (AS built-in enum, shown as a number) handle the special cases before the catch-all.</div>
+  {% if block.repr_items %}
+  <div class="sd-ladder{% if block.repr_items|length > 10 %} sd-ladder-scroll{% endif %}">
+    {% for it in block.repr_items %}
+    <div class="sd-step">
+      <span class="sd-idx">{{ it.row.Order }}</span>
+      <span class="fw-semibold">{{ it.qset_name }}</span>
+      <span class="sd-arrow">&rarr;</span>
+      <span>{{ it.appearance_name }}</span>
+      <span class="sd-arrow">&rarr;</span>
+      <span>{{ it.strategy_name }}</span>
+      {% if it.linetype_name and not it.linetype_name.startswith('#-') %}<span class="badge bg-light text-dark border">{{ it.linetype_name }}</span>{% endif %}
+      {% if loop.first %}<span class="badge bg-success-subtle text-success-emphasis ms-auto">first match wins</span>{% endif %}
+      {% if loop.last %}<span class="sd-fallback">last rule</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="table-responsive">
+  <table class="table table-sm table-hover ds-rules mb-0">
+    <thead class="table-light"><tr>
+      <th>#</th><th>Object set</th><th>Geom.</th><th>Appearance</th><th>Label</th><th>Label preview</th><th>Linetype</th><th>Simpl. gap</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for it in block.repr_items %}
+      <tr>
+        <td class="ord">{{ it.row.Order }}</td>
+        <td>{{ fld('DetObjReprMapItems', it.token, 'ObjQualifier', it.row.ObjQualifier, 'select', options.ObjQualifier) }}</td>
+        <td style="width:4.5rem">{{ fld('DetObjReprMapItems', it.token, 'GeometricRestrictions', it.row.GeometricRestrictions) }}</td>
+        <td>{{ fld('DetObjReprMapItems', it.token, 'Appearance', it.row.Appearance, 'select', options.Appearance) }}</td>
+        <td>{{ fld('DetObjReprMapItems', it.token, 'AnnotationStrategy', it.row.AnnotationStrategy, 'select', options.AnnotationStrategy) }}</td>
+        <td class="rule-label">{% if it.label and it.label.fields %}{% with p = it.label %}{% include "_label_preview.html" %}{% endwith %}{% endif %}</td>
+        <td>{{ fld('DetObjReprMapItems', it.token, 'LineType', it.row.LineType, 'select', options.LineType) }}</td>
+        <td style="width:6.5rem">{{ fld('DetObjReprMapItems', it.token, 'SimplifiedGap', it.row.SimplifiedGap, 'length', compact=true) }}</td>
+        <td class="text-nowrap">
+          <button type="submit" form="ruleForm" name="op" value="up:{{ it.row.Key }}:{{ it.row.Order }}"
+                  class="btn btn-sm btn-outline-secondary py-0" title="Move up" {% if loop.first %}disabled{% endif %}
+                  hx-post="{{ url_for('drawing_style_rule', database=database) }}"
+                  hx-vals='{"op": "up:{{ it.row.Key }}:{{ it.row.Order }}"}'
+                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&uarr;</button>
+          <button type="submit" form="ruleForm" name="op" value="down:{{ it.row.Key }}:{{ it.row.Order }}"
+                  class="btn btn-sm btn-outline-secondary py-0" title="Move down" {% if loop.last %}disabled{% endif %}
+                  hx-post="{{ url_for('drawing_style_rule', database=database) }}"
+                  hx-vals='{"op": "down:{{ it.row.Key }}:{{ it.row.Order }}"}'
+                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&darr;</button>
+          <button type="submit" form="ruleForm" name="op" value="copy:{{ it.row.Key }}:{{ it.row.Order }}"
+                  class="btn btn-sm btn-outline-success py-0" title="Copy below"
+                  hx-post="{{ url_for('drawing_style_rule', database=database) }}"
+                  hx-vals='{"op": "copy:{{ it.row.Key }}:{{ it.row.Order }}"}'
+                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&#10697;</button>
+          <button type="submit" form="ruleForm" name="op" value="delete:{{ it.row.Key }}:{{ it.row.Order }}"
+                  class="btn btn-sm btn-outline-danger py-0" title="Delete"
+                  hx-confirm="Delete rule {{ it.row.Order }} ({{ it.qset_name }})?"
+                  hx-post="{{ url_for('drawing_style_rule', database=database) }}"
+                  hx-vals='{"op": "delete:{{ it.row.Key }}:{{ it.row.Order }}"}'
+                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&times;</button>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>

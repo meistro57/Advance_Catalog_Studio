@@ -1,0 +1,37 @@
+<!-- templates/_drawing_macros.html -->
+{#- Shared field macro. Imported with context so ftin (ft-in formatting) is
+    available; the rules block is re-rendered on its own by htmx. -#}
+{% macro fld(table, token, col, value, kind='text', opts=None, rows=2, help=None, label=None, cls='', compact=false) -%}
+  {%- set name = table ~ '::' ~ token ~ '::' ~ col -%}
+  {%- if kind == 'length' -%}
+    {%- set ft = ftin(value) -%}
+    {%- set shown = ft if (ft and not ft.startswith('≈')) else (value if value is not none else '') -%}
+  {%- else -%}
+    {%- set shown = value if value is not none else '' -%}
+  {%- endif -%}
+  <div class="{{ cls }}">
+    {% if label is not none %}<label>{{ label or col }}</label>{% endif %}
+    <input type="hidden" name="o::{{ name }}" value="{{ shown }}">
+    {%- if kind == 'select' %}
+      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
+        {%- set ns = namespace(found=false) -%}
+        {%- for v, l in (opts or []) %}
+          {%- if v|string == shown|string %}{% set ns.found = true %}{% endif %}
+          <option value="{{ v }}" {% if v|string == shown|string %}selected{% endif %}>{{ l }}</option>
+        {%- endfor %}
+        {%- if not ns.found %}<option value="{{ shown }}" selected>{{ shown if shown != '' else '(blank)' }}{% if shown|string in ('', '0', '-1') %} — none{% else %} (current){% endif %}</option>{% endif %}
+      </select>
+    {%- elif kind == 'bool' %}
+      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
+        {%- for v in ['True','False'] %}<option value="{{ v }}" {% if shown|string == v %}selected{% endif %}>{{ 'Yes' if v == 'True' else 'No' }}</option>{% endfor %}
+      </select>
+    {%- elif kind == 'formula' %}
+      <textarea name="f::{{ name }}" rows="{{ rows }}" class="form-control form-control-sm formula ds-in live-label" data-orig="{{ shown }}">{{ shown }}</textarea>
+      <div class="live-target mt-1"></div>
+    {%- else %}
+      <input name="f::{{ name }}" value="{{ shown }}" class="form-control form-control-sm ds-in" data-orig="{{ shown }}">
+    {%- endif %}
+    {% if kind == 'length' %}<div class="ds-hint">{{ ((value|float)|round(3)) if value is not none else "" }} mm{% if not compact %}{% if ft %} · {{ ft }}{% endif %} — type mm or ft-in (2'-6 1/2"){% endif %}</div>{% endif %}
+    {% if help %}<div class="ds-hint">{{ help }}</div>{% endif %}
+  </div>
+{%- endmacro %}

@@ -24,6 +24,7 @@
   .rule-label .label-preview { padding:.1rem .35rem; min-height:0; font-size:11px; }
   #saveBar { position:sticky; bottom:0; z-index:20; }
   .ds-toc a { text-decoration:none; }
+  .repr-block.htmx-request { opacity:.55; transition:opacity .15s; }
   textarea.formula { font-family:monospace; font-size:.8rem; }
   .ds-help { background:#eef4ff; border-left:3px solid #0d6efd; border-radius:.3rem; padding:.55rem .75rem; font-size:.84rem; }
   .sd-figure-card { border:1px solid #dee2e6; border-radius:.4rem; background:#fff; padding:.5rem .6rem; height:100%; }
@@ -60,40 +61,7 @@
   .hatch-cell .sd-svg { width:54px; }
 </style>
 
-{% macro fld(table, token, col, value, kind='text', opts=None, rows=2, help=None, label=None, cls='', compact=false) -%}
-  {%- set name = table ~ '::' ~ token ~ '::' ~ col -%}
-  {%- if kind == 'length' -%}
-    {%- set ft = ftin(value) -%}
-    {%- set shown = ft if (ft and not ft.startswith('≈')) else (value if value is not none else '') -%}
-  {%- else -%}
-    {%- set shown = value if value is not none else '' -%}
-  {%- endif -%}
-  <div class="{{ cls }}">
-    {% if label is not none %}<label>{{ label or col }}</label>{% endif %}
-    <input type="hidden" name="o::{{ name }}" value="{{ shown }}">
-    {%- if kind == 'select' %}
-      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
-        {%- set ns = namespace(found=false) -%}
-        {%- for v, l in (opts or []) %}
-          {%- if v|string == shown|string %}{% set ns.found = true %}{% endif %}
-          <option value="{{ v }}" {% if v|string == shown|string %}selected{% endif %}>{{ l }}</option>
-        {%- endfor %}
-        {%- if not ns.found %}<option value="{{ shown }}" selected>{{ shown if shown != '' else '(blank)' }}{% if shown|string in ('', '0', '-1') %} — none{% else %} (current){% endif %}</option>{% endif %}
-      </select>
-    {%- elif kind == 'bool' %}
-      <select name="f::{{ name }}" class="form-select form-select-sm ds-in" data-orig="{{ shown }}">
-        {%- for v in ['True','False'] %}<option value="{{ v }}" {% if shown|string == v %}selected{% endif %}>{{ 'Yes' if v == 'True' else 'No' }}</option>{% endfor %}
-      </select>
-    {%- elif kind == 'formula' %}
-      <textarea name="f::{{ name }}" rows="{{ rows }}" class="form-control form-control-sm formula ds-in live-label" data-orig="{{ shown }}">{{ shown }}</textarea>
-      <div class="live-target mt-1"></div>
-    {%- else %}
-      <input name="f::{{ name }}" value="{{ shown }}" class="form-control form-control-sm ds-in" data-orig="{{ shown }}">
-    {%- endif %}
-    {% if kind == 'length' %}<div class="ds-hint">{{ ((value|float)|round(3)) if value is not none else "" }} mm{% if not compact %}{% if ft %} · {{ ft }}{% endif %} — type mm or ft-in (2'-6 1/2"){% endif %}</div>{% endif %}
-    {% if help %}<div class="ds-hint">{{ help }}</div>{% endif %}
-  </div>
-{%- endmacro %}
+{% from "_drawing_macros.html" import fld with context %}
 
 {% macro dims_figures(r) -%}
   <div class="row g-2 mt-2">
@@ -109,6 +77,7 @@
   </div>
 {%- endmacro %}
 
+<script src="{{ url_for('static', filename='vendor/htmx/htmx.min.js') }}"></script>
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <h4 class="mb-0">&#128208; Drawing Style Editor <small class="text-muted">{{ database }}</small>
@@ -164,7 +133,9 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 </form>
 
-<form id="styleForm" method="post" action="/db/{{ database }}/drawing-style/save">
+<form id="styleForm" method="post" action="/db/{{ database }}/drawing-style/save"
+      hx-post="{{ url_for('drawing_style_save', database=database) }}" hx-swap="none"
+      hx-on::after-request="if (event.detail.successful) window.__dsAfterSave()">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <input type="hidden" name="anchor" id="anchorField" value="">
 
@@ -280,57 +251,10 @@
       {% endif %}
 
       {# ---------------- representation rules ---------------- #}
-      <div class="ds-sub d-flex justify-content-between align-items-end" id="rules-{{ r.row.ObjReprMap }}">
-        <span>Representation rules &mdash; {{ r.repr_map.row.RunName if r.repr_map else '?' }} ({{ r.repr_items|length }})</span>
-        <button form="ruleForm" name="op" value="renumber:{{ r.row.ObjReprMap }}:0" class="btn btn-sm btn-outline-secondary py-0">Renumber</button>
-      </div>
-      <div class="ds-hint mb-1">Rules run top to bottom; each object set is drawn by the first rule that matches it. Repeated sets with a different
-        geometric restriction (AS built-in enum, shown as a number) handle the special cases before the catch-all.</div>
-      {% if r.repr_items %}
-      <div class="sd-ladder{% if r.repr_items|length > 10 %} sd-ladder-scroll{% endif %}">
-        {% for it in r.repr_items %}
-        <div class="sd-step">
-          <span class="sd-idx">{{ it.row.Order }}</span>
-          <span class="fw-semibold">{{ it.qset_name }}</span>
-          <span class="sd-arrow">&rarr;</span>
-          <span>{{ it.appearance_name }}</span>
-          <span class="sd-arrow">&rarr;</span>
-          <span>{{ it.strategy_name }}</span>
-          {% if it.linetype_name and not it.linetype_name.startswith('#-') %}<span class="badge bg-light text-dark border">{{ it.linetype_name }}</span>{% endif %}
-          {% if loop.first %}<span class="badge bg-success-subtle text-success-emphasis ms-auto">first match wins</span>{% endif %}
-          {% if loop.last %}<span class="sd-fallback">last rule</span>{% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <div class="table-responsive">
-      <table class="table table-sm table-hover ds-rules mb-0">
-        <thead class="table-light"><tr>
-          <th>#</th><th>Object set</th><th>Geom.</th><th>Appearance</th><th>Label</th><th>Label preview</th><th>Linetype</th><th>Simpl. gap</th><th></th>
-        </tr></thead>
-        <tbody>
-        {% for it in r.repr_items %}
-          <tr>
-            <td class="ord">{{ it.row.Order }}</td>
-            <td>{{ fld('DetObjReprMapItems', it.token, 'ObjQualifier', it.row.ObjQualifier, 'select', options.DetObjReprMapItems.ObjQualifier) }}</td>
-            <td style="width:4.5rem">{{ fld('DetObjReprMapItems', it.token, 'GeometricRestrictions', it.row.GeometricRestrictions) }}</td>
-            <td>{{ fld('DetObjReprMapItems', it.token, 'Appearance', it.row.Appearance, 'select', options.DetObjReprMapItems.Appearance) }}</td>
-            <td>{{ fld('DetObjReprMapItems', it.token, 'AnnotationStrategy', it.row.AnnotationStrategy, 'select', options.DetObjReprMapItems.AnnotationStrategy) }}</td>
-            <td class="rule-label">{% if it.label and it.label.fields %}{% with p = it.label %}{% include "_label_preview.html" %}{% endwith %}{% endif %}</td>
-            <td>{{ fld('DetObjReprMapItems', it.token, 'LineType', it.row.LineType, 'select', options.DetObjReprMapItems.LineType) }}</td>
-            <td style="width:6.5rem">{{ fld('DetObjReprMapItems', it.token, 'SimplifiedGap', it.row.SimplifiedGap, 'length', compact=true) }}</td>
-            <td class="text-nowrap">
-              <button form="ruleForm" name="op" value="up:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-secondary py-0" title="Move up" {% if loop.first %}disabled{% endif %}>&uarr;</button>
-              <button form="ruleForm" name="op" value="down:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-secondary py-0" title="Move down" {% if loop.last %}disabled{% endif %}>&darr;</button>
-              <button form="ruleForm" name="op" value="copy:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-success py-0" title="Copy below">&#10697;</button>
-              <button form="ruleForm" name="op" value="delete:{{ it.row.Key }}:{{ it.row.Order }}" class="btn btn-sm btn-outline-danger py-0" title="Delete"
-                      onclick="return confirm('Delete rule {{ it.row.Order }} ({{ it.qset_name }})?');">&times;</button>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      </div>
+      {% with block = {'map_key': r.row.ObjReprMap, 'repr_map': r.repr_map, 'repr_items': r.repr_items},
+              options = options.DetObjReprMapItems %}
+      {% include "_drawing_rules.html" %}
+      {% endwith %}
 
       {# ---------------- dimensions ---------------- #}
       {% if r.dims %}
@@ -549,6 +473,22 @@
     const sec = [...document.querySelectorAll('[id^="req-"],[id^="rules-"],#lib')]
       .filter(e => e.getBoundingClientRect().top < window.innerHeight / 2).pop();
     document.getElementById('anchorField').value = sec ? sec.id : '';
+  });
+
+  window.__dsAfterSave = () => {
+    form.querySelectorAll('.ds-in').forEach(el => { el.dataset.orig = el.value; });
+    refresh();
+  };
+
+  // Rule actions swap one rules block in place; ask before throwing away
+  // unsaved field edits (hx-confirm still handles its own question).
+  document.body.addEventListener('htmx:confirm', (evt) => {
+    const el = evt.detail && evt.detail.elt;
+    if (!el || !el.closest || !el.closest('.repr-block')) return;
+    if (!el.hasAttribute('hx-confirm') && window.__dirty &&
+        !confirm('You have unsaved field edits. This rule action re-renders the rules block and drops them. Continue?')) {
+      evt.preventDefault();
+    }
   });
   document.getElementById('ruleForm').addEventListener('submit', e => {
     if (window.__dirty && !confirm('You have unsaved field edits. Rule actions reload the page and drop them. Continue?')) e.preventDefault();

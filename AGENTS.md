@@ -94,6 +94,14 @@ and display-name token replacement.
   and runs `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
+- Drawing-style rule actions are htmx-enhanced: `templates/_drawing_rules.html`
+  is the single rules block (included by the page **and** returned by
+  `drawing_style_rule` for `HX-Request` posts), `drawing_styles.repr_block()`
+  loads just that map instead of the whole tree, and `_flash_oob.html` appends
+  flashed messages into `#flashHost`. Keep the plain `form="ruleForm"` submit
+  path working as the no-JS fallback, and keep `fld` in
+  `_drawing_macros.html` (imported `with context`). htmx 2.0.4 is vendored at
+  `static/vendor/htmx/htmx.min.js` so the tool stays offline.
 - `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
   schematic SVG figures (style overview, print-scale ruler, view box, length
   clipping, dimension-chain anatomy, per-view dimension plan, single chain,

@@ -518,6 +518,62 @@ def style_tree(database):
     return {"masters": masters, "libraries": libraries, "qset_items": qset_items}
 
 
+def repr_block(database, map_key, relations=None):
+    """One representation map's rules, for an in-place partial re-render.
+
+    Rule actions (move / copy / delete / renumber) only need this block, so
+    the editor can swap it without rebuilding the whole style page.
+    """
+    db = _db()
+    tables = set(db.list_tables(database))
+    tok = db.make_row_token
+    pk_items = db.get_primary_key_columns(database, "DetObjReprMapItems")
+
+    names = {
+        "qset": _label_map(database, "DetObjQualifierSet"),
+        "appearance": _label_map(database, "DetObjAppearance"),
+        "annot_strategy": _label_map(database, "DetObjAnnotationStrategy"),
+        "linetype": _label_map(database, "Linetypes", "LinetypeName"),
+    }
+    annot_types = _by_key(_rows(database, "SELECT * FROM DetAnnotationType")) if "DetAnnotationType" in tables else {}
+    strategies = _by_key(_rows(database, "SELECT * FROM DetObjAnnotationStrategy")) if "DetObjAnnotationStrategy" in tables else {}
+
+    def strategy_preview(skey):
+        strategy = strategies.get(skey)
+        if not strategy:
+            return None
+        annot_type = annot_types.get(strategy.get("AnnotationType"))
+        return parse_label_format(annot_type["Content"]) if annot_type else None
+
+    rmap = None
+    if "DetObjReprMapsNew" in tables:
+        rows = _rows(database, "SELECT * FROM DetObjReprMapsNew WHERE [Key] = %s", (map_key,))
+        rmap = rows[0] if rows else None
+    rmap_token = None
+    if rmap is not None:
+        rmap_pk = db.get_primary_key_columns(database, "DetObjReprMapsNew")
+        rmap_token = tok(rmap, rmap_pk) if rmap_pk else None
+
+    items = []
+    for it in _rows(database, "SELECT * FROM DetObjReprMapItems WHERE [Key] = %s ORDER BY [Order]", (map_key,)):
+        entry = {"row": it, "token": tok(it, pk_items) if pk_items else None}
+        entry.update({
+            "qset_name": names["qset"].get(it["ObjQualifier"], f"#{it['ObjQualifier']}"),
+            "appearance_name": names["appearance"].get(it["Appearance"], f"#{it['Appearance']}"),
+            "strategy_name": names["annot_strategy"].get(it["AnnotationStrategy"], f"#{it['AnnotationStrategy']}"),
+            "linetype_name": names["linetype"].get(it["LineType"], f"#{it['LineType']}"),
+            "label": strategy_preview(it["AnnotationStrategy"]),
+        })
+        items.append(entry)
+
+    return {
+        "map_key": map_key,
+        "repr_map": {"row": rmap, "token": rmap_token},
+        "repr_items": items,
+        "options": options_for_table(database, "DetObjReprMapItems", relations),
+    }
+
+
 def all_relation_options(database, relations=None):
     """{table: {col: [(v, label)]}} for every table that has local relations."""
     relations = relations if relations is not None else load_relations(database)

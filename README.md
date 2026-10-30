@@ -223,6 +223,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **Style identity** — picker name, help text, owner, title and cut-view title formulas with a live rendered preview.
 - **Each view** — scale (shown as `1:16 (3/4" = 1'-0")`), representation map, dimension strategy, view-box depth, length clipping. Lengths display in feet-inches and accept either mm or ft-in (`2'-6 1/2"`).
 - **Dimension setup** — every request row shows its point count and names, its axis and Above flag, and the file's own AS switches (global arrangement, grouping, combine, auto-separate, group number, label formula) as labelled badges with an "all fields" link.
+- **In-place rule edits** — move / copy / delete / renumber swap only that view's rules block (htmx, vendored locally) instead of reloading the page, so a long style keeps its scroll position; saving fields posts in the background and reports through the page's flash area. Both paths still work without JavaScript.
 - **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension section with a "how to read a chain" explainer, a plan of every chain in the view (X chains above/below the part, Y chains beside it, numbered into a legend), and a chain sketch per request (collapsed behind a summary once a view has more than six). They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
 - **Libraries** — label formulas (live preview plus a click-to-insert token palette), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
@@ -333,7 +334,9 @@ Advance_Catalog_Studio/
 │   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
 │   │   ├── js/anchor-configurator.js # Three.js anchor viewer
 │   │   ├── css/                   # bolt-set-viewer.css, fabrication-sheet.css
-│   │   └── vendor/three/           # Pinned local Three.js r160 (offline)
+│   │   └── vendor/
+│   │       ├── three/              # Pinned local Three.js r160 (offline)
+│   │       └── htmx/               # Pinned htmx 2.0.4 (offline partial updates)
 │   └── utils/
 │       ├── anchor_sets.py      # Anchor view model for the configurator
 │       ├── bolt_sets.py        # Bolt-set view model for the viewer

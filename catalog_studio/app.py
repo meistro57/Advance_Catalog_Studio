@@ -797,18 +797,28 @@ def drawing_style_save(database):
             flash(f"Saved {len(edits) - len(errors)} field(s) across {n} record(s).", "success")
         for e in errors:
             flash(e, "danger")
+    if request.headers.get("HX-Request"):
+        return Response(render_template("_flash_oob.html"), mimetype="text/html")
     anchor = request.form.get("anchor", "")
     return redirect(url_for("drawing_style", database=database) + (f"#{anchor}" if anchor else ""))
 
 
 @app.route("/db/<database>/drawing-style/rule", methods=["POST"])
 def drawing_style_rule(database):
-    """Representation-rule actions. Buttons post op='action:key:order'."""
+    """Representation-rule actions. Buttons post op='action:key:order'.
+
+    An htmx request gets just that map's rules block back, so reordering or
+    copying a rule keeps the page (and scroll position) intact; a plain form
+    post still redirects to the rebuilt page.
+    """
     if not _csrf_valid():
         abort(400)
-    key = ""
+    raw_op = request.form.get("op", "")
+    parts = raw_op.split(":")
+    map_key = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+    error = None
     try:
-        action, key, order = request.form.get("op", "").split(":")
+        action, key, order = parts
         key, order = int(key), int(order)
         if action in ("up", "down"):
             drawing_styles.move_repr_item(database, key, order, -1 if action == "up" else 1)
@@ -825,8 +835,21 @@ def drawing_style_rule(database):
         else:
             raise ValueError(f"unknown action {action!r}")
     except Exception as e:
-        flash(f"Rule change failed: {e}", "danger")
-    return redirect(url_for("drawing_style", database=database) + f"#rules-{key}")
+        error = f"Rule change failed: {e}"
+        flash(error, "danger")
+
+    if request.headers.get("HX-Request"):
+        flash_html = render_template("_flash_oob.html")
+        if map_key is None:
+            return Response(flash_html, mimetype="text/html")
+        block = drawing_styles.repr_block(database, map_key, _style_relations_or_none(database))
+        rules_html = render_template(
+            "_drawing_rules.html", database=database, block=block,
+            options=block["options"], rule_error=error,
+            ftin=drawing_styles.format_ft_in,
+        )
+        return Response(rules_html + flash_html, mimetype="text/html")
+    return redirect(url_for("drawing_style", database=database) + f"#rules-{map_key or ''}")
 
 
 @app.route("/db/<database>/drawing-style/label-preview", methods=["POST"])
