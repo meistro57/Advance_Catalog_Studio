@@ -348,7 +348,7 @@ def dimension_svg(linear, points=()):
             4,
             14,
             f"{'X' if direction == 0 else 'Y'}-direction chain, {count} point(s), "
-            f"{'above' if above else 'below'} the part",
+            f"{('above' if above else 'below') if direction == 0 else ('left of (above)' if above else 'right of (below)')} the part",
             "sd-head",
         )
     ]
@@ -375,19 +375,20 @@ def dimension_svg(linear, points=()):
     else:
         py0, py1, px0 = 40.0, 128.0, 220.0
         parts.append(_rect(px0, py0, 34, py1 - py0, "sd-part"))
-        chain_x = 300.0 if above else 160.0
+        # DSM guide: in a vertical chain "above" is the left side.
+        chain_x = 160.0 if above else 300.0
         parts.append(_line(chain_x, py0 - 6, chain_x, py1 + 6, "sd-dim"))
         ys = [py0] if count < 2 else [py0 + i * (py1 - py0) / (count - 1) for i in range(count)]
         for i, ty in enumerate(ys):
             parts.append(_line(chain_x - 6, ty, chain_x + 6, ty, "sd-dim"))
-            anchor = "start" if above else "end"
-            parts.append(tick_label(i, chain_x + (10 if above else -10), ty + 4, anchor))
+            anchor = "end" if above else "start"
+            parts.append(tick_label(i, chain_x + (-10 if above else 10), ty + 4, anchor))
 
     parts.append(
         _text(4, 154, "Direction 0 = X, 1 = Y (file values). Point names come from DetViewDimPointSelection.", "sd-note")
     )
     parts.append(
-        _text(4, 166, "Whether AS calls the far side 'above' for a Y request is unverified.", "sd-note")
+        _text(4, 166, "DSM guide: in a vertical chain, 'above' is the left side and 'below' the right.", "sd-note")
     )
     return _figure(520, 174, "Dimension chain schematic", "".join(parts))
 
@@ -453,8 +454,9 @@ def dimension_plan_svg(dims, width=720.0):
     max_lanes = MAX_PLAN_LANES
     x_above_all = [e for e in entries if e["direction"] == 0 and e["above"]]
     x_below_all = [e for e in entries if e["direction"] == 0 and not e["above"]]
-    y_right_all = [e for e in entries if e["direction"] == 1 and e["above"]]
-    y_left_all = [e for e in entries if e["direction"] == 1 and not e["above"]]
+    # DSM guide: in a vertical chain "above" is the left side, "below" the right.
+    y_left_all = [e for e in entries if e["direction"] == 1 and e["above"]]
+    y_right_all = [e for e in entries if e["direction"] == 1 and not e["above"]]
     x_above, x_below = x_above_all[:max_lanes], x_below_all[:max_lanes]
     y_right, y_left = y_right_all[:max_lanes], y_left_all[:max_lanes]
     hidden = [
@@ -648,10 +650,12 @@ def request_diagrams(request):
     for d in request.get("dims") or []:
         linear = (d.get("linear") or {}).get("row")
         if linear:
+            svg = dimension_svg(linear, d.get("points") or ())
+            d["svg"] = svg  # the chain card draws its own figure
             dims.append({
                 "name": linear.get("RunName") or f"request #{linear.get('Key')}",
                 "points": d.get("points") or [],
-                "svg": dimension_svg(linear, d.get("points") or ()),
+                "svg": svg,
             })
     return {
         "scale": scale_bar_svg(row.get("Scale")),

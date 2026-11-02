@@ -107,6 +107,11 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   `DetViewDimRequestLinear.Point1..15` (and `NumberOfPoints`) with the existing
   relation dropdowns; validate that the point count matches the populated
   points and that `DetViewDimPointSelection.Objects` resolves.
+- [ ] **E1b — Decode point-selection enums.** With a live AS 2026 DSM open
+  next to an export, record which `DetViewDimPointSelection` column/value is
+  each "Point type", "Point position on object/main part" and "Visibility"
+  option, and which `Direction` values are which chain directions. Only then
+  replace the raw columns on the dimension cards with labels (feeds A5).
 - [ ] **E2 — Arranger strategy editing.** Expose `ArrangerStrategy`,
   `ArrangerControl` and the merge distance on annotation strategies, with the
   same shared-record warning as other library edits.

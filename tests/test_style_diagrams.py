@@ -297,8 +297,8 @@ def test_dimension_plan_places_x_above_below_and_y_beside_the_part():
     dims = [
         {"linear": {"row": {"RunName": "Above", "Direction": 0, "ArrangeAbove": True}}, "points": ["A"]},
         {"linear": {"row": {"RunName": "Below", "Direction": 0, "ArrangeAbove": False}}, "points": ["A"]},
-        {"linear": {"row": {"RunName": "Right", "Direction": 1, "ArrangeAbove": True}}, "points": ["A"]},
-        {"linear": {"row": {"RunName": "Left", "Direction": 1, "ArrangeAbove": False}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Left", "Direction": 1, "ArrangeAbove": True}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Right", "Direction": 1, "ArrangeAbove": False}}, "points": ["A"]},
     ]
     svg = sd.dimension_plan_svg(dims)
     lanes = re.findall(r'<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" stroke="#', svg)
@@ -354,3 +354,19 @@ def test_request_diagrams_include_plan_and_decorate_marks_first_anatomy():
     reqs = tree["masters"][0]["style"]["requests"]
     assert reqs[0]["diagrams"]["anatomy"]
     assert reqs[1]["diagrams"]["anatomy"] is None
+
+
+def test_vertical_above_is_drawn_on_the_left():
+    # DSM guide (2016) p.72: "In the vertical detail views above is left and below is right."
+    above = sd.dimension_svg({"Direction": 1, "ArrangeAbove": True, "Number of Points": 2})
+    below = sd.dimension_svg({"Direction": 1, "ArrangeAbove": False, "Number of Points": 2})
+    assert 'class="sd-dim" x1="160.0" y1="34.0" x2="160.0"' in above
+    assert 'class="sd-dim" x1="300.0" y1="34.0" x2="300.0"' in below
+    assert "left of (above) the part" in above and "right of (below) the part" in below
+
+
+def test_dimension_plan_puts_vertical_above_lanes_left():
+    dims = [{"linear": {"row": {"RunName": "Up", "Direction": 1, "ArrangeAbove": True}}, "points": ["A"]}]
+    svg = sd.dimension_plan_svg(dims)
+    lanes = re.findall(r'<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" stroke="#', svg)
+    assert lanes and all(float(l[0]) < 250.0 for l in lanes)

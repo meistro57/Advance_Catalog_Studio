@@ -53,7 +53,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
-| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), read-only sub-style usage and orphan scan |
+| Drawing-style editor (Drawing Style Manager exports) | Menu-driven screens per view; style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), plain-language dimension request cards, read-only sub-style usage and orphan scan |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]

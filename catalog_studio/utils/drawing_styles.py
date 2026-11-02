@@ -31,6 +31,8 @@ Advance Steel 2026 exports.
 import re
 from fractions import Fraction
 
+from utils import dim_explain
+
 # ---------------------------------------------------------------------------
 # Pure helpers (unit-tested, no database)
 # ---------------------------------------------------------------------------
@@ -463,6 +465,7 @@ def style_tree(database):
     dstrats = _by_key(_rows(database, "SELECT * FROM DetViewDimStrategyNew")) if "DetViewDimStrategyNew" in tables else {}
     ditems = _rows(database, "SELECT * FROM DetViewDimStrategyItems ORDER BY [Key], [Order]") if "DetViewDimStrategyItems" in tables else []
     dlins = _by_key(_rows(database, "SELECT * FROM DetViewDimRequestLinear")) if "DetViewDimRequestLinear" in tables else {}
+    dpoints = _by_key(_rows(database, "SELECT * FROM DetViewDimPointSelection")) if "DetViewDimPointSelection" in tables else {}
 
     def build_request(rk):
         r = requests.get(rk)
@@ -486,16 +489,24 @@ def style_tree(database):
             if di["Key"] != r.get("DimStrategy"):
                 continue
             lin = dlins.get(di["RequestLinear"])
-            pts = []
+            pts, pkeys = [], []
             if lin:
                 for i in range(1, int(lin.get("Number of Points") or 0) + 1):
                     pkey = lin.get(f"Point{i}")
                     pts.append(names["point"].get(pkey, f"#{pkey}"))
+                    pkeys.append(pkey)
             dims.append({
                 **tokrow("DetViewDimStrategyItems", di),
                 "linear": tokrow("DetViewDimRequestLinear", lin) if lin else None,
                 "points": pts,
+                "point_keys": pkeys,
             })
+        explained = dim_explain.explain_strategy(dims, dpoints, names["qset"])
+        for d, e in zip(dims, explained):
+            d["explain"] = e
+            d["point_rows"] = [
+                tokrow("DetViewDimPointSelection", dpoints[k]) for k in d["point_keys"] if k in dpoints
+            ]
         sb = sysbox.get(r.get("SystemAndBox"))
         cl = clips.get(r.get("LengthclipXY"))
         rm = rmaps.get(r.get("ObjReprMap"))
