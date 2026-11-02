@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 317 tests; read-only bolt/anchor/stud/style views and
+Baseline: `main` green at 344 tests; read-only bolt/anchor/stud/style views and
 the health report exist; writes are the bolt diameter clone, raw row CRUD, find
 & replace, and drawing-style field/rule edits.
 
@@ -194,3 +194,13 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] Branch cleanup and README/docs alignment.
 - [x] Pre-change `COPY_ONLY` snapshots for the bolt diameter clone and find &
   replace, with fail-closed routes and manifests (329 tests).
+- [x] Find & replace runs in one transaction, cascading legacy `text`/`ntext`
+  to `nvarchar(max)` and rolling back on the first failure (issue #7).
+- [x] Anchor diameter clone replaces an existing target diameter instead of
+  duplicating it; the preview reports the rows that will be replaced (issue #8).
+- [x] Table browser validates `filter_col` against the table's columns and
+  limits `filter_op` to equals / contains (issue #9).
+- [x] Detach restores `MULTI_USER` when `sp_detach_db` fails, snapshots close
+  their connection on error, add-diameter names the snapshot failure, the bolt
+  clone refuses identity-keyed tables, `BoltsDistances.Description` uses a
+  token-boundary replace, and the tree is pyflakes-clean (issue #10).

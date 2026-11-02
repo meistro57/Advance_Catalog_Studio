@@ -204,13 +204,15 @@ This is the relationship-aware part of Catalog Studio. The wizard lets you:
 
 If any insert fails, the transaction rolls back rather than leaving half a diameter scattered through the catalog.
 
+Re-applying the same target diameter is safe: the wizard replaces the existing target rows instead of duplicating them (bolt tables are cleared first, and on anchor catalogs the hole and length rows are removed before their parent anchor records). The preview shows how many existing rows will be replaced. Cloning a diameter onto itself is refused.
+
 ### Find & Replace
 
-Searches textual columns across the database and reports matches by table and column before changing anything. This is useful when correcting catalog names, manufacturer designations, or legacy product labels.
+Searches textual columns across the database and reports matches by table and column before changing anything. This is useful when correcting catalog names, manufacturer designations, or legacy product labels. The whole replacement runs as one transaction, so a failure part-way through rolls back every column instead of leaving the catalog half changed; legacy `text`/`ntext` columns are converted on the fly because SQL Server's `REPLACE()` refuses them directly.
 
 ### Raw table editor
 
-For work that does not fit a guided tool, each table can be browsed and filtered directly. Supported tables allow adding, editing, duplicating, and deleting rows.
+For work that does not fit a guided tool, each table can be browsed and filtered directly. Filters are limited to the table's own columns and to the equals / contains operators; anything else is rejected. Supported tables allow adding, editing, duplicating, and deleting rows.
 
 Many Advance Steel tables use **composite primary keys** (`SetBolts`, `ScrewNew`, `SetNutsBolts`, `BoltsDistances`, and in style exports `DetObjReprMapItems (Key, Order)`). Rows are addressed by every key column together, and each edit/delete runs in a transaction that rolls back unless exactly one row is affected. Duplicating a composite-key row bumps the last integer key column (e.g. the next `Order` within the same `Key`).
 
@@ -509,6 +511,7 @@ These are planned features, not claims about the current release. Development wi
 - The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
 - The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
+- If detaching a database fails, Catalog Studio restores it to multi-user mode so it can still be reconnected.
 - Batch writes take a **pre-change snapshot** first: the bolt-diameter clone and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
 
 ## Contributing

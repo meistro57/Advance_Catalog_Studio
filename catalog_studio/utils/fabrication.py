@@ -474,7 +474,7 @@ def generate_elevation_svg(view: dict, mode: str = "imperial", draw_h: int = 500
     add(f'<line x1="{x_center}" y1="{px_y(L)}" x2="{x_center + half_w * scale + 6}" '
         f'y2="{px_y(L)}" stroke="#94a3b8" stroke-width="0.7"/>')  # leader to rod tip
 
-    x1 = dim_line(0, L, f"L = {dim_text(L)}")
+    dim_line(0, L, f"L = {dim_text(L)}")
     if t_top - t_bot > 0.5:
         dim_line(t_bot, t_top, f"thread = {dim_text(t_top - t_bot)}", x_off=26)
     if conc_y is not None and 0 < float(conc_y) < L:

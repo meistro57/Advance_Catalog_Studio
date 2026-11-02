@@ -38,8 +38,10 @@ and display-name token replacement.
   scan, catalog health report, fabrication sheet model, shear-stud browser
   model and clone plan, staging cleanup, connection timeouts) — no database
   needed.
-- **No linter, no CI, no Makefile, no packaging config exist.** Verification
-  is manual against the Docker SQL Server (plus the pytest suite).
+- **No configured linter, no CI, no Makefile, no packaging config exist.**
+  Verification is manual against the Docker SQL Server plus the pytest suite.
+  The tree is kept pyflakes-clean (`pyflakes catalog_studio tests *.py`), but
+  pyflakes is not a pinned dependency and no formatting policy is applied.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
   entry passes.
@@ -429,9 +431,18 @@ dimension logic of its own.
   - Names in cloned rows are rewritten via `db.smart_replace_name`, which only
     substitutes a token when it is preceded by whitespace and followed by
     ` x ` (bolt names) or at end-of-string/boundary — so `1/4` in `1 1/4`
-    is not corrupted.
-- `preview_find_replace` / `apply_find_replace` open a fresh connection per
-  table/column; fine for small catalogs, slow on large ones.
+    is not corrupted. Free text (`BoltsDistances.Description`) goes through
+    `db.replace_diameter_in_text`, which matches whole numbers only.
+  - Re-applying a clone replaces the target diameter instead of duplicating it:
+    the bolt tables are deleted first and the anchor branch deletes
+    `AnchorsHoleDefinition`/`AnchorsDefinition`/`AnchorsName` children before
+    parents in the same transaction. Applying with target == source raises.
+  - The bolt branch copies every column, so it refuses to run (fail closed) when
+    one of the copied tables has an identity column — that shape is unverified.
+- `preview_find_replace` / `apply_find_replace` each use one connection for the
+  whole scan. `apply_find_replace` runs every column update in one transaction
+  and rolls back on the first failure; legacy `text`/`ntext` columns are cast to
+  `nvarchar(max)` because SQL Server's `REPLACE()` rejects them.
 - Destructive browser actions (the staging cleanup POSTs) require a CSRF
   token from the session; `_csrf_token()` is injected into templates and
   `_csrf_valid()` guards each cleanup route. Target filenames are always
@@ -462,9 +473,9 @@ dimension logic of its own.
   recursive `Copy (1) of ...` names. Deep-copy naming is a project decision to
   make when that write path is verified.
 - **Performance:** catalog tables can hold tens of thousands of rows. Prefer one
-  connection per operation, parameterised batch statements and indexed lookups;
-  `preview_find_replace` / `apply_find_replace` still open a connection per
-  table/column and are the known slow path.
+  connection per operation, parameterised batch statements and indexed lookups.
+  `preview_find_replace` / `apply_find_replace` still run one `COUNT`/`UPDATE`
+  per text column and are the known slow path on very large catalogs.
 
 ## Known inconsistencies (not yet bugs to "fix" blindly)
 

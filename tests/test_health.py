@@ -4,8 +4,6 @@ Fixtures mirror the shapes returned by `db.get_catalog_diameters`, the anchor
 tables and the per-type modules. No database required.
 """
 
-import pytest
-
 from utils import health
 
 

@@ -671,8 +671,24 @@ def add_diameter(database):
                     include_tables=include_tables,
                 )
             elif action == "apply":
-                snapshot = snapshots.create_snapshot(
-                    database, f"add diameter {target_dia:g} mm")
+                try:
+                    snapshot = snapshots.create_snapshot(
+                        database, f"add diameter {target_dia:g} mm")
+                except Exception as e:
+                    flash(
+                        f"Pre-change snapshot failed, so nothing was added: {e}",
+                        "danger",
+                    )
+                    return render_template(
+                        "add_diameter.html",
+                        database=database,
+                        catalog_type=catalog_type,
+                        existing_diameters=existing_diameters,
+                        presets=presets,
+                        form_data=form_data,
+                        preview=None,
+                        meta=meta,
+                    )
                 counts = db.apply_clone_diameter(
                     database=database,
                     source_dia=source_dia,
@@ -812,6 +828,11 @@ def show_table(database, table):
     filter_op = request.args.get("filter_op", "=")
     filter_val = request.args.get("filter_val", "")
     virtual_val = request.args.get("virtual_val", "")
+
+    if filter_col and filter_col not in columns:
+        abort(400)
+    if filter_op not in ("=", "contains"):
+        abort(400)
 
     virtual = db.VIRTUAL_FILTERS.get(table)
     virtual_values = None

@@ -1,8 +1,6 @@
 """Smoke tests that the Flask app wires the bolt-set viewer routes and that the
 viewer template renders for a bolt catalog without requiring a database."""
 
-import pytest
-
 
 def test_bolt_set_viewer_routes_registered():
     from app import app
@@ -438,4 +436,47 @@ def test_add_diameter_blocks_when_the_snapshot_fails(monkeypatch):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "disk full" in body
+    assert "Pre-change snapshot failed" in body
     assert applied == []
+
+
+# --- table browser filter validation (issue #9) -----------------------------
+
+def _patch_table_browser(monkeypatch, columns):
+    from utils import db
+    calls = []
+    monkeypatch.setattr(db, "list_tables", lambda database: ["SetBolts"])
+    monkeypatch.setattr(
+        db, "get_columns",
+        lambda database, table: [{"COLUMN_NAME": c} for c in columns])
+    monkeypatch.setattr(db, "get_primary_key_columns", lambda database, table: [])
+    monkeypatch.setattr(db, "get_rows", lambda database, table: [])
+    monkeypatch.setattr(
+        db, "get_rows_filtered",
+        lambda *args, **kwargs: calls.append(args) or [])
+    return calls
+
+
+def test_table_filter_rejects_unknown_column(monkeypatch):
+    from app import app
+    calls = _patch_table_browser(monkeypatch, ["Name"])
+    resp = app.test_client().get("/db/SomeDb/SetBolts?filter_col=Name]+--&filter_val=x")
+    assert resp.status_code == 400
+    assert calls == []
+
+
+def test_table_filter_rejects_unknown_operator(monkeypatch):
+    from app import app
+    calls = _patch_table_browser(monkeypatch, ["Name"])
+    resp = app.test_client().get(
+        "/db/SomeDb/SetBolts?filter_col=Name&filter_op=OR+1%3D1&filter_val=x")
+    assert resp.status_code == 400
+    assert calls == []
+
+
+def test_table_filter_passes_known_column(monkeypatch):
+    from app import app
+    calls = _patch_table_browser(monkeypatch, ["Name"])
+    resp = app.test_client().get("/db/SomeDb/SetBolts?filter_col=Name&filter_val=x")
+    assert resp.status_code == 200
+    assert calls and calls[0][2] == "Name"

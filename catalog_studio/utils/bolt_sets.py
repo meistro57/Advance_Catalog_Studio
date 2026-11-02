@@ -37,8 +37,6 @@ stack and the nut-side hardware stack. If that is not positive the set cannot
 physically assemble on the chosen bolt length and a warning is emitted.
 """
 
-import json
-
 from utils import db as dbcore
 
 # Component columns repeat DIN/Diameter/Material/Position over 6 slots.
@@ -220,7 +218,6 @@ def build_layout(bolt: dict, partition: dict, grip_override: float = None) -> di
     trip; keep the two in sync.
     """
     length = bolt["length"]
-    head_height = bolt["head_height"]
 
     parts = []
     warnings = []
