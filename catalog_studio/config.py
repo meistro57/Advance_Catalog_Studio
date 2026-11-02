@@ -41,5 +41,8 @@ SUPPORTED_AS_VERSIONS = {2026}
 
 METADATA_FILE = os.path.join(BASE_DIR, "catalog_metadata.json")
 
+# Where bug reports and feature requests go; linked from the navigation bar.
+ISSUES_URL = "https://github.com/meistro57/Advance_Catalog_Studio/issues"
+
 # Pre-change .bak snapshots of scratch databases. Runtime only; git-ignored.
 SNAPSHOT_DIR = os.path.join(BASE_DIR, "snapshots")

@@ -40,7 +40,7 @@ def _csrf_valid() -> bool:
 
 @app.context_processor
 def _inject_csrf():
-    return {"csrf_token": _csrf_token()}
+    return {"csrf_token": _csrf_token(), "issues_url": config.ISSUES_URL}
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(config.EXPORT_DIR, exist_ok=True)

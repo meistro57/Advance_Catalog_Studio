@@ -44,3 +44,15 @@ def test_only_base_template_applies_the_theme_attribute():
             assert "data-bs-theme" in text
         else:
             assert "data-bs-theme" not in text, f"{path.name} sets the theme itself"
+
+
+def test_navigation_links_to_the_issue_tracker():
+    from app import app
+    from config import ISSUES_URL
+    resp = app.test_client().get("/db/SomeDb/find-replace")
+    body = resp.get_data(as_text=True)
+    assert ISSUES_URL.startswith("https://github.com/")
+    assert ISSUES_URL.endswith("/issues")
+    assert f'href="{ISSUES_URL}"' in body
+    assert 'rel="noopener"' in body
+    assert ">Issues<" in body

@@ -199,7 +199,9 @@ and display-name token replacement.
   hardware schedule, and the dimensioned SVG elevation renderer. All of it is
   unit-tested; the template never invents numbers.
 - `templates/base.html` + `static/css/theme.css` + `static/js/theme.js` — the
-  light/dark switch. `base.html` sets `data-bs-theme` on `<html>` from
+  light/dark switch and the **Issues** button. The button URL comes from
+  `config.ISSUES_URL` via the context processor (`issues_url`), not from the
+  template. `base.html` sets `data-bs-theme` on `<html>` from
   `localStorage` (`catalogStudioTheme`) before first paint, falling back to
   `prefers-color-scheme`, and renders the navbar toggle; `theme.js` only wires
   the switch, icons and cross-tab sync. `theme.css` owns the tokens **and** the

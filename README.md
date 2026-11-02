@@ -539,7 +539,7 @@ These are planned features, not claims about the current release. Development wi
 
 ## Contributing
 
-Catalog knowledge is the valuable bit. Bug reports, confirmed schema differences, reproducible catalog cases, and tested improvements are welcome through [GitHub Issues](https://github.com/meistro57/Advance_Catalog_Studio/issues).
+Catalog knowledge is the valuable bit. Bug reports, confirmed schema differences, reproducible catalog cases, and tested improvements are welcome through [GitHub Issues](https://github.com/meistro57/Advance_Catalog_Studio/issues); the navigation bar carries an **Issues** link to the same page so a problem can be filed straight from the tool.
 
 When reporting a problem, include the Advance Steel version, catalog type, operation performed, expected result, and the relevant schema or error output. Do not attach customer data or live production databases.
 
