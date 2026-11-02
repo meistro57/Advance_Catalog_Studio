@@ -184,3 +184,9 @@ whole form and answer with flashes only.
 - Labels for `AstorDetailsBase` enums (geometric restrictions, object
   qualifiers, display-type numbers on appearances, xy/z box modes).
 - Units of `DetViewLengthClip.ClippingGap` (5.0 — doesn't look like mm).
+- Whether deleting rows that the usage scan reports as unreachable produces an
+  importable export. The scan is read-only for that reason, and no purge,
+  deduplication, shrink or `.ldf` cleanup is implemented.
+- How a selectively deep-copied style branch (new keys, rewired references)
+  survives import. The reported keys are renumbered into the `22001+` range, so
+  a copy must allocate keys that Advance Steel accepts; that is unverified.

@@ -34,8 +34,10 @@ and display-name token replacement.
 - Dev-only test dependency (`pytest`) is in `requirements-dev.txt`; run the
   suite with `venv/bin/python -m pytest tests/`. All tests are unit/route tests
   (bolt-set view model and profile drawing, drawing-style label parsing,
-  figures and htmx rule partials, fabrication sheet model, shear-stud browser
-  model, staging cleanup, connection timeouts) — no database needed.
+  figures and htmx rule partials, drawing-style sub-style usage walk and orphan
+  scan, catalog health report, fabrication sheet model, shear-stud browser
+  model and clone plan, staging cleanup, connection timeouts) — no database
+  needed.
 - **No linter, no CI, no Makefile, no packaging config exist.** Verification
   is manual against the Docker SQL Server (plus the pytest suite).
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
@@ -94,6 +96,11 @@ and display-name token replacement.
   and runs `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
+  Feature requests sometimes name `DetStyle`, `DetStyleViews`, `DetView`,
+  `DetDimStrategy`, `DetObjectsSet`, `DetDimDefinition`, `DetDimPoints`,
+  `DetObjects` or `DetPresentation`: none of those exist in an AS 2026 export.
+  Map them via `docs/drawing-style-schema.md` before writing code, and never
+  introduce a second schema guess.
 - Drawing-style rule actions are htmx-enhanced: `templates/_drawing_rules.html`
   is the single rules block (included by the page **and** returned by
   `drawing_style_rule` for `HX-Request` posts), `drawing_styles.repr_block()`

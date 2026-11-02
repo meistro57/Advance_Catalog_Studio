@@ -40,7 +40,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Area | Current status |
 | --- | --- |
 | Validated Advance Steel version | **2026** |
-| Catalog types | Bolt and anchor, plus drawing-style exports |
+| Catalog types | Bolt, anchor, shear-stud (connector) and drawing-style exports |
 | Table editor raw row operations | Implemented |
 | Guided bolt-diameter cloning | Implemented |
 | Bolt-set visualizer (read-only) | 3D schematic + dimensioned 2D profile implemented |
@@ -502,6 +502,7 @@ These are planned features, not claims about the current release. Development wi
 - Drawing-style round trips (edit → export → Drawing Style Manager import) have been verified at the SQL level only; test imports on a copy of your style library first.
 - The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
+- The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
 
 ## Contributing
 
