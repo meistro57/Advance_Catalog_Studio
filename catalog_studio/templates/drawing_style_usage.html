@@ -1,0 +1,209 @@
+<!-- templates/drawing_style_usage.html -->
+{% extends "base.html" %}
+{% block title %}{{ database }} style usage{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}/drawing-style">&laquo; Drawing Style Editor</a></p>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h4 class="mb-1">Sub-style usage <span class="badge bg-secondary">read-only</span></h4>
+        <div class="text-muted small">
+            Reverse references from the export's own <code>InfoTableRelations</code> map:
+            who uses a shared record, and which rows nothing points at.
+        </div>
+    </div>
+    <span class="badge bg-light text-dark border">{{ database }}</span>
+</div>
+
+<div class="alert alert-light border small py-2">
+    This export renumbers every key into the same range, so shared records are easy to
+    miss: one appearance, label strategy or dimension strategy can feed several drawing
+    styles. Editing a shared record changes every style listed here. The analysis only
+    sees this one export &mdash; other style libraries are not considered.
+</div>
+
+{# ---------------- orphan scan ---------------- #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>Rows no drawing style reaches (orphan scan)</strong>
+        <span class="badge bg-light text-dark border">{{ model.orphans.total }} row(s)</span>
+    </div>
+    <div class="card-body py-3">
+        {% if model.orphans.tables %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Reached from</th>
+                        <th>Rows</th>
+                        <th>Unreachable</th>
+                        <th>Examples</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in model.orphans.tables %}
+                    <tr>
+                        <td class="text-nowrap"><code>{{ t.table }}</code></td>
+                        <td class="small text-muted">{{ t.reached_from|join(', ') }}</td>
+                        <td>{{ t.rows }}</td>
+                        <td><span class="badge bg-warning text-dark">{{ t.unreferenced }}</span></td>
+                        <td class="small">
+                            {% for s in t.samples %}<div>{{ s.label }}</div>{% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small mb-0">
+            These rows are not reachable from any <code>DetailStyle</code> in this export.
+            That can mean a superseded rule, a library entry used only by another style
+            library, or a detail-process row this export does not use. They are review
+            candidates, not deletions: purge or compaction is not offered here.
+        </p>
+        {% else %}
+        <p class="text-muted small mb-0">Every participating row is reachable from a drawing style.</p>
+        {% endif %}
+        {% if model.truncated_rows %}
+        <p class="text-muted small mb-0">
+            Row reads were capped at {{ model.row_limit }} for:
+            {{ model.truncated_rows|join(', ') }} &mdash; counts above may be partial.
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+{# ---------------- used by ---------------- #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white"><strong>Referenced by</strong></div>
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label class="form-label small text-uppercase text-muted mb-1" for="u-table">Sub-style table</label>
+                <select class="form-select form-select-sm" id="u-table" name="table" onchange="this.form.submit()">
+                    <option value="">Select a table&hellip;</option>
+                    {% for t in model.shared_tables %}
+                    <option value="{{ t }}" {% if model.selected_table == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label small text-uppercase text-muted mb-1" for="u-token">Record</label>
+                <select class="form-select form-select-sm" id="u-token" name="token" {% if not model.candidates %}disabled{% endif %}>
+                    {% if not model.selected_table %}
+                    <option value="">Choose a table first</option>
+                    {% elif not model.candidates %}
+                    <option value="">No referenced records</option>
+                    {% else %}
+                    {% for c in model.candidates %}
+                    <option value="{{ c.token }}" {% if model.selected_token == c.token %}selected{% endif %}>{{ c.label }} &mdash; {{ c.references }} reference(s)</option>
+                    {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary" {% if not model.candidates %}disabled{% endif %}>Show usage</button>
+                <a href="/db/{{ database }}/drawing-style/usage" class="btn btn-sm btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+        <div class="text-muted small mt-2">
+            Only referenced rows are listed. Collections are capped at
+            {{ model.candidates|length }} entries after sorting by usage.
+        </div>
+    </div>
+</div>
+
+{% if model.report %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>Used by: {{ model.report.record.label if model.report.record else 'record' }}</strong>
+        {% if model.report.ok %}
+        <span class="badge {% if model.report.styles|length > 1 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+            {{ model.report.styles|length }} drawing style(s)
+        </span>
+        {% endif %}
+    </div>
+    <div class="card-body py-3">
+        {% if not model.report.ok %}
+        <p class="text-danger small mb-0">{{ model.report.error }}</p>
+        {% elif not model.report.styles %}
+        <p class="text-muted small mb-0">
+            No drawing style in this export reaches that record through the relation map.
+            It may belong to a detail process that is empty here.
+        </p>
+        {% else %}
+        {% if model.report.styles|length > 1 %}
+        <div class="alert alert-warning py-2 small">
+            Shared record: editing it changes all {{ model.report.styles|length }} styles below.
+        </div>
+        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>Drawing style</th>
+                        <th>Picker name</th>
+                        <th>Category (AS enum)</th>
+                        <th>Owner</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in model.report.styles %}
+                    <tr>
+                        <td><strong>{{ s.name }}</strong></td>
+                        <td class="small">{{ s.master_name or '—' }}</td>
+                        <td class="small text-muted">
+                            {{ s.categories.base if s.categories.base is not none else '—' }}
+                            / {{ s.categories.sub if s.categories.sub is not none else '—' }}
+                        </td>
+                        <td class="small">{{ s.owner or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small">
+            Category numbers are Advance Steel's built-in enum values; the export does not
+            carry their labels, so they are shown as numbers rather than guessed names.
+        </p>
+        {% for s in model.report.styles %}
+        <div class="mb-2">
+            <div class="fw-semibold small">{{ s.name }}</div>
+            <ol class="small mb-0">
+                <li class="text-muted">{{ model.report.record.table }} {{ model.report.record.label }}</li>
+                {% for step in s.path %}
+                <li>
+                    <code>{{ step.table }}</code>
+                    <span class="text-muted">{{ step.column }}</span>
+                    &rarr; {{ step.label }}
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endfor %}
+        {% if model.report.direct %}
+        <div class="mt-3">
+            <div class="fw-semibold small mb-1">Directly referenced by</div>
+            <ul class="small mb-0">
+                {% for d in model.report.direct %}
+                <li><code>{{ d.table }}</code> &mdash; {{ d.labels|join('; ') }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if model.report.truncated %}
+        <p class="text-warning small mb-0 mt-2">
+            The walk was capped, so deeper or additional parents may exist.
+        </p>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="text-muted small">
+    Read-only dependency analysis over the export's declared relations. It reports; it does
+    not rewrite, deduplicate, purge or compact the catalog.
+</div>
+{% endblock %}

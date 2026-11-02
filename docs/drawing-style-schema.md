@@ -54,6 +54,52 @@ Gaps/bugs in Autodesk's map, patched in `drawing_styles.SUPPLEMENTARY_RELATIONS`
 | `DetViewDimRequestLinear.Point1..15` | (missing) | `DetViewDimPointSelection` |
 | `DetViewRequestCategories.Key` | `DetBaseCategories` | the row's own id — ignored |
 
+## Reverse references ("used by") and orphan scan
+
+`InfoTableRelations` gives every in-file reference as
+`Child.Column -> Parent.Bind`, but it never says which side contains which. The
+direction was settled from the data and is encoded in
+`utils/style_usage.py: ASCENT_EDGES` as
+`(child_table, child_column, parent_table, parent_column)`: a child row is
+reached from a parent row whose `parent_column` equals the child's
+`child_column`. Two shapes appear:
+
+| Shape | Example | Meaning |
+| --- | --- | --- |
+| child column holds the parent's key | `DetObjReprMapItems.Key -> DetObjReprMapsNew.Key` | rules share their map's `Key`; `Order` is their position |
+| child column holds a foreign key | `DetObjReprMapsNew.Key -> DetViewRequest.ObjReprMap` | the view request owns its representation map |
+
+The verified upward chains are:
+
+```
+DetObjAppearance.Key          -> DetObjReprMapItems.Appearance
+DetObjAnnotationStrategy.Key  -> DetObjReprMapItems.AnnotationStrategy
+DetAnnotationType.Key         -> DetObjAnnotationStrategy.AnnotationType
+DetObjQualifierSet.Key        -> DetObjReprMapItems.ObjQualifier
+Linetypes.Key                 -> DetObjReprMapItems.LineType
+DetObjReprMapItems.Key        -> DetObjReprMapsNew.Key
+DetObjReprMapsNew.Key         -> DetViewRequest.ObjReprMap
+DetViewRequest.Key            -> DetailStyle.Request1..Request10
+DetViewDimStrategyItems.Key   -> DetViewDimStrategyNew.Key
+DetViewDimRequestLinear.Key   -> DetViewDimStrategyItems.RequestLinear
+DetViewDimPointSelection.Key  -> DetViewDimRequestLinear.Point1..Point15
+DetViewDimStrategyNew.Key     -> DetViewRequest.DimStrategy
+```
+
+Walking those edges from a shared row reaches every `DetailStyle` that depends
+on it; walking them in reverse from each `DetailStyle` marks every reachable
+row, so rows left over are unreachable from any style. Across the three
+checked-in style exports exactly one row is unreachable (an unused
+`DetGridReferenceSettings` "Default" entry), which is the expected noise floor.
+
+The feature request names `DetStyle`, `DetStyleViews`, `DetView`,
+`DetDimStrategy`, `DetObjectsSet`, `DetDimDefinition` and `DetDimPoints`; none
+of those tables exist in an AS 2026 export. Equivalents in this schema:
+`DetailStyle`, `DetailStyle.Request1..10` (+ `DetViewRequest`),
+`DetViewRequest`, `DetViewDimStrategyNew`, `DetObjReprMapsNew` +
+`DetObjReprMapItems`, `DetObjAppearance`/`DetObjAnnotationStrategy`,
+`DetViewDimStrategyNew`, `DetViewDimPointSelection`.
+
 ## Composite keys
 
 `DetObjReprMapItems`, `DetViewDimStrategyItems`, `DetailStyleMapItems`,

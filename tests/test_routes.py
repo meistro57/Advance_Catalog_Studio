@@ -315,3 +315,76 @@ def test_database_page_links_the_health_report(monkeypatch):
     resp = app.test_client().get("/db/SomeDb")
     assert resp.status_code == 200
     assert "/db/SomeDb/health" in resp.get_data(as_text=True)
+
+
+# --- drawing-style sub-style usage ------------------------------------------
+
+def _fake_usage_model():
+    return {
+        "database": "StyleSample",
+        "orphans": {
+            "total": 1,
+            "tables": [{
+                "table": "DetObjAppearance", "reached_from": ["DetObjReprMapItems.Appearance"],
+                "rows": 2, "unreferenced": 1, "samples": [{"label": "Unused"}],
+            }],
+        },
+        "shared_tables": ["DetObjAppearance"],
+        "selected_table": "DetObjAppearance",
+        "candidates": [{"label": "Visible", "token": "22001", "references": 2}],
+        "selected_token": "22001",
+        "report": {
+            "ok": True,
+            "record": {"table": "DetObjAppearance", "label": "Visible", "pk": {"Key": 22001}},
+            "styles": [{
+                "key": 22001, "name": "3 - Elevation View - Full", "owner": "DSC",
+                "master_name": "3 - Elevation View - Full",
+                "categories": {"base": 3, "sub": 9},
+                "path": [{"table": "DetObjReprMapItems", "column": "Appearance", "label": "22001"},
+                         {"table": "DetailStyle", "column": "Request1", "label": "3 - Elevation View - Full"}],
+            }],
+            "direct": [{"table": "DetObjReprMapItems", "labels": ["22001"]}],
+            "truncated": False,
+        },
+        "row_limit": 5000,
+        "truncated_rows": [],
+    }
+
+
+def test_drawing_style_usage_route_registered():
+    from app import app
+    assert "drawing_style_usage" in {r.endpoint for r in app.url_map.iter_rules()}
+
+
+def test_drawing_style_usage_redirects_for_non_style(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "bolt")
+    resp = app.test_client().get("/db/SomeBolt/drawing-style/usage")
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/db/SomeBolt")
+
+
+def test_drawing_style_usage_renders_orphans_and_used_by(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "drawing style")
+    monkeypatch.setattr("utils.style_usage.build_page_model",
+                        lambda database, table=None, token=None: _fake_usage_model())
+    resp = app.test_client().get("/db/StyleSample/drawing-style/usage")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Unreferenced" in body or "no drawing style reaches" in body
+    assert "DetObjAppearance" in body and "Visible" in body
+    assert "3 - Elevation View - Full" in body
+    assert "read-only" in body
+
+
+def test_drawing_style_usage_redirects_when_the_model_fails(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "drawing style")
+
+    def boom(database, table=None, token=None):
+        raise RuntimeError("no relations")
+
+    monkeypatch.setattr("utils.style_usage.build_page_model", boom)
+    resp = app.test_client().get("/db/StyleSample/drawing-style/usage")
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/db/StyleSample/drawing-style")

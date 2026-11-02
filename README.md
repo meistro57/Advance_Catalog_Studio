@@ -53,7 +53,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
-| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains) |
+| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), read-only sub-style usage and orphan scan |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -252,6 +252,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
 - **Libraries** — label formulas (live preview plus a click-to-insert token palette), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
 - **Integrity check** — every in-file reference is checked before you export.
+- **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
 
 ![Drawing Style Editor: style identity, title formula preview, view settings](docs/images/drawing-style-editor.png)
 
@@ -272,6 +273,17 @@ Label formulas use Advance Steel's token syntax:
 The preview fills fields with sample values (`%Position` → `b104`), so `#Rounded%Position#End#Newline#Height(3.20)%Name` previews as a framed mark over the part name.
 
 To make a variant rather than overwrite a style, rename it before exporting. Unsaved edits are highlighted, and the save bar counts them; rule moves, copies and deletes apply immediately.
+
+### Sub-style usage and orphan scan
+
+The Style Manager hides a real hazard: appearances, label formulas, qualifier sets and dimension setups are shared library rows, and one edit changes every style that uses them. The export also renumbers all keys into one range (`22001`, `22002`, ...), so the links are invisible in the SQL tables.
+
+`/db/<db>/drawing-style/usage` (button: **Sub-style usage**) answers both halves:
+
+- **Referenced by** — pick a shared table and a record; the page lists every `DetailStyle` that reaches it through the containment chain (view request → representation map → rule → appearance/label strategy, or view request → dimension strategy → dimension item → point selection), with the picker name, owner and category numbers, and a hop-by-hop path. When more than one style depends on the record it says so up front.
+- **Rows no drawing style reaches** — every row in the style tables that is unreachable from all `DetailStyle` rows, grouped by table with examples. In the checked-in samples this is a single unused grid-reference setting; it is a review prompt, not a delete list.
+
+The chain is declared in `utils/style_usage.py` (`ASCENT_EDGES`) from the verified export shape, because the export's `InfoTableRelations` map states references but not which side contains which. Category values are Advance Steel built-in enums, shown as numbers because their labels are not in the export. Nothing is written, deduplicated, purged or compacted.
 
 ### Shear-stud (connector) browser
 
@@ -397,6 +409,7 @@ Advance_Catalog_Studio/
 │       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG
 │       ├── drawing_styles.py   # Drawing-style tree, label parsing, relations
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
+│       ├── style_usage.py      # Reverse references (used-by) and orphan scan
 │       ├── shear_studs.py      # Shear-stud (connector) browser model
 │       ├── health.py          # Cross-type read-only health report
 │       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
@@ -462,7 +475,9 @@ Next steps for the drawing-style editor:
 - clone a whole style inside one export, so several variants can ship in one file;
 - edit dimension point selections and arranger strategies with the same dropdowns;
 - label the Advance Steel built-in values (geometric restrictions, object qualifiers, box modes) once they are verified against a live install;
-- styles that use detail processes (`DetailProcess*` tables, empty in the first sample).
+- styles that use detail processes (`DetailProcess*` tables, empty in the first sample);
+- selective deep-copy of a style branch (new keys, rewired references) and batch presentation replacement: both are write paths and wait on a verified Advance Steel round trip;
+- purging orphan rows and compacting the database: the tool reports unreachable rows but does not delete them, because a purged export has not been round-trip verified and the `.mdf` / `.ldf` pair must stay consistent for import.
 
 ### Catalog intelligence and comparison
 

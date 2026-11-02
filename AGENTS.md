@@ -122,6 +122,18 @@ and display-name token replacement.
   fraction, `≈` marker); the templates call it as the `sdim` Jinja filter and
   carry `units` through filter links and the clone form. Never convert values
   before they reach SQL or the clone proposal.
+- `catalog_studio/utils/style_usage.py` — read-only "used by" walk and orphan
+  scan for drawing-style exports (`/db/<db>/drawing-style/usage`, template
+  `drawing_style_usage.html`, "Sub-style usage" button on the editor page).
+  Containment direction is declared in `ASCENT_EDGES` (child table/column ->
+  parent table/column) because `InfoTableRelations` states references but not
+  which side contains which; keep it in sync with
+  `docs/drawing-style-schema.md`. The walk (`usage`), the reachability scan
+  (`orphan_report`) and the pure helpers are unit-tested; unreachable rows are
+  reported only. `DetStyle`/`DetStyleViews`/`DetView`/`DetDimStrategy`/
+  `DetObjectsSet`/`DetDimDefinition`/`DetDimPoints` from the feature request do
+  NOT exist in an AS 2026 export — the observed names are in the module
+  docstring. No purge, compaction, LDF deletion or clone lives here.
 - `catalog_studio/utils/health.py` — read-only catalog health report
   (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
   the database page). It adds no new catalog semantics: `build_report()`

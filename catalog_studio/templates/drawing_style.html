@@ -84,6 +84,7 @@
     {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
   </h4>
   <div class="d-flex gap-2">
+    <a href="/db/{{ database }}/drawing-style/usage" class="btn btn-sm btn-outline-primary">Sub-style usage</a>
     <a href="/db/{{ database }}" class="btn btn-sm btn-outline-secondary">Raw tables</a>
     <form method="post" action="/db/{{ database }}/detach" onsubmit="return confirm('Detach and export the mdf/ldf? Unsaved edits on this page will be lost.');">
       <button class="btn btn-sm btn-success">&#11015; Detach &amp; Export mdf/ldf</button>

@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
-from utils import shear_studs, health
+from utils import shear_studs, health, style_usage
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -890,6 +890,28 @@ def _relation_options_for(database, table):
         return drawing_styles.options_for_table(database, table, rels)
     except Exception:
         return {}
+
+
+@app.route("/db/<database>/drawing-style/usage")
+def drawing_style_usage(database):
+    """Read-only "used by" and orphan scan for a drawing-style export.
+
+    The analysis follows the export's own InfoTableRelations map; it invents no
+    table names and never deletes or compacts anything.
+    """
+    if db.guess_catalog_type(database) != "drawing style":
+        flash("This database isn't a drawing-style export.", "warning")
+        return redirect(url_for("show_database", database=database))
+    table = request.args.get("table", "").strip() or None
+    token = request.args.get("token", "").strip() or None
+    try:
+        model = style_usage.build_page_model(database, table=table, token=token)
+    except Exception as e:
+        flash(f"Could not build the usage report: {e}", "danger")
+        return redirect(url_for("drawing_style", database=database))
+    return render_template(
+        "drawing_style_usage.html", database=database, model=model,
+    )
 
 
 @app.route("/db/<database>/drawing-style")
