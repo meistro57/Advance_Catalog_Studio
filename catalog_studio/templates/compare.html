@@ -1,0 +1,171 @@
+<!-- templates/compare.html -->
+{% extends "base.html" %}
+{% block title %}Compare catalogs{% endblock %}
+{% block content %}
+<p><a href="/">&laquo; Home</a></p>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h4 class="mb-1">Compare catalogs</h4>
+        <div class="text-muted small">
+            Table presence, row counts and diameter coverage for two attached
+            databases. Read-only: nothing in either catalog is changed.
+        </div>
+    </div>
+    <span class="badge bg-light text-dark border">read-only</span>
+</div>
+
+<form method="get" action="/compare" class="row g-2 align-items-end mb-4" style="max-width: 760px">
+    <div class="col-md-5">
+        <label class="form-label small mb-0" for="compareA">Database A</label>
+        <select class="form-select form-select-sm" id="compareA" name="a">
+            <option value="">&mdash; choose &mdash;</option>
+            {% for name in attached %}
+            <option value="{{ name }}" {% if name == name_a %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-5">
+        <label class="form-label small mb-0" for="compareB">Database B</label>
+        <select class="form-select form-select-sm" id="compareB" name="b">
+            <option value="">&mdash; choose &mdash;</option>
+            {% for name in attached %}
+            <option value="{{ name }}" {% if name == name_b %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-sm btn-primary w-100" type="submit">Compare</button>
+    </div>
+</form>
+
+{% if not attached %}
+<div class="alert alert-warning">No databases are attached to the scratch SQL Server.</div>
+{% endif %}
+
+{% if result %}
+<div class="row g-2 mb-3">
+    {% for side in [result.a, result.b] %}
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body py-2">
+                <div class="fw-bold">
+                    {{ side.database }}
+                    {% if side.catalog_type %}<span class="badge bg-secondary">{{ side.catalog_type }}</span>{% endif %}
+                </div>
+                <div class="text-muted small">
+                    {{ side.tables }} table(s), {{ side.rows }} row(s)
+                    {% set lib = meta.get(side.database, {}).get('library') %}
+                    {% if lib %}<span class="badge bg-warning text-dark ms-1">delivered library</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-2 mb-3 small">
+    {% for label, value in [
+        ('Tables shared', result.summary.tables_shared),
+        ('Tables only in A', result.summary.tables_only_a),
+        ('Tables only in B', result.summary.tables_only_b),
+        ('Tables with different counts', result.summary.tables_changed),
+    ] %}
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <div class="text-muted text-uppercase" style="font-size:.72rem">{{ label }}</div>
+                <div class="fs-5 fw-bold">{{ value }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white fw-bold">Tables</div>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th class="text-end">{{ result.a.database }}</th>
+                    <th class="text-end">{{ result.b.database }}</th>
+                    <th class="text-end">Delta (B&nbsp;&minus;&nbsp;A)</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in result.tables %}
+                <tr>
+                    <td>
+                        {{ row.table }}
+                        {% if row.present == 'a' %}<span class="badge bg-warning text-dark">only A</span>{% endif %}
+                        {% if row.present == 'b' %}<span class="badge bg-info text-dark">only B</span>{% endif %}
+                    </td>
+                    <td class="text-end">{{ row.a if row.a is not none else '&mdash;'|safe }}</td>
+                    <td class="text-end">{{ row.b if row.b is not none else '&mdash;'|safe }}</td>
+                    <td class="text-end">
+                        {% if row.delta is none %}&mdash;
+                        {% elif row.delta > 0 %}<span class="text-success">+{{ row.delta }}</span>
+                        {% elif row.delta < 0 %}<span class="text-danger">{{ row.delta }}</span>
+                        {% else %}0{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white fw-bold d-flex justify-content-between">
+        <span>Diameters</span>
+        <span class="text-muted small fw-normal">
+            {{ result.summary.diameters_both }} in both,
+            {{ result.summary.diameters_only_a }} only in A,
+            {{ result.summary.diameters_only_b }} only in B
+        </span>
+    </div>
+    {% if result.diameters %}
+    <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Key (mm)</th>
+                    <th>{{ result.a.database }}</th>
+                    <th>{{ result.b.database }}</th>
+                    <th class="text-end">Rows A</th>
+                    <th class="text-end">Rows B</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in result.diameters %}
+                <tr>
+                    <td>{{ '%g'|format(row.key) }}
+                        {% if row.present == 'a' %}<span class="badge bg-warning text-dark">only A</span>{% endif %}
+                        {% if row.present == 'b' %}<span class="badge bg-info text-dark">only B</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if row.name_a %}{{ row.name_a.strip() }}{% else %}&mdash;{% endif %}
+                        {% if row.orphan_a %}<span class="badge bg-danger">orphan</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if row.name_b %}{{ row.name_b.strip() }}{% else %}&mdash;{% endif %}
+                        {% if row.orphan_b %}<span class="badge bg-danger">orphan</span>{% endif %}
+                    </td>
+                    <td class="text-end">{{ row.records_a if row.records_a is not none else '&mdash;'|safe }}</td>
+                    <td class="text-end">{{ row.records_b if row.records_b is not none else '&mdash;'|safe }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted small">
+        Neither database exposes a diameter table (only bolt, anchor and shear-stud
+        catalogs do), so there is nothing to compare here.
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

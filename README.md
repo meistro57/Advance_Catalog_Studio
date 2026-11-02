@@ -133,8 +133,9 @@ pip install -r requirements-dev.txt   # adds pytest
 python -m pytest tests/
 ```
 
-The tree is also kept free of pyflakes findings; this is a convenience check, not
-a pinned dependency:
+The tree is also kept free of pyflakes findings; the same two commands run in
+GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request, so a
+change that needs a database cannot silently break the suite:
 
 ```bash
 pyflakes catalog_studio tests *.py
@@ -211,6 +212,18 @@ Every attached database has a **Health Report** page (`/db/<db>/health`). It agg
 
 The report is read-only: it never repairs anything, and every finding names the table it came from so it can be inspected in the raw table editor. A clean report is not a guarantee — it only means the checks this tool knows about did not fail. Existing samples show real findings (for example `Grade5` has a 10 mm diameter with no bolts and a 3/8" diameter with no nuts/washers).
 
+The same findings download as `health.json` (the full report, including tables and sections) or `health.csv` (one row per finding: severity, area, code, table, message) from the **JSON** and **CSV** buttons on the page, for archiving a review or attaching to an issue.
+
+### Comparing two catalogs
+
+`/compare` (also a **Compare** button in the navigation bar) puts two attached databases side by side without changing either one:
+
+- table presence — shared tables, tables only on one side;
+- row counts per table with the delta between the two;
+- diameter coverage for bolt, anchor and shear-stud catalogs: which keys exist on each side, their display names, related-row totals and orphan flags.
+
+It answers "what changed between my original export and this repaired copy?" without detaching or re-importing anything. Only attached databases can be compared, and nothing is written.
+
 ### Add / Clone Diameter wizard
 
 This is the relationship-aware part of Catalog Studio. The wizard lets you:
@@ -226,6 +239,29 @@ This is the relationship-aware part of Catalog Studio. The wizard lets you:
 If any insert fails, the transaction rolls back rather than leaving half a diameter scattered through the catalog.
 
 Re-applying the same target diameter is safe: the wizard replaces the existing target rows instead of duplicating them (bolt tables are cleared first, and on anchor catalogs the hole and length rows are removed before their parent anchor records). The preview shows how many existing rows will be replaced. Cloning a diameter onto itself is refused.
+
+### Pre-change snapshots
+
+Before a batch write (diameter clone, find & replace) Catalog Studio takes a `COPY_ONLY` backup of the scratch database inside the container and copies it to `catalog_studio/snapshots/<database>/` next to a JSON manifest. If the snapshot cannot be taken, the write does not run.
+
+The database page lists the snapshots for that database and offers **Prune older**, which keeps the newest N (default 5) and deletes the rest — an explicit action, never automatic, because a snapshot can be hundreds of megabytes.
+
+Restoring is a deliberate manual step, because the in-container `.bak` is removed after the copy:
+
+```bash
+docker cp catalog_studio/snapshots/<database>/<file>.bak \
+  hilti-scratch-sql:/var/opt/mssql/data/<file>.bak
+```
+
+then, from `sqlcmd` or SSMS inside the container:
+
+```sql
+ALTER DATABASE [<database>] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+RESTORE DATABASE [<database>] FROM DISK = N'/var/opt/mssql/data/<file>.bak' WITH REPLACE;
+ALTER DATABASE [<database>] SET MULTI_USER;
+```
+
+`snapshots.restore_plan()` produces exactly that command set for a chosen snapshot, and it is unit-tested, but the tool never runs it for you.
 
 ### Find & Replace
 
@@ -438,7 +474,8 @@ Advance_Catalog_Studio/
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
 │       ├── style_usage.py      # Reverse references (used-by) and orphan scan
 │       ├── shear_studs.py      # Shear-stud (connector) browser model
-│       ├── snapshots.py        # COPY_ONLY pre-change .bak snapshots
+│       ├── snapshots.py        # COPY_ONLY .bak snapshots, retention, restore plan
+│       ├── compare.py          # Read-only comparison of two attached catalogs
 
 │       ├── health.py          # Cross-type read-only health report
 │       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
@@ -449,8 +486,10 @@ Advance_Catalog_Studio/
 │       └── staging_cleanup.py  # Safe removal of staged uploads
 ├── tests/                     # Pytest: models, SVG figures, routes (no DB needed)
 ├── samples/                   # Example mdf/ldf catalog pairs (tracked)
+├── .github/workflows/ci.yml   # Tests + lint on push/PR (no database needed)
 ├── docs/
 │   ├── images/
+│   ├── csrf-audit.md          # Every route: writes, CSRF handling, exemptions
 │   ├── drawing-style-schema.md # Drawing Style Manager export investigation
 │   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
 ├── db_inspect.py
@@ -535,6 +574,9 @@ These are planned features, not claims about the current release. Development wi
 - Catalog schemas can differ between Advance Steel versions and component families.
 - The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
 - If detaching a database fails, Catalog Studio restores it to multi-user mode so it can still be reconnected.
+- Databases attached from a delivered Advance Steel library file (`AstorDetails.mdf`, `AstorBase.mdf`, `AstorAddIn.mdf`, `AstorSettings.mdf`) are recorded as such and kept **read-only**: every write route refuses them with an explanation. Attach a copy under a new database name to edit it.
+- Every request that can change something (uploads, attach, create, detach, clone, find & replace, row CRUD, style edits, snapshot pruning) requires a session CSRF token; the central guard and the full route list are in `docs/csrf-audit.md`.
+- Snapshot pruning is manual and keeps the newest five by default; restoring a snapshot is a documented `docker cp` + `RESTORE DATABASE ... WITH REPLACE` step, never automatic.
 - Batch writes take a **pre-change snapshot** first: the bolt-diameter clone and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
 
 ## Contributing

@@ -42,10 +42,12 @@ and display-name token replacement.
   theme hooks) — no database needed. The clone and find/replace tests stub the
   cursor, so they assert statement order and commit/rollback rather than SQL
   Server behaviour.
-- **No configured linter, no CI, no Makefile, no packaging config exist.**
-  Verification is manual against the Docker SQL Server plus the pytest suite.
-  The tree is kept pyflakes-clean (`pyflakes catalog_studio tests *.py`), but
-  pyflakes is not a pinned dependency and no formatting policy is applied.
+- **No configured linter, no Makefile, no packaging config exist.** CI exists:
+  `.github/workflows/ci.yml` runs `compileall`, `pytest tests/` and
+  `pyflakes catalog_studio tests *.py` on every push/PR. Verification of real
+  catalogs is still manual against the Docker SQL Server; the suite itself needs
+  no database. The tree is kept pyflakes-clean, but pyflakes is not a pinned
+  dependency and no formatting policy is applied.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
   entry passes.
@@ -84,10 +86,14 @@ and display-name token replacement.
   skips the database query when it is down.
 - `catalog_studio/utils/docker_ops.py` — shells out to `docker cp`/`exec`/
   `inspect` to move files in/out of the container.
-- `catalog_studio/utils/metadata.py` — per-database `catalog_type` and
+- `catalog_studio/utils/metadata.py` — per-database `catalog_type`, `library` and
   `as_version`, stored in a local JSON sidecar
   (`catalog_studio/catalog_metadata.json`), deliberately **not** written into
-  the mdf (extra tables would break Advance Steel import).
+  the mdf (extra tables would break Advance Steel import). `library_kind()`
+  recognises an attachment made from `AstorDetails` / `AstorAddIn` /
+  `AstorBase` / `AstorSettings` and the attach route stores it; `app._blocked_write()`
+  then refuses every write route for that database (delivered libraries are
+  read-only). Detach/export and all reads stay allowed.
 - `catalog_studio/utils/staging.py` — pairs `.mdf` with `_log.ldf` in uploads/,
   suggests DB names from filenames, lists exports/.
 - `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the runtime
@@ -164,9 +170,23 @@ and display-name token replacement.
   (fail closed, never "warn and continue"). Snapshots are runtime files
   (git-ignored); the exported mdf/ldf pair remains the deliverable. Tests patch
   `db.backup_database` / `docker_ops.copy_out_of_container`, so no DB is needed.
+  Retention is explicit: `snapshot_files()` lists the `.bak` files (newest
+  first, manifest optional), `prune_snapshots(keep=5)` deletes the surplus and
+  backs the database page's **Prune older** button
+  (`POST /db/<db>/snapshots/prune`, CSRF-checked), and `restore_plan()` returns
+  the `docker cp` + `RESTORE DATABASE ... WITH REPLACE` commands for a manual
+  restore. Nothing here executes a restore.
+- `catalog_studio/utils/compare.py` — read-only side-by-side comparison of two
+  attached databases (`/compare`, template `compare.html`, **Compare** button in
+  the nav bar): table presence, per-table row counts with deltas, and diameter
+  keys/names/related-row counts/orphan flags for bolt, anchor and shear-stud
+  catalogs. Pure helpers (`table_diff`, `count_diff`, `diameter_diff`,
+  `summary`) are unit-tested; `build_comparison()` is the only SQL. It never
+  writes and refuses a database with itself.
 - `catalog_studio/utils/health.py` — read-only catalog health report
   (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
-  the database page). It adds no new catalog semantics: `build_report()`
+  the database page; the same findings download as `/db/<db>/health.json` and
+  `/db/<db>/health.csv`). It adds no new catalog semantics: `build_report()`
   dispatches on `db.guess_catalog_type` and reuses `db.get_catalog_diameters`
   (bolt diameter coverage against the documented six-table relationship),
   `bolt_sets.parse_component_slots`/`annotate_components` (anchor hardware
@@ -459,11 +479,14 @@ dimension logic of its own.
   whole scan. `apply_find_replace` runs every column update in one transaction
   and rolls back on the first failure; legacy `text`/`ntext` columns are cast to
   `nvarchar(max)` because SQL Server's `REPLACE()` rejects them.
-- Destructive browser actions (the staging cleanup POSTs) require a CSRF
-  token from the session; `_csrf_token()` is injected into templates and
-  `_csrf_valid()` guards each cleanup route. Target filenames are always
-  re-derived server-side from the scanned staged list, never trusted from the
-  browser.
+- Every POST is CSRF-checked by the central `_csrf_guard()` (`before_request`)
+  before the route body runs; only `READ_ONLY_POST_ENDPOINTS` (clone preview,
+  label preview) and `action=preview` on add-diameter/find-replace are exempt.
+  The bolt-set sketch route checks the JSON `csrf_token` itself. Any new POST
+  route must either rely on that guard or be added to the exemption set **and**
+  to `docs/csrf-audit.md`; `test_every_writing_post_route_requires_csrf` walks
+  the URL map and fails otherwise. Staging targets are always re-derived
+  server-side from the scanned staged list, never trusted from the browser.
 - `.gitignore` excludes `venv/`, `__pycache__/`, `.pytest_cache/`, `.crush/`,
   everything in `catalog_studio/uploads/` (kept via `.gitkeep`) and generated
   files in `catalog_studio/exports/`. Example `.mdf`/`.ldf` pairs are tracked

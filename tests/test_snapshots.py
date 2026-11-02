@@ -110,3 +110,97 @@ def test_list_snapshots_reads_manifests_newest_first(monkeypatch, tmp_path):
 def test_list_snapshots_is_empty_without_a_directory(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path / "missing"))
     assert snapshots.list_snapshots("DB") == []
+
+
+# --- retention --------------------------------------------------------------
+
+def _write_snapshot(tmp_path, database, filename, size=16, reason="batch"):
+    directory = tmp_path / database
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / filename
+    path.write_bytes(b"S" * size)
+    manifest = {
+        "database": database,
+        "reason": reason,
+        "filename": filename,
+        "created_utc": "2026-11-02T00:00:00+00:00",
+    }
+    (directory / (filename + ".json")).write_text(json.dumps(manifest))
+    return path
+
+
+def test_snapshot_files_lists_newest_first(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    _write_snapshot(tmp_path, "DB", "DB_20260101T000000Z_older.bak")
+    _write_snapshot(tmp_path, "DB", "DB_20261102T000000Z_newer.bak")
+    names = [item["filename"] for item in snapshots.snapshot_files("DB")]
+    assert names == ["DB_20261102T000000Z_newer.bak", "DB_20260101T000000Z_older.bak"]
+    assert snapshots.snapshot_files("MISSING") == []
+
+
+def test_snapshot_files_tolerates_a_missing_manifest(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    directory = tmp_path / "DB"
+    directory.mkdir()
+    (directory / "DB_20260101T000000Z_manual.bak").write_bytes(b"S")
+    [item] = snapshots.snapshot_files("DB")
+    assert item["has_manifest"] is False and item["reason"] is None
+
+
+def test_prune_keeps_the_newest_n_and_deletes_the_rest(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    names = [f"DB_2026110{day}T000000Z_run.bak" for day in range(1, 8)]
+    for name in names:
+        _write_snapshot(tmp_path, "DB", name, size=10)
+
+    result = snapshots.prune_snapshots("DB", keep=3)
+
+    assert result["kept"] == 3
+    assert [item["filename"] for item in result["removed"]] == list(reversed(names[:4]))
+    assert result["bytes_freed"] == 40
+    remaining = [item["filename"] for item in snapshots.snapshot_files("DB")]
+    assert remaining == list(reversed(names[4:]))
+    directory = tmp_path / "DB"
+    assert not (directory / (names[0] + ".json")).exists()
+
+
+def test_prune_is_a_no_op_when_within_the_limit(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    _write_snapshot(tmp_path, "DB", "DB_20261101T000000Z_run.bak")
+    result = snapshots.prune_snapshots("DB", keep=5)
+    assert result == {"kept": 1, "removed": [], "bytes_freed": 0}
+
+
+def test_prune_requires_keeping_at_least_one(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    with pytest.raises(ValueError):
+        snapshots.prune_snapshots("DB", keep=0)
+
+
+def test_delete_snapshot_rejects_names_outside_the_directory(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    _write_snapshot(tmp_path, "DB", "DB_20261101T000000Z_run.bak")
+    with pytest.raises(ValueError):
+        snapshots.delete_snapshot("DB", "../../evil.bak")
+    assert snapshots.snapshot_files("DB")
+
+
+def test_restore_plan_documents_the_manual_restore(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    _write_snapshot(tmp_path, "DB", "DB_20261101T000000Z_run.bak")
+    plan = snapshots.restore_plan("DB", "DB_20261101T000000Z_run.bak")
+
+    assert plan["container_path"] == "/var/opt/mssql/data/DB_20261101T000000Z_run.bak"
+    assert "docker cp" in plan["docker_command"]
+    assert plan["statements"][0].startswith("ALTER DATABASE [DB] SET SINGLE_USER")
+    assert "RESTORE DATABASE [DB] FROM DISK" in plan["statements"][1]
+    assert plan["statements"][2].endswith("SET MULTI_USER;")
+
+
+def test_restore_plan_rejects_unknown_and_invalid_names(monkeypatch, tmp_path):
+    monkeypatch.setattr(snapshots.config, "SNAPSHOT_DIR", str(tmp_path))
+    _write_snapshot(tmp_path, "DB", "DB_20261101T000000Z_run.bak")
+    with pytest.raises(ValueError):
+        snapshots.restore_plan("DB", "other.bak")
+    with pytest.raises(ValueError):
+        snapshots.restore_plan("bad name", "DB_20261101T000000Z_run.bak")

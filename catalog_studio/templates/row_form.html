@@ -8,6 +8,7 @@
 <div class="row g-4">
     <div class="col-lg-{{ '6' if table == 'AnchorsDefinition' else '12' }}">
         <form method="post" id="rowForm" class="bg-white p-4 rounded shadow-sm" style="max-width: 700px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
             {% set rel_opts = relation_options or {} %}
             {% for c in columns %}

@@ -390,6 +390,18 @@ def test_drawing_style_usage_redirects_when_the_model_fails(monkeypatch):
 
 # --- pre-change snapshots gate batch writes --------------------------------
 
+def _csrf(client):
+    """Establish a session and return its CSRF token (GET / sets it)."""
+    client.get("/")
+    with client.session_transaction() as session:
+        return session["_csrf"]
+
+
+def _post_with_csrf(client, path, data):
+    payload = dict(data)
+    payload["csrf_token"] = _csrf(client)
+    return client.post(path, data=payload)
+
 def test_find_replace_blocks_when_the_snapshot_fails(monkeypatch):
     from app import app
     applied = []
@@ -397,8 +409,8 @@ def test_find_replace_blocks_when_the_snapshot_fails(monkeypatch):
                         lambda database, reason: (_ for _ in ()).throw(RuntimeError("no backup")))
     monkeypatch.setattr("utils.db.apply_find_replace",
                         lambda *a, **k: applied.append(True) or {})
-    resp = app.test_client().post("/db/SomeDb/find-replace",
-                                  data={"action": "apply", "find": "x", "replace": "y"})
+    resp = _post_with_csrf(app.test_client(), "/db/SomeDb/find-replace",
+                           {"action": "apply", "find": "x", "replace": "y"})
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "snapshot failed" in body.lower()
@@ -412,8 +424,8 @@ def test_find_replace_reports_the_snapshot_on_success(monkeypatch):
                         lambda database, reason: {"filename": "SomeDb_2026_x.bak"})
     monkeypatch.setattr("utils.db.apply_find_replace",
                         lambda *a, **k: {"ScrewNew.Name": 2})
-    resp = app.test_client().post("/db/SomeDb/find-replace",
-                                  data={"action": "apply", "find": "x", "replace": "y"})
+    resp = _post_with_csrf(app.test_client(), "/db/SomeDb/find-replace",
+                           {"action": "apply", "find": "x", "replace": "y"})
     body = resp.get_data(as_text=True)
     assert "Replaced" in body
     assert "SomeDb_2026_x.bak" in body
@@ -429,7 +441,7 @@ def test_add_diameter_blocks_when_the_snapshot_fails(monkeypatch):
                         lambda database, reason: (_ for _ in ()).throw(RuntimeError("disk full")))
     monkeypatch.setattr("utils.db.apply_clone_diameter",
                         lambda **kwargs: applied.append(True) or {})
-    resp = app.test_client().post("/db/SomeDb/add-diameter", data={
+    resp = _post_with_csrf(app.test_client(), "/db/SomeDb/add-diameter", {
         "action": "apply", "source_dia": "10", "target_dia": "12",
         "target_name": " 12.00 mm", "replace_from": "10.00", "replace_to": "12.00",
     })

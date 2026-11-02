@@ -16,6 +16,7 @@
             <div class="card-header">Upload a new mdf/ldf export</div>
             <div class="card-body">
                 <form action="/upload" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="mb-2">
                         <label class="form-label">.mdf file</label>
                         <input type="file" name="mdf_file" class="form-control" accept=".mdf">
@@ -33,6 +34,7 @@
             <div class="card-header">Create a new catalog from scratch</div>
             <div class="card-body">
                 <form action="/create" method="post" class="row g-2 align-items-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="col-auto">
                         <label class="form-label small mb-0">Database name</label>
                         <input type="text" name="db_name" class="form-control form-control-sm" placeholder="e.g. MyNewAnchors" required>
@@ -86,6 +88,7 @@
                 <div class="d-flex align-items-center gap-2 border-bottom pb-2 mb-2">
                     <div class="flex-grow-1">
                         <form action="/attach" method="post" class="row g-2 align-items-center m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input type="hidden" name="base" value="{{ pair.base }}">
                             <input type="hidden" name="mdf" value="{{ pair.mdf }}">
                             <input type="hidden" name="ldf" value="{{ pair.ldf or '' }}">
@@ -237,6 +240,7 @@
                                 {% endif %}
                             </span>
                             <form action="/db/{{ name }}/detach" method="post" class="m-0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button class="btn btn-sm btn-outline-danger"
                                         onclick="return confirm('Detach {{ name }} and export it? It will be removed from the live SQL Server session.');">
                                     Detach &amp; Export
