@@ -194,6 +194,16 @@ and display-name token replacement.
   `≈` marker for inexact conversions), validation, safe sheet filenames, the
   hardware schedule, and the dimensioned SVG elevation renderer. All of it is
   unit-tested; the template never invents numbers.
+- `templates/base.html` + `static/css/theme.css` + `static/js/theme.js` — the
+  light/dark switch. `base.html` sets `data-bs-theme` on `<html>` from
+  `localStorage` (`catalogStudioTheme`) before first paint, falling back to
+  `prefers-color-scheme`, and renders the navbar toggle; `theme.js` only wires
+  the switch, icons and cross-tab sync. `theme.css` owns the tokens **and** the
+  dark remaps for the light-only utilities the templates use (`bg-white`,
+  `bg-light`, `text-dark` scoped to `bg-light`). Keep pages extending
+  `base.html` so they inherit the theme, and keep SVG/drawing surfaces on light
+  "paper" (`.cs-paper`, `.bp-host`, `.label-preview`, the Three.js canvas, the
+  printable fabrication sheet) — their strokes and dimension text assume it.
 - `catalog_studio/static/vendor/three/` — **pinned local** Three.js r160
   (`three.module.js`, `OrbitControls.js`) so the workshop works offline. The
   viewer template loads it via an import map (`three` and `three/addons/`

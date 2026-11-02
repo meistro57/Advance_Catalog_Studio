@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 344 tests; read-only bolt/anchor/stud/style views and
+Baseline: `main` green at 348 tests; read-only bolt/anchor/stud/style views and
 the health report exist; writes are the bolt diameter clone, raw row CRUD, find
 & replace, and drawing-style field/rule edits.
 
@@ -204,3 +204,6 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   their connection on error, add-diameter names the snapshot failure, the bolt
   clone refuses identity-keyed tables, `BoltsDistances.Description` uses a
   token-boundary replace, and the tree is pyflakes-clean (issue #10).
+- [x] Light/dark theme: navbar toggle, `localStorage` + `prefers-color-scheme`,
+  Bootstrap `data-bs-theme` tokens in `static/css/theme.css`, drawing surfaces
+  kept on light paper (348 tests).

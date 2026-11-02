@@ -166,6 +166,14 @@ The home page is the ingest/edit/export control centre. It shows:
 - new bolt and anchor catalog creation;
 - completed exports ready for download.
 
+### Light and dark mode
+
+A **Dark / Light** button in the navigation bar switches the interface theme. The choice is remembered in the browser (`localStorage`) and, on a first visit, follows the operating system's `prefers-color-scheme`; while no explicit choice has been made, a system change is followed live. Nothing is stored server-side.
+
+The chrome re-themes: navigation, cards, tables, forms, alerts, badges and the drawing-style editor, including its helper panels and "changed cell" highlight. Engineering drawings deliberately stay on light "paper" in both themes - the Three.js schematic, the dimensioned bolt profile, the drawing-style schematic figures and label previews - because their strokes, dimension text and part colours are drawn for a light background. The printable fabrication sheet is always light.
+
+Bootstrap 5.3.3's own `data-bs-theme` attribute drives the standard components; `static/css/theme.css` holds the colour tokens and the remaps for the light-only utility classes the templates use (`bg-white`, `bg-light`, `text-dark` inside `bg-light`).
+
 ### Database overview
 
 Opening an attached database shows every table and its live row count. Bolt and shear-stud catalogs also receive a diameter summary bar showing:
@@ -402,6 +410,8 @@ Advance_Catalog_Studio/
 │   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer + editor
 │   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
 │   │   ├── js/anchor-configurator.js # Three.js anchor viewer
+│   │   ├── js/theme.js            # Light/dark toggle (persistence, icons)
+│   │   ├── css/theme.css          # Light/dark tokens + Bootstrap remaps
 │   │   ├── css/                   # bolt-set-viewer.css, fabrication-sheet.css
 │   │   └── vendor/
 │   │       ├── three/              # Pinned local Three.js r160 (offline)

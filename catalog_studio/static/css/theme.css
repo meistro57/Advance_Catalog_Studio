@@ -1,0 +1,129 @@
+/* static/css/theme.css
+ *
+ * Light/dark tokens for the app chrome, plus the remaps needed because the
+ * templates hardcode a few light-only Bootstrap utilities (bg-white, bg-light,
+ * text-dark). Mounted once from base.html, after Bootstrap.
+ *
+ * Engineering drawings (the Three.js canvas, the dimensioned bolt profile, the
+ * drawing-style schematic figures and label previews) stay on light "paper" in
+ * both themes so the dark strokes and dimension text remain legible.
+ */
+
+:root {
+    --cs-page-bg: #f5f6f8;
+    --cs-surface: #ffffff;
+    --cs-surface-alt: #f8f9fa;
+    --cs-ink: #212529;
+    --cs-muted: #6c757d;
+    --cs-border: #dee2e6;
+    --cs-head-bg: #212529;
+    --cs-head-ink: #ffffff;
+    --cs-help-bg: #eef4ff;
+    --cs-help-border: #0d6efd;
+    --cs-help-ink: #0b3d91;
+    --cs-changed-bg: #fff3cd;
+    --cs-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+    --cs-paper: #ffffff;
+    --cs-paper-ink: #212529;
+}
+
+[data-bs-theme="dark"] {
+    /* Let Bootstrap's own components (cards, tables, forms, modals) follow. */
+    --bs-body-bg: #1a2027;
+    --bs-body-color: #e8eef4;
+    --bs-secondary-bg: #222a33;
+    --bs-tertiary-bg: #263039;
+    --bs-border-color: #313c48;
+    --bs-secondary-color: rgba(232, 238, 244, .72);
+    --bs-emphasis-color: #ffffff;
+
+    --cs-page-bg: #12161b;
+    --cs-surface: #1a2027;
+    --cs-surface-alt: #222a33;
+    --cs-ink: #e8eef4;
+    --cs-muted: #9aa7b4;
+    --cs-border: #313c48;
+    --cs-head-bg: #263039;
+    --cs-help-bg: #16243a;
+    --cs-help-border: #4c8dff;
+    --cs-help-ink: #bcd6ff;
+    --cs-changed-bg: #43380f;
+    --cs-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+}
+
+html body {
+    padding: 2rem;
+    background: var(--cs-page-bg);
+    color: var(--cs-ink);
+}
+
+/* Templates use these light-only utilities as surface colours. `text-dark` is
+ * only remapped inside `.bg-light` (badges on the neutral surface); on the
+ * coloured badges (bg-info / bg-warning) dark text is still the right answer. */
+.bg-white { background-color: var(--cs-surface) !important; }
+.bg-light { background-color: var(--cs-surface-alt) !important; }
+[data-bs-theme="dark"] .bg-light.text-dark { color: var(--cs-ink) !important; }
+.border { border-color: var(--cs-border) !important; }
+
+table.data-table th {
+    position: sticky;
+    top: 0;
+    background: var(--cs-head-bg);
+    color: var(--cs-head-ink);
+}
+
+.table-wrap { max-height: 70vh; overflow: auto; }
+td { white-space: nowrap; }
+.badge-missing { background: #dc3545; }
+
+/* Paper surfaces: drawings keep a light background in both themes. */
+.bp-host,
+.cs-paper {
+    background-color: var(--cs-paper) !important;
+    color: var(--cs-paper-ink);
+}
+
+.label-preview { color: var(--cs-paper-ink); }
+.label-preview .text-muted { color: #6c757d !important; }
+
+#themeToggle { min-width: 5rem; }
+#themeToggle .theme-icon { line-height: 1; }
+
+/* ---- dark overrides for the per-page stylesheets ------------------------- */
+
+[data-bs-theme="dark"] .bs-help,
+[data-bs-theme="dark"] .ds-help {
+    background: var(--cs-help-bg);
+    border-left-color: var(--cs-help-border);
+    color: var(--cs-ink);
+}
+
+[data-bs-theme="dark"] .bs-help strong { color: var(--cs-help-ink); }
+
+[data-bs-theme="dark"] .ds-card {
+    background: var(--cs-surface);
+    box-shadow: var(--cs-shadow);
+}
+
+[data-bs-theme="dark"] .ds-card > .card-header { background: var(--cs-head-bg); }
+
+[data-bs-theme="dark"] .ds-sub,
+[data-bs-theme="dark"] .ds-grid label,
+[data-bs-theme="dark"] .ds-hint,
+[data-bs-theme="dark"] .ds-rules .ord,
+[data-bs-theme="dark"] .sd-step .sd-fallback,
+[data-bs-theme="dark"] .editor-row .editor-slot,
+[data-bs-theme="dark"] .editor-row .editor-meta,
+[data-bs-theme="dark"] .editor-row .editor-slot small,
+[data-bs-theme="dark"] #boltInfoPanel .row-item .k,
+[data-bs-theme="dark"] #anchorInfoPanel .row-item .k,
+[data-bs-theme="dark"] #detailPanel .row-item .k {
+    color: var(--cs-muted);
+}
+
+[data-bs-theme="dark"] .ds-rules tr.changed { background: var(--cs-changed-bg) !important; }
+
+[data-bs-theme="dark"] .sd-step {
+    background: var(--cs-surface-alt);
+    border-color: var(--cs-border);
+}
