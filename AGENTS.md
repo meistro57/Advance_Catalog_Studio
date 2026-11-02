@@ -36,8 +36,12 @@ and display-name token replacement.
   (bolt-set view model and profile drawing, drawing-style label parsing,
   figures and htmx rule partials, drawing-style sub-style usage walk and orphan
   scan, catalog health report, fabrication sheet model, shear-stud browser
-  model and clone plan, staging cleanup, connection timeouts) — no database
-  needed.
+  model and clone plan, staging cleanup, connection timeouts, the diameter
+  clone's replace-before-insert order, find & replace's single transaction and
+  legacy-type casts, detach/backup connection recovery, and the light/dark
+  theme hooks) — no database needed. The clone and find/replace tests stub the
+  cursor, so they assert statement order and commit/rollback rather than SQL
+  Server behaviour.
 - **No configured linter, no CI, no Makefile, no packaging config exist.**
   Verification is manual against the Docker SQL Server plus the pytest suite.
   The tree is kept pyflakes-clean (`pyflakes catalog_studio tests *.py`), but

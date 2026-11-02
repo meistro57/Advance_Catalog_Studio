@@ -153,8 +153,10 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   names, anchor hardware material mismatches).
 - [ ] **G3 — CI.** GitHub Actions running `pytest`, `python -m compileall`, and
   a docs link check on push/PR (repo currently has no CI).
-- [ ] **G4 — Lint/format.** Decide on `ruff` (and a formatting policy) or
-  explicitly stay unformatted; do not reformat unrelated code in one commit.
+- [~] **G4 — Lint/format.** `pyflakes catalog_studio tests *.py` is clean and
+  is now the documented convenience check; still decide whether to pin `ruff`
+  (and a formatting policy) or explicitly stay unformatted. Do not reformat
+  unrelated code in one commit.
 - [ ] **G5 — Docs refresh.** Screenshot for the usage page, refresh
   `catalog-studio-dashboard.png`, and re-check the README status table after
   every milestone.

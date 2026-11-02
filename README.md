@@ -54,6 +54,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
 | Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), read-only sub-style usage and orphan scan |
+| Interface theme | Light and dark, remembered per browser; drawings stay on light paper |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -120,11 +121,23 @@ The suite needs no SQL Server. It covers the bolt-set view model and the dimensi
 assembly profile, the shear-stud browser model and its preview-only clone proposal,
 drawing-style label parsing, schematic figures and the htmx rule partials, the
 fabrication sheet model, staging cleanup, connection timeouts, and route
-smoke tests:
+smoke tests. It also pins the write-safety behaviour of the guided tools: the
+diameter clone replaces the target before inserting, find & replace commits once
+or rolls back, detach and backup always close (and detach restores multi-user
+mode), and the theme hooks stay in place. Those database tests stub the cursor,
+so they check the statements and commit/rollback calls rather than a live SQL
+Server:
 
 ```bash
 pip install -r requirements-dev.txt   # adds pytest
 python -m pytest tests/
+```
+
+The tree is also kept free of pyflakes findings; this is a convenience check, not
+a pinned dependency:
+
+```bash
+pyflakes catalog_studio tests *.py
 ```
 
 ## Typical workflow
