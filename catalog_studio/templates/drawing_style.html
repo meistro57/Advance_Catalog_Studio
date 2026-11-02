@@ -360,10 +360,12 @@
         <div class="token-palette mb-2">
           {% for t in label_tokens %}<button type="button" class="btn btn-sm btn-outline-primary py-0 token-insert" data-token="%{{ t }}">%{{ t }}</button>{% endfor %}
           {% for c in label_commands %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="{{ c }}">{{ c }}</button>{% endfor %}
+          {% for e in label_escapes %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="%%{{ e }}" title="symbol escape">%%{{ e }}</button>{% endfor %}
         </div>
         <div class="ds-hint mb-2">
           Tokens: <code>%Field</code> = model property &middot; <code>#Newline</code> &middot; <code>#Height(mm)</code> &middot;
-          <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed.
+          <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed &middot;
+          <code>%%c</code> &Oslash; &middot; <code>%%d</code> &deg; &middot; <code>%%p</code> &plusmn; &middot; <code>%%%</code> %.
           Preview uses sample values; orange fields aren't in the sample list (still fine in AS).
         </div>
         {% for e in tree.libraries.get('DetAnnotationType', []) %}

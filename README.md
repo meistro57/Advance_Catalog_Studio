@@ -478,8 +478,10 @@ Next steps for the drawing-style editor:
 - edit dimension point selections and arranger strategies with the same dropdowns;
 - label the Advance Steel built-in values (geometric restrictions, object qualifiers, box modes) once they are verified against a live install;
 - styles that use detail processes (`DetailProcess*` tables, empty in the first sample);
-- selective deep-copy of a style branch (new keys, rewired references) and batch presentation replacement: both are write paths and wait on a verified Advance Steel round trip;
-- purging orphan rows and compacting the database: the tool reports unreachable rows but does not delete them, because a purged export has not been round-trip verified and the `.mdf` / `.ldf` pair must stay consistent for import.
+- selective deep-copy of a style branch: the guide confirms DSM's two modes (Copy shares sub-styles, Deep copy duplicates every level and prefixes each with `Copy of`), so a selective branch is a third mode whose keys and import behaviour still need a verified round trip;
+- batch presentation replacement across styles: a write path that also needs the round trip, and it should reuse the sub-style usage report to warn about shared records;
+- purging orphan rows: the tool reports unreachable rows but does not delete them, because a purged export has not been round-trip verified and the `.mdf` / `.ldf` pair must stay consistent for import;
+- compaction: use the Drawing Style Manager's own **Compact database** function (it merges equal records and rewires references); Catalog Studio does not duplicate it.
 
 ### Catalog intelligence and comparison
 

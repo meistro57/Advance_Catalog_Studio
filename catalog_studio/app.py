@@ -936,6 +936,7 @@ def drawing_style(database):
         length_cols=drawing_styles.LENGTH_COLUMNS, ftin=drawing_styles.format_ft_in,
         scale_denom=drawing_styles.scale_denominator,
         label_tokens=sorted(drawing_styles.KNOWN_FIELDS),
+        label_escapes=list(drawing_styles.SYMBOL_ESCAPES),
         label_commands=["#Newline", "#Height(6.40)", "#Bold(1)", "#Underline(1)",
                         "#Color(2)", "#Italic(1)", "#Rounded", "#End"],
     )

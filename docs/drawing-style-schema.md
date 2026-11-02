@@ -111,7 +111,15 @@ manager's behaviour (kept locally in `docs/references/`, not committed):
   and `FAB196818` (presentations).
 
 They describe the manager, not the SQL schema, and they predate the 2026
-export, so they confirm concepts and workflows only.
+export, so they confirm concepts and workflows only. What each contributes:
+
+| Document | Confirms |
+| --- | --- |
+| *Advance Steel Drawing Style Manager Guide* (2016) | full manager UI, Copy vs Deep copy, optional shared-item warning, Compact database, label token table |
+| *Drawing Style Manager Guide 6.1* (2005) | sub-style reuse model, `.mdb` export/import, Advance vs User libraries |
+| AU `MSF9970-L` (Drawing Styles customization) | Copy shares sub-styles, Deep copy duplicates all levels and prefixes them `Copy of` |
+| AU `FAB22624` (Drawings) | token-based labelling on sheets, style selection workflow |
+| AU `FAB196818` (presentations) | practical presentation/token tips |
 
 | Guide term | Observed table(s) |
 | --- | --- |
@@ -231,6 +239,9 @@ redirect to `#rules-<map>` for the no-JavaScript path. htmx is vendored at
 whole form and answer with flashes only.
 
 ## Not verified yet
+
+The guides above describe the 2016 manager and its `.mdb` libraries; the 2026
+export is a SQL Server pair, so none of the following is settled by them.
 
 - How the Drawing Style Manager import handles a style whose name already
   exists. Renaming before import sidesteps it.

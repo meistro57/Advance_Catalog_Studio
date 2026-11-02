@@ -96,6 +96,8 @@ and display-name token replacement.
   and runs `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
+  Do not reimplement compaction: the Style Manager's own **Compact database**
+  merges equal records and rewires references; the tool only reports.
   Feature requests sometimes name `DetStyle`, `DetStyleViews`, `DetView`,
   `DetDimStrategy`, `DetObjectsSet`, `DetDimDefinition`, `DetDimPoints`,
   `DetObjects` or `DetPresentation`: none of those exist in an AS 2026 export.
