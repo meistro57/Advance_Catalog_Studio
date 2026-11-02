@@ -524,3 +524,33 @@ def test_plan_clone_proposes_the_next_relation_key():
     row = plan_tables(result)["ConnectorRelations"][0]
     assert row["Key"] == 5
     assert row["ConnectorDiameter"] == 12.0
+
+
+# --- catalog type detection -------------------------------------------------
+
+def test_guess_catalog_type_prefers_connector_tables_over_setbolts(monkeypatch):
+    from utils import db
+    monkeypatch.setattr(db, "list_tables",
+                        lambda database: ["SetBolts", "ConnectorStandard",
+                                          "ConnectorDiameters"])
+    assert db.guess_catalog_type("NelsonH4L") == "shear stud"
+
+
+def test_guess_catalog_type_detects_a_connector_diameters_table_alone(monkeypatch):
+    from utils import db
+    monkeypatch.setattr(db, "list_tables", lambda database: ["ConnectorDiameters", "SetBolts"])
+    assert db.guess_catalog_type("PartialConnector") == "shear stud"
+
+
+def test_guess_catalog_type_still_labels_plain_bolt_catalogs(monkeypatch):
+    from utils import db
+    monkeypatch.setattr(db, "list_tables",
+                        lambda database: ["SetBolts", "BoltsDiameters", "SetOfBolts"])
+    assert db.guess_catalog_type("A325TC_mark") == "bolt"
+
+
+def test_guess_catalog_type_still_labels_anchor_catalogs(monkeypatch):
+    from utils import db
+    monkeypatch.setattr(db, "list_tables",
+                        lambda database: ["SetBolts", "AnchorsDefinition"])
+    assert db.guess_catalog_type("US_Hooked_Anchors") == "anchor"
