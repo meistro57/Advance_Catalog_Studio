@@ -233,3 +233,28 @@ def test_shear_stud_clone_preview_blocks_duplicate_diameter(monkeypatch):
     body = resp.get_data(as_text=True)
     assert "blocked" in body
     assert "already exists" in body
+
+
+def test_shear_stud_browser_renders_imperial_units(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")
+    monkeypatch.setattr("utils.shear_studs.get_browser_model",
+                        lambda database: _fake_shear_stud_model())
+    resp = app.test_client().get("/db/NelsonH4L/shear-stud-browser?units=in")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "≈ 1/4 in" in body
+    assert "units=mm" in body and "units=in" in body
+
+
+def test_shear_stud_clone_preview_uses_requested_units(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")
+    monkeypatch.setattr("utils.shear_studs.get_browser_model",
+                        lambda database: _fake_shear_stud_model())
+    resp = _clone_post(app.test_client(), units="in")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "≈ 1/4 in" in body
+    assert "≈ 5/16 in" in body
+    assert "stored values (millimetres)" in body

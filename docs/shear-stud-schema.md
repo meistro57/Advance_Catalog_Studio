@@ -113,3 +113,8 @@ in Advance Steel is therefore believed to be:
   consistent (`'   6.00 mm'` for 6 mm next to `' 10.00 mm'`). Generated names
   should use one canonical form (`' 6.00 mm'`); existing rows are reported as
   *info* and preserved as authored.
+- Display units are presentation-only: millimetres stay the stored unit and an
+  `inch` toggle converts diameters, lengths, hole rules and head geometry with
+  the fabrication-sheet rule (nearest 1/16 in, reduced fraction, `≈` when not
+  exactly representable). The clone proposal table always lists the values as
+  they would be stored, and no conversion happens before a value reaches SQL.

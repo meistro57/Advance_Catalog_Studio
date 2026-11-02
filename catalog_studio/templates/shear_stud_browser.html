@@ -16,7 +16,13 @@
             <code>ConnectorRelations</code> and <code>SetBolts</code>.
         </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Display units">
+            <a class="btn {% if units == 'mm' %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
+               href="?{{ {'standard': selections.standard, 'material': selections.material, 'diameter': selections.diameter, 'length': selections.length, 'units': 'mm'}|urlencode }}">mm</a>
+            <a class="btn {% if units == 'in' %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
+               href="?{{ {'standard': selections.standard, 'material': selections.material, 'diameter': selections.diameter, 'length': selections.length, 'units': 'in'}|urlencode }}">inch</a>
+        </div>
         <a href="/db/{{ database }}/SetBolts" class="btn btn-sm btn-outline-secondary">Raw SetBolts</a>
         <a href="/db/{{ database }}/ConnectorRelations" class="btn btn-sm btn-outline-secondary">Raw ConnectorRelations</a>
     </div>
@@ -79,23 +85,24 @@
                 </select>
             </div>
             <div class="col-6 col-md-2">
-                <label class="form-label small text-uppercase text-muted mb-1" for="f-diameter">Diameter (mm)</label>
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-diameter">Diameter</label>
                 <select class="form-select form-select-sm" id="f-diameter" name="diameter">
                     <option value="">All</option>
                     {% for value in options.diameters %}
-                    <option value="{{ value }}" {% if selections.diameter and number_text(selections.diameter) == number_text(value) %}selected{% endif %}>{{ number_text(value) }}</option>
+                    <option value="{{ value }}" {% if selections.diameter and number_text(selections.diameter) == number_text(value) %}selected{% endif %}>{{ value|sdim(units) }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col-6 col-md-2">
-                <label class="form-label small text-uppercase text-muted mb-1" for="f-length">Length (mm)</label>
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-length">Length</label>
                 <select class="form-select form-select-sm" id="f-length" name="length">
                     <option value="">All</option>
                     {% for value in options.lengths %}
-                    <option value="{{ value }}" {% if selections.length and number_text(selections.length) == number_text(value) %}selected{% endif %}>{{ number_text(value) }}</option>
+                    <option value="{{ value }}" {% if selections.length and number_text(selections.length) == number_text(value) %}selected{% endif %}>{{ value|sdim(units) }}</option>
                     {% endfor %}
                 </select>
             </div>
+            <input type="hidden" name="units" value="{{ units }}">
             <div class="col-12 col-md-4 d-flex gap-2">
                 <button type="submit" class="btn btn-sm btn-primary">Apply filters</button>
                 <a href="/db/{{ database }}/shear-stud-browser" class="btn btn-sm btn-outline-secondary">Clear</a>
@@ -112,6 +119,7 @@
         </span>
     </summary>
     <form method="post" action="/db/{{ database }}/shear-stud-browser/clone-preview" class="card-body py-3">
+        <input type="hidden" name="units" value="{{ units }}">
         <div class="row g-2">
             <div class="col-6 col-md-3">
                 <label class="form-label small text-uppercase text-muted mb-1" for="c-standard">Source family</label>
@@ -133,7 +141,7 @@
                 <label class="form-label small text-uppercase text-muted mb-1" for="c-source">From &Oslash; (mm)</label>
                 <select class="form-select form-select-sm" id="c-source" name="source_diameter">
                     {% for value in options.diameters %}
-                    <option value="{{ value }}">{{ number_text(value) }}</option>
+                    <option value="{{ value }}">{{ value|sdim(units) }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -189,9 +197,9 @@
                 {{ item.message }}
                 {% if item.group %}
                 <span class="text-muted">
-                    ({{ item.group.standard }} / {{ item.group.material }} /
-                    &Oslash;{{ number_text(item.group.diameter) }} mm{% if item.stud %},
-                    {{ number_text(item.stud.length) }} mm{% endif %})
+                ({{ item.group.standard }} / {{ item.group.material }} /
+                &Oslash;{{ item.group.diameter|sdim(units) }}{% if item.stud %},
+                {{ item.stud.length|sdim(units) }}{% endif %})
                 </span>
                 {% endif %}
             </li>
@@ -237,7 +245,7 @@
                         <tr>
                             <th>Diameter</th>
                             <th>Hole rules (along &times; across)</th>
-                            <th>Lengths (mm)</th>
+                            <th>Lengths</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -245,7 +253,7 @@
                         {% for group in grade.diameters %}
                         <tr>
                             <td class="text-nowrap">
-                                <strong>{{ number_text(group.diameter) }} mm</strong>
+                                <strong>{{ group.diameter|sdim(units) }}</strong>
                                 <div class="text-muted small">
                                     <code>{{ group.diameter_display }}</code>
                                     <a class="ms-1"
@@ -256,8 +264,8 @@
                                 {% if group.distances %}
                                     {% for rule in group.distances %}
                                     <div>
-                                        {{ number_text(rule.along) }} &times; {{ number_text(rule.across) }}
-                                        <span class="text-muted">(tolerance {{ number_text(rule.hole_tolerance) }})</span>
+                                        {{ rule.along|sdim(units) }} &times; {{ rule.across|sdim(units) }}
+                                        <span class="text-muted">(tolerance {{ rule.hole_tolerance|sdim(units) }})</span>
                                     </div>
                                     {% endfor %}
                                     <a href="/db/{{ database }}/ConnectorDistances?filter_col=Key&filter_val={{ group.diameter }}"
@@ -270,7 +278,7 @@
                                 {% if group.lengths %}
                                     {% for length in group.lengths %}
                                     <a class="badge bg-light text-dark border text-decoration-none"
-                                       href="/db/{{ database }}/shear-stud-browser?standard={{ group.standard|urlencode }}&material={{ group.material|urlencode }}&diameter={{ group.diameter }}&length={{ length }}">{{ number_text(length) }}</a>
+                                       href="/db/{{ database }}/shear-stud-browser?standard={{ group.standard|urlencode }}&material={{ group.material|urlencode }}&diameter={{ group.diameter }}&length={{ length }}&units={{ units }}">{{ length|sdim(units) }}</a>
                                     {% endfor %}
                                     <a class="small ms-1"
                                        href="/db/{{ database }}/SetBolts?filter_col=Diameter&filter_val={{ group.diameter }}">raw</a>
@@ -313,8 +321,8 @@
             <tr>
                 <th>Family</th>
                 <th>Grade</th>
-                <th>&Oslash; mm</th>
-                <th>Length mm</th>
+                <th>&Oslash;</th>
+                <th>Length</th>
                 <th>Name</th>
                 <th>Head</th>
                 <th>Weight (kg)</th>
@@ -329,13 +337,13 @@
                     {% if loop.first %}
                     <td rowspan="{{ group.studs|length }}">{{ group.standard }}</td>
                     <td rowspan="{{ group.studs|length }}">{{ group.material }}</td>
-                    <td rowspan="{{ group.studs|length }}">{{ number_text(group.diameter) }}</td>
+                    <td rowspan="{{ group.studs|length }}">{{ group.diameter|sdim(units) }}</td>
                     {% endif %}
-                    <td>{{ number_text(stud.length) }}</td>
+                    <td>{{ stud.length|sdim(units) }}</td>
                     <td>{{ stud.name or '—' }}</td>
                     <td class="small text-nowrap">
-                        {{ stud.head_diameter if stud.head_diameter is not none else '—' }}
-                        &times; {{ stud.head_height if stud.head_height is not none else '—' }}
+                        {{ stud.head_diameter|sdim(units) if stud.head_diameter is not none else '—' }}
+                        &times; {{ stud.head_height|sdim(units) if stud.head_height is not none else '—' }}
                         <span class="text-muted">
                             {% if stud.corners %} {{ stud.corners }}-sided{% else %} round{% endif %}
                         </span>

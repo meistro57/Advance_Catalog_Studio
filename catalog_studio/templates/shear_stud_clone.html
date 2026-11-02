@@ -22,14 +22,14 @@
     <div class="col-6 col-md-2">
         <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
             <div class="text-uppercase text-muted small">Source</div>
-            <div class="fs-6 fw-bold">{{ number_text(plan.source.diameter) }} mm</div>
+            <div class="fs-6 fw-bold">{{ plan.source.diameter|sdim(units) }}</div>
             <div class="text-muted small">{{ plan.source.lengths|length }} lengths</div>
         </div></div>
     </div>
     <div class="col-6 col-md-2">
         <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
             <div class="text-uppercase text-muted small">Target</div>
-            <div class="fs-6 fw-bold">{{ number_text(plan.target.diameter) }} mm</div>
+            <div class="fs-6 fw-bold">{{ plan.target.diameter|sdim(units) }}</div>
             <div class="text-muted small">{{ plan.target.lengths|length }} lengths</div>
         </div></div>
     </div>
@@ -90,6 +90,7 @@
     <div class="card-header bg-white">
         <strong>{{ section.table }}</strong>
         <span class="badge bg-light text-dark border ms-2">{{ section.rows|length }} row(s)</span>
+        <span class="text-muted small ms-2">stored values (millimetres)</span>
     </div>
     <div class="card-body py-3">
         {% if section.rows %}
@@ -123,10 +124,10 @@
         <ul class="list-unstyled small mb-0">
             <li><span class="text-muted">Family</span> {{ plan.source.standard }}</li>
             <li><span class="text-muted">Grade</span> {{ plan.source.material }}</li>
-            <li><span class="text-muted">Diameter</span> {{ number_text(plan.source.diameter) }} mm</li>
+            <li><span class="text-muted">Diameter</span> {{ plan.source.diameter|sdim(units) }}</li>
             <li>
                 <span class="text-muted">Lengths</span>
-                {% for length in plan.source.lengths %}{{ number_text(length) }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {% for length in plan.source.lengths %}{{ length|sdim(units) }}{% if not loop.last %}, {% endif %}{% endfor %}
             </li>
         </ul>
     </div>

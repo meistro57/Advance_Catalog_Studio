@@ -22,6 +22,8 @@ app.config.from_object(config)
 app.jinja_env.filters["fmm"] = fabrication.format_mm
 app.jinja_env.filters["fin_fraction"] = fabrication.format_in
 app.jinja_env.filters["f_dim"] = fabrication.format_dim_text
+# Shear-stud browser dimensions: stored millimetres, displayed in mm or inches.
+app.jinja_env.filters["sdim"] = shear_studs.format_dimension
 
 
 def _csrf_token() -> str:
@@ -409,6 +411,7 @@ def shear_stud_browser(database):
         "diameter": request.args.get("diameter", "").strip(),
         "length": request.args.get("length", "").strip(),
     }
+    units = shear_studs.normalize_units(request.args.get("units"))
     filters = {}
     for name in ("diameter", "length"):
         raw = selections[name]
@@ -439,6 +442,7 @@ def shear_stud_browser(database):
         summary=shear_studs.summarize(groups, issues),
         options=model["options"],
         selections=selections,
+        units=units,
         number_text=shear_studs.number_text,
     )
 
@@ -491,6 +495,7 @@ def shear_stud_clone_preview(database):
         plan=plan,
         form=form,
         options=model["options"],
+        units=shear_studs.normalize_units(request.form.get("units")),
         number_text=shear_studs.number_text,
     )
 

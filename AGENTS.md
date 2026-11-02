@@ -116,7 +116,12 @@ and display-name token replacement.
   per-record geometry checks, per-(standard, material, diameter) grouping with
   the documented completeness rules, filtering and summaries. Pure helpers are
   unit-tested; `get_browser_model()` is the only SQL (reads `Connector*` +
-  `SetBolts`). Nothing here writes.
+  `SetBolts`). Nothing here writes. Display units are presentation-only:
+  `normalize_units()` / `format_dimension()` keep storage in millimetres and
+  render inches through `fabrication.format_in` (nearest 1/16 in, reduced
+  fraction, `≈` marker); the templates call it as the `sdim` Jinja filter and
+  carry `units` through filter links and the clone form. Never convert values
+  before they reach SQL or the clone proposal.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the

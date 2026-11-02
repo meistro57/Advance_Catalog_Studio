@@ -554,3 +554,31 @@ def test_guess_catalog_type_still_labels_anchor_catalogs(monkeypatch):
     monkeypatch.setattr(db, "list_tables",
                         lambda database: ["SetBolts", "AnchorsDefinition"])
     assert db.guess_catalog_type("US_Hooked_Anchors") == "anchor"
+
+
+# --- display units ----------------------------------------------------------
+
+def test_normalize_units_accepts_inch_spellings():
+    for value in ("in", "IN", "inch", "inches", "imperial", '"'):
+        assert ss.normalize_units(value) == "in"
+    assert ss.normalize_units("mm") == "mm"
+    assert ss.normalize_units("") == "mm"
+    assert ss.normalize_units(None) == "mm"
+    assert ss.normalize_units("bogus") == "mm"
+
+
+def test_format_dimension_shows_stored_millimetres_by_default():
+    assert ss.format_dimension(12.7) == "12.7 mm"
+    assert ss.format_dimension(12.7, "mm") == "12.7 mm"
+
+
+def test_format_dimension_converts_to_reduced_inches():
+    assert ss.format_dimension(12.7, "in") == "1/2 in"
+    assert ss.format_dimension(25.4, "in") == "1 in"
+    assert ss.format_dimension(31.75, "in") == "1 1/4 in"
+    assert ss.format_dimension(16.0, "in") == "≈ 5/8 in"
+
+
+def test_format_dimension_handles_missing_values():
+    assert ss.format_dimension(None) == "—"
+    assert ss.format_dimension(None, "in") == "—"

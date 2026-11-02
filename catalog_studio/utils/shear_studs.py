@@ -24,6 +24,7 @@ import re
 from collections import defaultdict
 
 from utils import db as dbcore
+from utils import fabrication
 
 CONNECTOR_STANDARD = "ConnectorStandard"
 CONNECTOR_MATERIAL = "ConnectorMaterial"
@@ -83,6 +84,30 @@ def number_text(value):
     if number is None:
         return ""
     return f"{number:g}"
+
+
+UNITS = ("mm", "in")
+
+
+def normalize_units(value):
+    """Display units for the browser: 'mm' (default) or 'in'."""
+    text = str(value or "").strip().lower()
+    return "in" if text in {"in", "inch", "inches", "imperial", '"'} else "mm"
+
+
+def format_dimension(value_mm, units="mm"):
+    """Display-only conversion; catalog values stay stored in millimetres.
+
+    Imperial output reuses the fabrication sheet convention: nearest 1/16 in,
+    reduced fraction, `≈` prefix when the millimetre value is not exactly
+    representable at that denominator.
+    """
+    number = to_float(value_mm)
+    if number is None:
+        return "\u2014"
+    if normalize_units(units) == "in":
+        return f"{fabrication.format_in(number)} in"
+    return f"{number_text(number)} mm"
 
 
 def expected_stud_name(standard, diameter, length):
