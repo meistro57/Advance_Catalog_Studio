@@ -250,7 +250,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **In-place rule edits** — move / copy / delete / renumber swap only that view's rules block (htmx, vendored locally) instead of reloading the page, so a long style keeps its scroll position; saving fields posts in the background and reports through the page's flash area. Both paths still work without JavaScript.
 - **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension section with a "how to read a chain" explainer, a plan of every chain in the view (X chains above/below the part, Y chains beside it, numbered into a legend), and a chain sketch per request (collapsed behind a summary once a view has more than six). They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
-- **Libraries** — label formulas (live preview plus a click-to-insert token palette), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
+- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
 - **Integrity check** — every in-file reference is checked before you export.
 - **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
 
@@ -284,6 +284,8 @@ The Style Manager hides a real hazard: appearances, label formulas, qualifier se
 - **Rows no drawing style reaches** — every row in the style tables that is unreachable from all `DetailStyle` rows, grouped by table with examples. In the checked-in samples this is a single unused grid-reference setting; it is a review prompt, not a delete list.
 
 The chain is declared in `utils/style_usage.py` (`ASCENT_EDGES`) from the verified export shape, because the export's `InfoTableRelations` map states references but not which side contains which. Category values are Advance Steel built-in enums, shown as numbers because their labels are not in the export. Nothing is written, deduplicated, purged or compacted.
+
+Autodesk's own Drawing Style Manager guide confirms the model and the two copy modes: **Copy** reuses the original sub-styles, **Deep copy** duplicates every level (prefixing each copy with `Copy of`). DSM's **Compact database** button already merges equal records and rewires references, so this page reports unreachable rows instead of duplicating that operation; run Compact in the Style Manager on a copy after reviewing the report.
 
 ### Shear-stud (connector) browser
 

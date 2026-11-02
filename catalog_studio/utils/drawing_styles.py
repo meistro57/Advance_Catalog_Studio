@@ -209,21 +209,45 @@ def parse_length(text):
 
 # --- label formula parsing (DetAnnotationType.Content, DetailStyle.TitleFormat)
 
+# Sample values for the preview only. The field names come from the token table
+# in Autodesk's Advance Steel 2016 Drawing Style Manager guide (plus the fields
+# seen in the checked-in exports), so a documented token previews as a value
+# instead of an "unknown" placeholder.
 KNOWN_FIELDS = {
     "Note": "A", "ViewNumber": "3", "Scale": "3/4\"=1'-0\"", "Date": "10/30/26",
     "MainPartPosNum": "B12", "MainPartPos": "B12", "Position": "b104", "Name": "BEAM",
     "Denotation": "GR-1", "ItemNumber": "C7", "BoltCount": "6", "Diameter": "3/4\"",
     "Length": "2 1/4\"", "Norm": "A325N", "AnchorPartName": "AB-1",
     "Material": "A992", "Section": "W12X26", "Level": "+12'-0\"",
+    # Autodesk guide tokens
+    "ProfName": "IPE 300", "RodCount": "12", "Coating": "HDG", "PosNum": "P24",
+    "Width": "8\"", "Thickness": "1/2\"", "HoleDiameter": "7/8\"",
+    "Assembly": "B-12", "SunkDepth": "1/4\"", "Tapping": "LH", "Set": "Mu2S",
+    "HeadDiameter": "1 1/4\"", "Alpha_e": "45\u00b0", "Quantity": "4",
+    "MainPartQuantity": "2", "Role": "Beam", "USDate": "10/30/2026",
+    "Time": "13:45", "Day": "30", "Month": "10", "Year": "2026",
+    "Hour": "13", "Minute": "45", "AssemblyLength": "2 1/4\"",
+    "FlangeThickness": "3/8\"", "WebThickness": "1/4\"", "AxisLength": "12'-0\"",
 }
 for _i in range(1, 11):
     KNOWN_FIELDS[f"UserAttr{_i}"] = f"UA{_i}"
+for _i in range(1, 5):
+    KNOWN_FIELDS[f"ExtName{_i}"] = f"EN-{_i}"
+
+# AutoCAD-style symbol escapes used by label formulas (guide: "special symbols
+# can be inserted using ASCII codes", e.g. %%c for the diameter sign).
+SYMBOL_ESCAPES = {"c": "\u00d8", "d": "\u00b0", "p": "\u00b1", "%": "%"}
 
 ACI_COLORS = {1: "#d62728", 2: "#c9a400", 3: "#2ca02c", 4: "#17becf", 5: "#1f4fd6",
               6: "#c41fc4", 7: "#111"}
 FRAME_COMMANDS = {"Rounded", "Rectangle", "Frame", "Circle", "Box"}
 
-_TOKEN = re.compile(r"#(?P<cmd>[A-Za-z]+)(?:\((?P<arg>[^)]*)\))?|%(?P<field>[A-Za-z][A-Za-z0-9_]*)")
+_TOKEN = re.compile(
+    r"#(?P<cmd>[A-Za-z]+)(?:\((?P<arg>[^)]*)\))?"
+    r"|%%(?P<escape>[cdp%])"
+    r"|%(?P<field>[A-Za-z][A-Za-z0-9_]*)",
+    re.IGNORECASE,
+)
 
 
 def _split_field(name):
@@ -261,6 +285,9 @@ def parse_label_format(content):
     for m in _TOKEN.finditer(content):
         text(content[pos:m.start()])
         pos = m.end()
+        if m.group("escape"):
+            text(SYMBOL_ESCAPES.get(m.group("escape").lower(), m.group(0)))
+            continue
         if m.group("field"):
             name, rest = _split_field(m.group("field"))
             fields.append(name)

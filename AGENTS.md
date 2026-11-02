@@ -100,7 +100,11 @@ and display-name token replacement.
   `DetDimStrategy`, `DetObjectsSet`, `DetDimDefinition`, `DetDimPoints`,
   `DetObjects` or `DetPresentation`: none of those exist in an AS 2026 export.
   Map them via `docs/drawing-style-schema.md` before writing code, and never
-  introduce a second schema guess.
+  introduce a second schema guess. Label formulas also support the `%%c` / `%%d`
+  / `%%p` / `%%%` symbol escapes and the token set documented in Autodesk's
+  Drawing Style Manager guide (see `KNOWN_FIELDS`); keep samples preview-only.
+  The vendor PDFs live in `docs/references/` and are git-ignored (copyrighted,
+  large); they describe the AS 2016 / DSM 6.1 manager, not the SQL schema.
 - Drawing-style rule actions are htmx-enhanced: `templates/_drawing_rules.html`
   is the single rules block (included by the page **and** returned by
   `drawing_style_rule` for `HX-Request` posts), `drawing_styles.repr_block()`

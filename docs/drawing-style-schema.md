@@ -100,6 +100,59 @@ of those tables exist in an AS 2026 export. Equivalents in this schema:
 `DetObjReprMapItems`, `DetObjAppearance`/`DetObjAnnotationStrategy`,
 `DetViewDimStrategyNew`, `DetViewDimPointSelection`.
 
+## What the Autodesk guides confirm
+
+Five Autodesk/partner documents were used to check the terminology and the
+manager's behaviour (kept locally in `docs/references/`, not committed):
+
+- *Advance Steel Drawing Style Manager Guide* (2016, `advance-steel-2016-...`),
+- *Drawing Style Manager Guide 6.1* (`AS-DSM guide-6.1-EN-051028`),
+- AU handouts `MSF9970-L` (Drawing Styles customization), `FAB22624` (Drawings)
+  and `FAB196818` (presentations).
+
+They describe the manager, not the SQL schema, and they predate the 2026
+export, so they confirm concepts and workflows only.
+
+| Guide term | Observed table(s) |
+| --- | --- |
+| Drawing style | `DetailStyle` (+ picker record `DetailMasterTable`) |
+| View / view request | `DetViewRequest` (+ `DetViewSystemAndBox`, `DetViewLengthClip`) |
+| Object presentation set / rules | `DetObjReprMapsNew` / `DetObjReprMapItems` |
+| Model objects | `DetObjQualifierSet` (+ `DetObjQualifierSetItem`, `...Group`) |
+| Labeling strategy | `DetObjAnnotationStrategy` |
+| Label content | `DetAnnotationType.Content` |
+| Dimension strategy | `DetViewDimStrategyNew` / `DetViewDimStrategyItems` ("dimension definitions") |
+| Dimension chain / request | `DetViewDimRequestLinear` |
+| Point selection rules | `DetViewDimPointSelection` |
+
+Behaviour confirmed by the guides:
+
+- **Copy shares, Deep copy duplicates.** The guide: *"The Copy function will
+  create a new DS, but referring (sharing) the same sub-styles with the original
+  DS"*; deep copy duplicates the full structure and prefixes every copied level
+  with `Copy of`. The handout adds that copied sub-style rows are *"all new
+  records in the database"*. This is the hazard the sub-style usage page exists
+  to expose.
+- **The manager can warn about shared edits.** *"Modifying a sub-style modifies
+  all drawing styles that use that sub-style. The Drawing Style Manager can be
+  set up to display a warning when a shared item ... is modified."* So the
+  sharing is not always silent; it is an option in DSM.
+- **DSM already has the deduplication feature.** The `Compact database` button
+  *"searches for equal records inside all detail tables ... combines the records
+  and updates all records that have a relationship to the current combined
+  object"* (control tables such as `DetRole` excluded). Catalog Studio therefore
+  reports unreachable rows instead of re-implementing compaction; use DSM's
+  Compact on a copy after reviewing the report.
+- **Advance vs User is a library, not a row.** Styles live under the delivered
+  `Advance` category or the editable `User` library (`_astm4CommDetailing User
+  <base> <sub>`). An export is one library file, so provenance is the source
+  database (`AstorDetails` = delivered, `AstorAddIn` = user overrides), not a
+  column; the usage page shows the database name and `OwnerText` instead.
+- **Label tokens.** The guide lists the token table now mirrored in
+  `drawing_styles.KNOWN_FIELDS` (`%ProfName`, `%Thickness`, `%UserAttr1..10`,
+  ...) and the AutoCAD-style symbol escapes `%%c` (Ø), `%%d` (°), `%%p` (±) and
+  `%%%` (%), which `parse_label_format` renders as symbols.
+
 ## Composite keys
 
 `DetObjReprMapItems`, `DetViewDimStrategyItems`, `DetailStyleMapItems`,

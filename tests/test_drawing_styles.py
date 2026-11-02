@@ -189,3 +189,17 @@ def test_row_token_composite_handles_floats_and_text():
     cols = ["Standard", "Diameter", "Length"]
     row = {"Standard": "A325 / TC", "Diameter": 19.05, "Length": 50.8}
     assert db.parse_row_token(db.make_row_token(row, cols), cols) == row
+
+
+def test_label_parse_symbol_escapes():
+    p = ds.parse_label_format("%%c20 %%C %%d %%p 100%%")
+    text = "".join(s.get("text") or "" for s in p["lines"][0])
+    assert text == "Ø20 Ø ° ± 100%%"
+    assert not [s for s in p["lines"][0] if s["kind"] == "cmd"]
+
+
+def test_label_parse_guide_tokens_preview_as_values():
+    p = ds.parse_label_format("%Thickness %Width %Role %ExtName2 %UserAttr10")
+    samples = [s["sample"] for s in p["lines"][0] if s["kind"] == "field"]
+    assert samples == ["1/2\"", "8\"", "Beam", "EN-2", "UA10"]
+    assert all(s["known"] for s in p["lines"][0] if s["kind"] == "field")

@@ -12,3 +12,7 @@ __pycache__/
 catalog_studio/uploads/*
 !catalog_studio/uploads/.gitkeep
 catalog_studio/exports/*
+
+# Vendor reference documentation (Autodesk guides/handouts) kept locally only:
+# copyrighted material and large binaries, never committed.
+docs/references/
