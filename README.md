@@ -48,8 +48,12 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
-| Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) |
+| Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) with JSON/CSV downloads |
+| Catalog comparison (`/compare`) | Implemented (read-only: table presence, row counts, diameter coverage) |
+| Pre-change snapshots | Implemented for the batch writes: `COPY_ONLY` backup + manifest, explicit prune (newest N), documented manual restore |
+| Delivered-library protection | Implemented (databases attached from `Astor*.mdf` are read-only) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
+| CSRF protection | Every POST is checked centrally; read-only previews are the documented exceptions (`docs/csrf-audit.md`) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
@@ -151,6 +155,8 @@ pyflakes catalog_studio tests *.py
 6. **Apply** the change. Database changes run as transactions.
 7. **Detach & Export** the modified `.mdf` / `.ldf` pair.
 8. **Test** it in a controlled Advance Steel environment before adopting it.
+
+Before you detach, `/compare` shows what actually changed between the original export and the edited copy: tables that appeared or disappeared, row-count deltas and the diameter keys on each side.
 
 ## Advance Steel round trip
 

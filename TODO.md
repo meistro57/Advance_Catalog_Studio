@@ -171,7 +171,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 
 - [ ] **G1 — Metadata sidecar.** `catalog_studio/catalog_metadata.json` is dirty
   from live attaches (`Mark_Column`, `HILTI_HY_200`); decide whether the file is
-  runtime state (git-ignore it) or committed examples.
+  runtime state (git-ignore it) or committed examples. It now also carries the
+  `library` flag that makes delivered Astor* attachments read-only, so a stale
+  entry can silently block (or unblock) writes — worth settling.
 - [ ] **G2 — Reference PDFs.** `docs/references/` holds the Autodesk guides and
   is git-ignored; keep a one-line note in the docs on what each is used for.
 - [ ] **G3 — Test gaps.** No automated coverage for: `add-diameter` apply,

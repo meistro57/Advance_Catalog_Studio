@@ -1,7 +1,6 @@
 # CSRF audit
 
-_Last reviewed: 2026-11-02, `catalog_studio/app.py` at `dce2e77` + the write-guard
-change._
+_Last reviewed: 2026-11-02, introduced in `a7bdf54`._
 
 The Flask development server has no authentication, so a page from another site
 open in the same browser could otherwise trigger a state change with a plain
@@ -20,6 +19,9 @@ session CSRF token.
 - `tests/test_write_guards.py::test_every_writing_post_route_requires_csrf`
   walks the live URL map and fails if any non-exempt POST accepts a request with
   no token.
+- The `/uploads/*` routes keep their original explicit `_csrf_valid()` check as
+  well; it is redundant now but harmless, and the staging cleanup tests still
+  exercise it directly.
 
 ## POST routes
 

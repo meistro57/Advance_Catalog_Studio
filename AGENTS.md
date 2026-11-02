@@ -286,7 +286,11 @@ repeat the same logic inside an explicit transaction
 (`autocommit=False` + `commit()`/`rollback()`). Export/detach runs
 `sp_detach_db`, then `docker cp`s the files back to `exports/` for download.
 Also available per table: browse/filter/add/edit/duplicate/delete rows, and a
-database-wide find & replace over all text columns.
+database-wide find & replace over all text columns. Every POST that can write
+passes the central CSRF guard first, and write routes additionally call
+`_blocked_write()` so an attachment recorded as a delivered library cannot be
+modified. Two read-only views sit on top: `/db/<db>/health(.json|.csv)` and
+`/compare?a=&b=`.
 
 Bolt-set viewer flow (issue #1): `/db/<db>/bolt-set-viewer` (page, bolt
 catalogs only) → the page's JS calls
@@ -525,6 +529,11 @@ dimension logic of its own.
   the app).
 
 ## Gotchas for safe changes
+
+- Adding a POST route: the central `_csrf_guard()` already requires a token, so
+  the form needs `csrf_token`. If the route only renders a preview, add it to
+  `READ_ONLY_POST_ENDPOINTS` **and** `docs/csrf-audit.md`
+  (`test_every_writing_post_route_requires_csrf` enforces the split).
 
 - Never point the tool at live Advance Steel databases; keep untouched source
   copies. The Flask dev server (port 5050, debug on) has no auth.
