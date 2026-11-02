@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
+from utils import shear_studs
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -380,6 +381,121 @@ def anchor_configurator_payload(database):
 
 
 # --------------------------------------------------------------------------
+# Shear-stud (connector) browser (issue #4, read-only first slice)
+# --------------------------------------------------------------------------
+
+
+@app.route("/db/<database>/shear-stud-browser")
+def shear_stud_browser(database):
+    """Family / grade / diameter / length browser for connector catalogs.
+
+    Read-only: the page only reads the Connector* tables plus SetBolts. The
+    observed schema is not yet verified against a live Advance Steel install,
+    so no editing or cloning is offered here.
+    """
+    if db.guess_catalog_type(database) != "shear stud":
+        flash("The shear-stud browser only supports shear-stud (connector) catalogs.", "warning")
+        return redirect(url_for("show_database", database=database))
+
+    try:
+        model = shear_studs.get_browser_model(database)
+    except Exception as e:
+        flash(f"Could not read the connector tables: {e}", "danger")
+        return redirect(url_for("show_database", database=database))
+
+    selections = {
+        "standard": request.args.get("standard", "").strip(),
+        "material": request.args.get("material", "").strip(),
+        "diameter": request.args.get("diameter", "").strip(),
+        "length": request.args.get("length", "").strip(),
+    }
+    filters = {}
+    for name in ("diameter", "length"):
+        raw = selections[name]
+        if not raw:
+            filters[name] = None
+            continue
+        value = shear_studs.to_float(raw)
+        if value is None:
+            flash(f"Ignored {name} filter {raw!r}: not a number.", "warning")
+            selections[name] = ""
+        filters[name] = value
+
+    groups = shear_studs.filter_groups(
+        model["groups"],
+        standard=selections["standard"] or None,
+        material=selections["material"] or None,
+        diameter=filters["diameter"],
+        length=filters["length"],
+    )
+    issues = shear_studs.collect_issues(groups, model["global_issues"])
+
+    return render_template(
+        "shear_stud_browser.html",
+        database=database,
+        families=model["families"],
+        groups=groups,
+        issues=issues,
+        summary=shear_studs.summarize(groups, issues),
+        options=model["options"],
+        selections=selections,
+        number_text=shear_studs.number_text,
+    )
+
+
+@app.route("/db/<database>/shear-stud-browser/clone-preview", methods=["POST"])
+def shear_stud_clone_preview(database):
+    """Preview the rows an "add stud diameter" clone would need.
+
+    Preview only: the plan is generated in memory and rendered with the issues
+    that block it. No SQL is written and there is no apply action, because the
+    connector schema is not yet verified against a live Advance Steel install.
+    """
+    if db.guess_catalog_type(database) != "shear stud":
+        flash("The shear-stud browser only supports shear-stud (connector) catalogs.", "warning")
+        return redirect(url_for("show_database", database=database))
+
+    try:
+        model = shear_studs.get_browser_model(database)
+    except Exception as e:
+        flash(f"Could not read the connector tables: {e}", "danger")
+        return redirect(url_for("show_database", database=database))
+
+    form = {
+        "standard": request.form.get("standard", "").strip(),
+        "material": request.form.get("material", "").strip(),
+        "source_diameter": request.form.get("source_diameter", "").strip(),
+        "target_diameter": request.form.get("target_diameter", "").strip(),
+        "lengths": request.form.get("lengths", "").strip(),
+        "along": request.form.get("along", "").strip(),
+        "across": request.form.get("across", "").strip(),
+        "hole_tolerance": request.form.get("hole_tolerance", "").strip(),
+    }
+    plan = shear_studs.plan_clone(
+        model["groups"],
+        model["relation_keys"],
+        model["diameter_keys"],
+        standard=form["standard"],
+        material=form["material"],
+        source_diameter=form["source_diameter"],
+        target_diameter=form["target_diameter"],
+        lengths=form["lengths"],
+        scale_geometry="scale_geometry" in request.form,
+        along=form["along"],
+        across=form["across"],
+        hole_tolerance=form["hole_tolerance"],
+    )
+    return render_template(
+        "shear_stud_clone.html",
+        database=database,
+        plan=plan,
+        form=form,
+        options=model["options"],
+        number_text=shear_studs.number_text,
+    )
+
+
+# --------------------------------------------------------------------------
 # Printable anchor fabrication detail sheet (issue #2)
 # --------------------------------------------------------------------------
 
@@ -463,6 +579,15 @@ def fabrication_sheet(database):
 @app.route("/db/<database>/add-diameter", methods=["GET", "POST"])
 def add_diameter(database):
     catalog_type = db.guess_catalog_type(database)
+    # Shear-stud catalogs have no BoltsDiameters/SetOfBolts chain for the clone
+    # engine to copy (issue #4); their write path is still unverified.
+    if catalog_type == "shear stud":
+        flash(
+            "Bolt-diameter cloning does not apply to shear-stud catalogs yet; "
+            "use the read-only shear-stud browser instead.",
+            "warning",
+        )
+        return redirect(url_for("show_database", database=database))
     existing_diameters = db.get_catalog_diameters(database)
     meta = metadata.get(database)
     presets = db.STANDARD_DIAMETERS

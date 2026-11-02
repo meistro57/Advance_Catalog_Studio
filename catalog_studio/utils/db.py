@@ -570,11 +570,76 @@ def smart_replace_name(name: str, replace_from: str, replace_to: str) -> str:
     return name.replace(replace_from, replace_to)
 
 
+def _get_connector_diameters(tables: set, cur, conn) -> list:
+    """Diameters for a shear-stud (connector) catalog.
+
+    Connector catalogs keep their diameters in `ConnectorDiameters` and link
+    them through `ConnectorRelations` / `ConnectorDistances`; the reused
+    `SetBolts` table holds the stud rows themselves (issue #4).
+    """
+    items = []
+    by_key = {}
+
+    def ensure(key, run_name=None):
+        if key in by_key:
+            return by_key[key]
+        item = {
+            "key": key,
+            "run_name": run_name if run_name is not None else f"{key} mm",
+            "description": "",
+            "token": guess_token(run_name or "", key),
+            "counts": {},
+        }
+        by_key[key] = item
+        items.append(item)
+        return item
+
+    if "ConnectorDiameters" in tables:
+        cur.execute("SELECT [Key], RunName, Description FROM ConnectorDiameters ORDER BY [Key]")
+        for r in cur.fetchall():
+            key = r["Key"]
+            if key is None:
+                continue
+            item = ensure(key, r["RunName"])
+            item["run_name"] = r["RunName"] or ""
+            item["description"] = r["Description"] or ""
+            item["token"] = guess_token(r["RunName"], key)
+
+    for table, column in [
+        ("ConnectorRelations", "ConnectorDiameter"),
+        ("ConnectorDistances", "Key"),
+        ("SetBolts", "Diameter"),
+    ]:
+        if table not in tables:
+            continue
+        cur.execute(
+            f"SELECT [{column}] AS dia, COUNT(*) AS cnt FROM [{table}] GROUP BY [{column}]"
+        )
+        for r in cur.fetchall():
+            key = r["dia"]
+            if key is None:
+                continue
+            ensure(key)["counts"][table] = r["cnt"]
+
+    conn.close()
+
+    for item in items:
+        item["total_related"] = sum(item["counts"].values())
+        item["is_orphan"] = item["total_related"] == 0
+    items.sort(key=lambda i: i["key"])
+    return items
+
+
 def get_catalog_diameters(database: str) -> list:
     """Return all diameters present in the database with row counts across related tables."""
     conn, cur = connect(database)
     tables = set(list_tables(database))
     catalog_type = guess_catalog_type(database)
+
+    # Shear-stud catalogs have no BoltsDiameters table; their diameter list is
+    # ConnectorDiameters (issue #4).
+    if catalog_type == "shear stud":
+        return _get_connector_diameters(tables, cur, conn)
 
     diam_dict = {}
 

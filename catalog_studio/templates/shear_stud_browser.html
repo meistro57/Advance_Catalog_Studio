@@ -1,0 +1,369 @@
+<!-- templates/shear_stud_browser.html -->
+{% extends "base.html" %}
+{% block title %}{{ database }} shear studs{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h4 class="mb-1">
+            Shear Stud Catalog <span class="badge bg-secondary">read-only</span>
+        </h4>
+        <div class="text-muted small">
+            Families, grades, diameters and lengths read from
+            <code>ConnectorStandard</code>, <code>ConnectorMaterial</code>,
+            <code>ConnectorDiameters</code>, <code>ConnectorDistances</code>,
+            <code>ConnectorRelations</code> and <code>SetBolts</code>.
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/db/{{ database }}/SetBolts" class="btn btn-sm btn-outline-secondary">Raw SetBolts</a>
+        <a href="/db/{{ database }}/ConnectorRelations" class="btn btn-sm btn-outline-secondary">Raw ConnectorRelations</a>
+    </div>
+</div>
+
+<div class="alert alert-warning py-2 small">
+    <strong>Observed schema, not round-trip verified.</strong>
+    Field meanings here come from a single Nelson H4L export
+    (<code>docs/shear-stud-schema.md</code>). Nothing on this page writes to the
+    catalog, and <code>SetBolts.Type</code> is shown but not interpreted.
+</div>
+
+<div class="row g-2 mb-3">
+    {% for label, value in [
+        ('Families', summary.families),
+        ('Grades', summary.materials),
+        ('Diameters', summary.diameters),
+        ('Stud lengths', summary.studs),
+        ('Distinct lengths', summary.lengths),
+        ('Complete groups', summary.complete),
+    ] %}
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body py-2">
+                <div class="text-uppercase text-muted small">{{ label }}</div>
+                <div class="fs-5 fw-bold">{{ value }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if summary.errors or summary.warnings or summary.notes %}
+<div class="alert alert-light border small py-2">
+    Validation in this view: <span class="badge bg-danger">{{ summary.errors }} error(s)</span>
+    <span class="badge bg-warning text-dark">{{ summary.warnings }} warning(s)</span>
+    <span class="badge bg-secondary">{{ summary.notes }} note(s)</span>
+</div>
+{% endif %}
+
+<form method="get" class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-standard">Family</label>
+                <select class="form-select form-select-sm" id="f-standard" name="standard">
+                    <option value="">All</option>
+                    {% for value in options.standards %}
+                    <option value="{{ value }}" {% if selections.standard == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-material">Grade</label>
+                <select class="form-select form-select-sm" id="f-material" name="material">
+                    <option value="">All</option>
+                    {% for value in options.materials %}
+                    <option value="{{ value }}" {% if selections.material == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-diameter">Diameter (mm)</label>
+                <select class="form-select form-select-sm" id="f-diameter" name="diameter">
+                    <option value="">All</option>
+                    {% for value in options.diameters %}
+                    <option value="{{ value }}" {% if selections.diameter and number_text(selections.diameter) == number_text(value) %}selected{% endif %}>{{ number_text(value) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="f-length">Length (mm)</label>
+                <select class="form-select form-select-sm" id="f-length" name="length">
+                    <option value="">All</option>
+                    {% for value in options.lengths %}
+                    <option value="{{ value }}" {% if selections.length and number_text(selections.length) == number_text(value) %}selected{% endif %}>{{ number_text(value) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary">Apply filters</button>
+                <a href="/db/{{ database }}/shear-stud-browser" class="btn btn-sm btn-outline-secondary">Clear</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<details class="card border-0 shadow-sm mb-4">
+    <summary class="card-header bg-white">
+        <strong>Plan a clone (preview only)</strong>
+        <span class="text-muted small ms-2">
+            propose the rows for a new diameter; nothing is written
+        </span>
+    </summary>
+    <form method="post" action="/db/{{ database }}/shear-stud-browser/clone-preview" class="card-body py-3">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-standard">Source family</label>
+                <select class="form-select form-select-sm" id="c-standard" name="standard">
+                    {% for value in options.standards %}
+                    <option value="{{ value }}">{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-material">Source grade</label>
+                <select class="form-select form-select-sm" id="c-material" name="material">
+                    {% for value in options.materials %}
+                    <option value="{{ value }}">{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-source">From &Oslash; (mm)</label>
+                <select class="form-select form-select-sm" id="c-source" name="source_diameter">
+                    {% for value in options.diameters %}
+                    <option value="{{ value }}">{{ number_text(value) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-target">New &Oslash; (mm)</label>
+                <input class="form-control form-control-sm" id="c-target" name="target_diameter" inputmode="decimal" placeholder="12">
+            </div>
+            <div class="col-12 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-lengths">Lengths (mm)</label>
+                <input class="form-control form-control-sm" id="c-lengths" name="lengths" placeholder="30, 35, 40">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-along">Along (mm)</label>
+                <input class="form-control form-control-sm" id="c-along" name="along" inputmode="decimal" placeholder="scaled">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-across">Across (mm)</label>
+                <input class="form-control form-control-sm" id="c-across" name="across" inputmode="decimal" placeholder="scaled">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small text-uppercase text-muted mb-1" for="c-tolerance">Hole tol. (mm)</label>
+                <input class="form-control form-control-sm" id="c-tolerance" name="hole_tolerance" inputmode="decimal" placeholder="source">
+            </div>
+            <div class="col-6 col-md-2 d-flex align-items-end">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" id="c-scale" name="scale_geometry" checked>
+                    <label class="form-check-label small" for="c-scale">Scale geometry</label>
+                </div>
+            </div>
+            <div class="col-12 col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Preview proposed rows</button>
+            </div>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+            Blank along/across fields take the scaled source rule. The preview lists every
+            proposed row plus duplicate, completeness and name-conflict findings; there is
+            no apply action until the connector schema is verified.
+        </p>
+    </form>
+</details>
+
+{% if issues %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="fw-bold small text-uppercase text-muted mb-2">Validation findings ({{ issues|length }})</div>
+        <ul class="list-unstyled mb-0 small">
+            {% for item in issues %}
+            <li class="mb-1">
+                <span class="badge {% if item.severity == 'error' %}bg-danger{% elif item.severity == 'warn' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                    {{ item.severity }}
+                </span>
+                <span class="text-muted">{{ item.table }}</span>
+                {{ item.message }}
+                {% if item.group %}
+                <span class="text-muted">
+                    ({{ item.group.standard }} / {{ item.group.material }} /
+                    &Oslash;{{ number_text(item.group.diameter) }} mm{% if item.stud %},
+                    {{ number_text(item.stud.length) }} mm{% endif %})
+                </span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<h5 class="mb-2">Families and lengths</h5>
+{% if not families %}
+<p class="text-muted">No connector families found in this catalog.</p>
+{% endif %}
+{% for family in families %}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ family.run_name }}</strong>
+            <span class="text-muted small">family</span>
+            <a class="small ms-2"
+               href="/db/{{ database }}/ConnectorStandard?filter_col=Key&filter_val={{ family.standard|urlencode }}">raw</a>
+        </div>
+        <span class="badge bg-secondary">{{ family.stud_count }} studs</span>
+    </div>
+    <div class="card-body py-3">
+        {% for grade in family.grades %}
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="fw-semibold">{{ grade.run_name }}</span>
+                    <span class="text-muted small">grade</span>
+                    <a class="small ms-2"
+                       href="/db/{{ database }}/ConnectorMaterial?filter_col=Key&filter_val={{ grade.material|urlencode }}">raw</a>
+                    {% if grade.weight is not none and grade.weight > 0 %}
+                    <span class="text-muted small ms-2">material weight {{ grade.weight }}</span>
+                    {% endif %}
+                </div>
+                <span class="badge bg-light text-dark border">{{ grade.stud_count }} studs</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Diameter</th>
+                            <th>Hole rules (along &times; across)</th>
+                            <th>Lengths (mm)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in grade.diameters %}
+                        <tr>
+                            <td class="text-nowrap">
+                                <strong>{{ number_text(group.diameter) }} mm</strong>
+                                <div class="text-muted small">
+                                    <code>{{ group.diameter_display }}</code>
+                                    <a class="ms-1"
+                                       href="/db/{{ database }}/ConnectorDiameters?filter_col=Key&filter_val={{ group.diameter }}">raw</a>
+                                </div>
+                            </td>
+                            <td class="text-nowrap small">
+                                {% if group.distances %}
+                                    {% for rule in group.distances %}
+                                    <div>
+                                        {{ number_text(rule.along) }} &times; {{ number_text(rule.across) }}
+                                        <span class="text-muted">(tolerance {{ number_text(rule.hole_tolerance) }})</span>
+                                    </div>
+                                    {% endfor %}
+                                    <a href="/db/{{ database }}/ConnectorDistances?filter_col=Key&filter_val={{ group.diameter }}"
+                                       class="small">raw</a>
+                                {% else %}
+                                <span class="text-danger">missing</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if group.lengths %}
+                                    {% for length in group.lengths %}
+                                    <a class="badge bg-light text-dark border text-decoration-none"
+                                       href="/db/{{ database }}/shear-stud-browser?standard={{ group.standard|urlencode }}&material={{ group.material|urlencode }}&diameter={{ group.diameter }}&length={{ length }}">{{ number_text(length) }}</a>
+                                    {% endfor %}
+                                    <a class="small ms-1"
+                                       href="/db/{{ database }}/SetBolts?filter_col=Diameter&filter_val={{ group.diameter }}">raw</a>
+                                {% else %}
+                                <span class="text-danger">no lengths</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-nowrap">
+                                {% if group.complete %}
+                                <span class="badge bg-success">complete</span>
+                                {% else %}
+                                <span class="badge bg-danger">incomplete</span>
+                                {% endif %}
+                                {% if group.relation_keys %}
+                                <a class="small ms-1"
+                                   href="/db/{{ database }}/ConnectorRelations?filter_col=ConnectorDiameter&filter_val={{ group.diameter }}">relations</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<h5 class="mb-2">
+    Studs
+    <span class="badge bg-secondary">{{ groups|length }} group(s)</span>
+</h5>
+{% if not groups %}
+<p class="text-muted">No studs match the current filters.</p>
+{% else %}
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle bg-white">
+        <thead>
+            <tr>
+                <th>Family</th>
+                <th>Grade</th>
+                <th>&Oslash; mm</th>
+                <th>Length mm</th>
+                <th>Name</th>
+                <th>Head</th>
+                <th>Weight (kg)</th>
+                <th>Type</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in groups %}
+                {% for stud in group.studs %}
+                <tr>
+                    {% if loop.first %}
+                    <td rowspan="{{ group.studs|length }}">{{ group.standard }}</td>
+                    <td rowspan="{{ group.studs|length }}">{{ group.material }}</td>
+                    <td rowspan="{{ group.studs|length }}">{{ number_text(group.diameter) }}</td>
+                    {% endif %}
+                    <td>{{ number_text(stud.length) }}</td>
+                    <td>{{ stud.name or '—' }}</td>
+                    <td class="small text-nowrap">
+                        {{ stud.head_diameter if stud.head_diameter is not none else '—' }}
+                        &times; {{ stud.head_height if stud.head_height is not none else '—' }}
+                        <span class="text-muted">
+                            {% if stud.corners %} {{ stud.corners }}-sided{% else %} round{% endif %}
+                        </span>
+                    </td>
+                    <td>{{ stud.weight if stud.weight is not none else '—' }}</td>
+                    <td>
+                        {{ stud.type if stud.type is not none else '—' }}
+                        <span class="text-muted small">observed</span>
+                    </td>
+                    <td class="small">
+                        {% for item in stud.issues %}
+                        <span class="badge {% if item.severity == 'error' %}bg-danger{% elif item.severity == 'warn' %}bg-warning text-dark{% else %}bg-secondary{% endif %}"
+                              title="{{ item.message }}">{{ item.code }}</span>
+                        {% endfor %}
+                        {% if not stud.issues %}<span class="text-success">ok</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="text-muted small mt-3">
+    Read-only view of the observed connector schema. Diameter lookup names keep the
+    authored <code>RunName</code> whitespace; incomplete records are flagged, not
+    repaired. Editing and cloning stay out of scope until the schema is verified
+    against Advance Steel 2026.
+</div>
+{% endblock %}

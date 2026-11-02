@@ -34,8 +34,8 @@ and display-name token replacement.
 - Dev-only test dependency (`pytest`) is in `requirements-dev.txt`; run the
   suite with `venv/bin/python -m pytest tests/`. All tests are unit/route tests
   (bolt-set view model and profile drawing, drawing-style label parsing,
-  figures and htmx rule partials, fabrication sheet model, staging cleanup,
-  connection timeouts) — no database needed.
+  figures and htmx rule partials, fabrication sheet model, shear-stud browser
+  model, staging cleanup, connection timeouts) — no database needed.
 - **No linter, no CI, no Makefile, no packaging config exist.** Verification
   is manual against the Docker SQL Server (plus the pytest suite).
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
@@ -111,6 +111,12 @@ and display-name token replacement.
   live through `POST /db/<db>/drawing-style/diagram`, which reuses the same
   builders so there is one geometry implementation (no JS twin). Keep the
   "unverified" notes in the figures when touching them.
+- `catalog_studio/utils/shear_studs.py` — read-only shear-stud (connector)
+  browser model: metric display parsing/formatting, stud name convention,
+  per-record geometry checks, per-(standard, material, diameter) grouping with
+  the documented completeness rules, filtering and summaries. Pure helpers are
+  unit-tested; `get_browser_model()` is the only SQL (reads `Connector*` +
+  `SetBolts`). Nothing here writes.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the
@@ -283,7 +289,34 @@ bolts (see `docs/shear-stud-schema.md` for the full observed schema, keys,
 minimum record set, and naming conventions). Field meanings such as
 `SetBolts.Type` are recorded as OBSERVED only — nothing in the connector
 shape is verified against a live AS 2026 install yet, so there is no
-shear-stud editing UI and adding one must start from that schema note.
+shear-stud writing UI; adding one must start from that schema note.
+
+`catalog_studio/utils/shear_studs.py` is the read-only slice: pure functions
+build a per-(standard, material, diameter) model from the connector rows plus
+`SetBolts`, apply the documented completeness rules (lookup rows, diameter
+row, distance rule, relation row, at least one stud length) and emit
+error/warning/note issues. `get_browser_model()` only reads. The page is
+`/db/<db>/shear-stud-browser` (`shear_stud_browser` route, template
+`shear_stud_browser.html`, linked from the dashboard for `shear stud`
+catalogs) and `db.get_catalog_diameters()` has its own connector branch so
+`ConnectorDiameters` show up on the dashboard with orphan detection. The
+bolt-diameter clone route redirects for these catalogs (its engine copies
+tables they do not have), and the dashboard hides that button. The pure
+model, validation, filtering and the route are unit-tested; nothing writes to
+a connector catalog.
+
+`plan_clone()` in the same module is the **preview-only** clone proposal
+(`POST /db/<db>/shear-stud-browser/clone-preview`, template
+`shear_stud_clone.html`): it returns INSERT-shaped rows for
+`ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations` and
+`SetBolts` plus the issues that block them (existing diameter/group/length/
+name, duplicate or non-numeric lengths, incomplete or missing source, tight
+spacing). Geometry, weight and the hole rule scale by `target/source` only
+when asked, are labelled as estimates, and weight is left empty when no source
+stud of that length exists. There is deliberately no apply route — the
+proposal is the review artifact for the unverified write path, and
+`ConnectorRelations.Key` is proposed as `max(Key)+1` (not an identity column
+in the export).
 
 ## Fabrication detail sheet (issue #2)
 

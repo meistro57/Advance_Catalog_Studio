@@ -43,7 +43,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
-| Shear-stud (connector) catalogs | Phase 1 schema investigation; auto-detection added |
+| Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
@@ -112,8 +112,9 @@ Open [http://localhost:5050](http://localhost:5050).
 ### Run the tests
 
 The suite needs no SQL Server. It covers the bolt-set view model and the dimensioned
-assembly profile, drawing-style label parsing, schematic figures and the htmx rule
-partials, the fabrication sheet model, staging cleanup, connection timeouts, and route
+assembly profile, the shear-stud browser model and its preview-only clone proposal,
+drawing-style label parsing, schematic figures and the htmx rule partials, the
+fabrication sheet model, staging cleanup, connection timeouts, and route
 smoke tests:
 
 ```bash
@@ -160,12 +161,12 @@ The home page is the ingest/edit/export control centre. It shows:
 
 ### Database overview
 
-Opening an attached database shows every table and its live row count. Bolt catalogs also receive a diameter summary bar showing:
+Opening an attached database shows every table and its live row count. Bolt and shear-stud catalogs also receive a diameter summary bar showing:
 
 - nominal and internal millimetre values;
 - related-record totals;
 - orphan warnings for diameters with no working child records;
-- shortcuts to the guided diameter tool and database-wide find/replace.
+- shortcuts to the guided diameter tool and database-wide find/replace (shear-stud catalogs get the read-only stud browser instead).
 
 ### Add / Clone Diameter wizard
 
@@ -233,6 +234,18 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 Dropdowns come from the export's own `InfoTableRelations` table (Autodesk's column → lookup map) plus a few verified fixes. References to Autodesk's built-in databases aren't in the export, so those stay as raw numbers. Schema notes: [`docs/drawing-style-schema.md`](docs/drawing-style-schema.md).
 
 To make a variant rather than overwrite a style, rename it before exporting.
+
+### Shear-stud (connector) browser
+
+Catalogs that carry the `Connector*` tables (currently the Nelson H4L export) are detected as `shear stud` and get a **read-only** browser at `/db/<db>/shear-stud-browser`:
+
+- **Families and lengths** — one card per family, one table per grade, one row per diameter with the authored `ConnectorDiameters.RunName`, the hole/spacing rule from `ConnectorDistances`, and every stud length as a chip (clicking one filters the stud table to that length).
+- **Studs** — family, grade, diameter, length, display name, head diameter × height with round or n-sided head, weight and the raw `SetBolts.Type`, with a status column carrying the validation findings for each record.
+- **Validation** — the documented minimum record set is checked per (family, grade, diameter): lookup rows, `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`, and at least one stud length. Orphan lookups, duplicate relations or stud rows, head diameter not larger than the shank, broken names and non-canonical diameter display strings are reported as error / warning / note rather than repaired.
+- **Traceability** — every friendly value links back to its raw table, filtered to the matching record (for example `SetBolts` by diameter, or `ConnectorRelations` by connector diameter).
+- **Clone proposal (preview only)** — a "Plan a clone" form takes a source family/grade/diameter plus a target diameter and free-form length list, then renders the INSERT-shaped rows it *would* need in `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations` and `SetBolts`. Optionally it scales head geometry, weight and the hole rule by the diameter ratio and says so; blank along/across fields fall back to the (scaled) source rule. Duplicate diameters, lengths, names and relation keys, incomplete sources, non-numeric input and tight spacing are reported as issues that block the plan. There is **no apply action** — the proposal is a review artifact for the eventual write path.
+
+The page never writes to the catalog. Field meanings are **observed** from a single export and not yet round-trip verified through Advance Steel 2026, so editing, cloning and the relation-key rule stay out of scope until that verification is done. Schema notes: [`docs/shear-stud-schema.md`](docs/shear-stud-schema.md).
 
 ## Why bolt diameters are difficult
 
@@ -345,6 +358,7 @@ Advance_Catalog_Studio/
 │       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG
 │       ├── drawing_styles.py   # Drawing-style tree, label parsing, relations
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
+│       ├── shear_studs.py      # Shear-stud (connector) browser model
 │       ├── db.py               # SQL inspection and catalog operations
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
 │       ├── metadata.py         # Catalog type/version metadata

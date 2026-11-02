@@ -74,3 +74,42 @@ in Advance Steel is therefore believed to be:
   round trip).
 - ISO 13918-style studs previously observed in `SetBolts` in other catalogs
   may share this `Connector*` shape or differ; do not assume.
+
+## Consumers in Catalog Studio (read-only)
+
+- `utils/db.py: guess_catalog_type` labels the shape `shear stud` by table
+  presence; `get_catalog_diameters` has a connector branch so the dashboard
+  lists `ConnectorDiameters` with counts from `ConnectorRelations`,
+  `ConnectorDistances` and `SetBolts`, and flags diameters with no references
+  as orphans.
+- `utils/shear_studs.py` builds a per-(standard, material, diameter) model and
+  treats the minimum record set above as the completeness rule. Findings are
+  `error` (record set broken: missing lookup/diameter/distance/relation row,
+  no lengths, duplicate relation or stud, head not larger than the shank,
+  name or `RunName` disagreeing with the key), `warn` (name off the observed
+  convention, unparseable `RunName`, orphan lookup row, non-positive head
+  height) or `info` (`RunName` spacing kept as authored, zero stud weight).
+  Nothing is repaired and nothing is written.
+- `/db/<db>/shear-stud-browser` renders family → grade → diameter cards with
+  the authored `RunName`, the hole rule, length chips, the stud table and the
+  validation findings, and links every value back to its raw table.
+- The bolt-diameter clone route refuses these catalogs (its engine copies
+  `BoltsDiameters`/`SetOfBolts`/`ScrewNew` rows they do not have) and the
+  dashboard hides that button; a stud clone workflow waits on verification.
+- `POST /db/<db>/shear-stud-browser/clone-preview` proposes, but never writes,
+  the rows for a new diameter: one `ConnectorDiameters` row (`Key` = target mm,
+  canonical `RunName`), one `ConnectorDistances` row (scaled or explicit
+  along/across, tolerance from the source rule), one `ConnectorRelations` row
+  (`Key` = `max(Key)+1`, since the column is not an identity) and one
+  `SetBolts` row per requested length (observed name convention, `Type`,
+  `Source`, `OwnerText` copied from the source stud). Head diameter/height and
+  weight scale by `target/source` and `(target/source)²` only on request and
+  are labelled estimates; weight is left empty when no source stud of that
+  length exists. Blocking findings: existing `ConnectorDiameters` key or
+  family/grade/diameter group, existing length or name, duplicate/non-numeric/
+  non-positive lengths, missing or incomplete source. The proposal is a review
+  artifact for the future write path, not a supported edit.
+- Observed but not enforced: the `RunName` strings are not whitespace
+  consistent (`'   6.00 mm'` for 6 mm next to `' 10.00 mm'`). Generated names
+  should use one canonical form (`' 6.00 mm'`); existing rows are reported as
+  *info* and preserved as authored.
