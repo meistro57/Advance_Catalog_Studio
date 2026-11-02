@@ -40,6 +40,9 @@ and display-name token replacement.
   needed.
 - **No linter, no CI, no Makefile, no packaging config exist.** Verification
   is manual against the Docker SQL Server (plus the pytest suite).
+- The backlog is `TODO.md`; live-Advance-Steel evidence goes in
+  `docs/verification-log.md`. Write paths stay blocked until their verification
+  entry passes.
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
   and be running (`docker start hilti-scratch-sql`; it is configured with
   `--restart unless-stopped`). SQL Server `sa` password is hardcoded in
@@ -147,6 +150,14 @@ and display-name token replacement.
   `DetObjectsSet`/`DetDimDefinition`/`DetDimPoints` from the feature request do
   NOT exist in an AS 2026 export — the observed names are in the module
   docstring. No purge, compaction, LDF deletion or clone lives here.
+- `catalog_studio/utils/snapshots.py` — data-safety net for batch writes:
+  `create_snapshot()` runs `BACKUP DATABASE ... WITH COPY_ONLY` inside the
+  scratch container, copies the `.bak` to `catalog_studio/snapshots/<db>/` and
+  writes a JSON manifest. `add-diameter` (apply) and `find-replace` (apply) call
+  it first and abort when it fails; any new batch mutation must do the same
+  (fail closed, never "warn and continue"). Snapshots are runtime files
+  (git-ignored); the exported mdf/ldf pair remains the deliverable. Tests patch
+  `db.backup_database` / `docker_ops.copy_out_of_container`, so no DB is needed.
 - `catalog_studio/utils/health.py` — read-only catalog health report
   (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
   the database page). It adds no new catalog semantics: `build_report()`
@@ -433,6 +444,27 @@ dimension logic of its own.
 - Only Advance Steel **2026** is validated; schema shapes are known to differ
   across versions (comments reference a FastenSuite `integrity_check.py`
   expecting a different bolt schema). Treat any new schema as unverified.
+
+## Stack, database roles and naming policy
+
+- **Stack:** this tool is Python 3.12 + Flask (see `requirements.txt`). Requests
+  to re-platform it to C#/.NET/EF are out of scope; the Python modules already
+  encode the verified schema knowledge and the test suite.
+- **Database roles (documented by Autodesk, not re-verified here):**
+  `AstorDetails.mdf` = delivered templates/styles (treat as read-only),
+  `AstorAddIn.mdf` = user overrides and cloned styles, `AstorBase.mdf` =
+  fasteners/bolts/anchors/studs/materials, `AstorSettings.mdf` = global defaults.
+  The tool only ever sees copies attached to the scratch container; record
+  provenance per file (`catalog_metadata.json`), never write to a delivered
+  library, and prefer authoring into a copy of the user library.
+- **Naming:** generated names follow the observed conventions (` 10.00 mm`,
+  `1/2 inch`, `<family> <dia> x <length>`) and are token-safe; never emit
+  recursive `Copy (1) of ...` names. Deep-copy naming is a project decision to
+  make when that write path is verified.
+- **Performance:** catalog tables can hold tens of thousands of rows. Prefer one
+  connection per operation, parameterised batch statements and indexed lookups;
+  `preview_find_replace` / `apply_find_replace` still open a connection per
+  table/column and are the known slow path.
 
 ## Known inconsistencies (not yet bugs to "fix" blindly)
 

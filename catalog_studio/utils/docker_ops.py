@@ -43,6 +43,11 @@ def copy_out_of_container(container_path: str, host_path: str):
     _run(["docker", "cp", src, host_path])
 
 
+def remove_in_container(container_path: str):
+    """Delete a server-side file (e.g. a .bak already copied to the host)."""
+    _run(["docker", "exec", CONTAINER_NAME, "rm", "-f", container_path])
+
+
 def container_is_running() -> bool:
     try:
         out = _run(["docker", "inspect", "-f", "{{.State.Running}}", CONTAINER_NAME])

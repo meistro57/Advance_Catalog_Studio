@@ -413,6 +413,8 @@ Advance_Catalog_Studio/
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
 │       ├── style_usage.py      # Reverse references (used-by) and orphan scan
 │       ├── shear_studs.py      # Shear-stud (connector) browser model
+│       ├── snapshots.py        # COPY_ONLY pre-change .bak snapshots
+
 │       ├── health.py          # Cross-type read-only health report
 │       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
@@ -507,6 +509,7 @@ These are planned features, not claims about the current release. Development wi
 - The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
 - The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
+- Batch writes take a **pre-change snapshot** first: the bolt-diameter clone and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
 
 ## Contributing
 

@@ -40,3 +40,6 @@ ADVANCE_STEEL_VERSION = 2026
 SUPPORTED_AS_VERSIONS = {2026}
 
 METADATA_FILE = os.path.join(BASE_DIR, "catalog_metadata.json")
+
+# Pre-change .bak snapshots of scratch databases. Runtime only; git-ignored.
+SNAPSHOT_DIR = os.path.join(BASE_DIR, "snapshots")

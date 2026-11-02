@@ -431,6 +431,25 @@ def get_physical_files(database: str) -> dict:
     return result
 
 
+def backup_database(database: str, container_path: str, label: str = "catalog-studio snapshot"):
+    """Write a consistent COPY_ONLY .bak inside the container.
+
+    Used before batch mutations; the caller copies it out with docker cp.
+    Paths are server-generated, the database name is validated.
+    """
+    if not valid_identifier(database):
+        raise ValueError("Invalid database name.")
+    if not container_path or "'" in container_path:
+        raise ValueError("Unsafe backup path.")
+    conn, cur = connect()
+    cur.execute(
+        f"BACKUP DATABASE [{database}] TO DISK = %s "
+        f"WITH COPY_ONLY, INIT, NAME = %s, DESCRIPTION = %s",
+        (container_path, label[:128], "Catalog Studio pre-change snapshot"),
+    )
+    conn.close()
+
+
 def run_script(database: str, statements: list):
     """Run a list of DDL/DML statements against a database, one at a time."""
     conn, cur = connect(database)

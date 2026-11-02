@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
-from utils import shear_studs, health, style_usage
+from utils import shear_studs, health, style_usage, snapshots
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -671,6 +671,8 @@ def add_diameter(database):
                     include_tables=include_tables,
                 )
             elif action == "apply":
+                snapshot = snapshots.create_snapshot(
+                    database, f"add diameter {target_dia:g} mm")
                 counts = db.apply_clone_diameter(
                     database=database,
                     source_dia=source_dia,
@@ -687,7 +689,8 @@ def add_diameter(database):
                 summary_parts = [f"{t} ({cnt})" for t, cnt in counts.items()]
                 flash(
                     f"Successfully added diameter '{target_name}' ({target_dia} mm) to {database}! "
-                    f"Generated {total_new} records across {len(counts)} tables: {', '.join(summary_parts)}.",
+                    f"Generated {total_new} records across {len(counts)} tables: {', '.join(summary_parts)}. "
+                    f"Snapshot: {snapshot['filename']}.",
                     "success",
                 )
                 return redirect(url_for("show_database", database=database))
@@ -725,12 +728,25 @@ def find_replace(database):
             if return_to:
                 return redirect(return_to)
         elif find_text and action == "apply":
+            try:
+                snapshot = snapshots.create_snapshot(
+                    database, f"find-replace {find_text[:20]}")
+            except Exception as e:
+                flash(
+                    f"Pre-change snapshot failed, so nothing was replaced: {e}",
+                    "danger",
+                )
+                return render_template(
+                    "find_replace.html", database=database,
+                    find_text=find_text, replace_text=replace_text, preview=None,
+                )
             applied = db.apply_find_replace(database, find_text, replace_text)
             if applied:
                 total = sum(applied.values())
                 flash(
                     f"Replaced '{find_text}' → '{replace_text}' across "
-                    f"{total} cell(s) in {len(applied)} column(s).",
+                    f"{total} cell(s) in {len(applied)} column(s). "
+                    f"Snapshot: {snapshot['filename']}.",
                     "success",
                 )
             else:

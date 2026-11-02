@@ -388,3 +388,54 @@ def test_drawing_style_usage_redirects_when_the_model_fails(monkeypatch):
     resp = app.test_client().get("/db/StyleSample/drawing-style/usage")
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/db/StyleSample/drawing-style")
+
+
+# --- pre-change snapshots gate batch writes --------------------------------
+
+def test_find_replace_blocks_when_the_snapshot_fails(monkeypatch):
+    from app import app
+    applied = []
+    monkeypatch.setattr("utils.snapshots.create_snapshot",
+                        lambda database, reason: (_ for _ in ()).throw(RuntimeError("no backup")))
+    monkeypatch.setattr("utils.db.apply_find_replace",
+                        lambda *a, **k: applied.append(True) or {})
+    resp = app.test_client().post("/db/SomeDb/find-replace",
+                                  data={"action": "apply", "find": "x", "replace": "y"})
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "snapshot failed" in body.lower()
+    assert "no backup" in body
+    assert applied == []
+
+
+def test_find_replace_reports_the_snapshot_on_success(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.snapshots.create_snapshot",
+                        lambda database, reason: {"filename": "SomeDb_2026_x.bak"})
+    monkeypatch.setattr("utils.db.apply_find_replace",
+                        lambda *a, **k: {"ScrewNew.Name": 2})
+    resp = app.test_client().post("/db/SomeDb/find-replace",
+                                  data={"action": "apply", "find": "x", "replace": "y"})
+    body = resp.get_data(as_text=True)
+    assert "Replaced" in body
+    assert "SomeDb_2026_x.bak" in body
+
+
+def test_add_diameter_blocks_when_the_snapshot_fails(monkeypatch):
+    from app import app
+    applied = []
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "bolt")
+    monkeypatch.setattr("utils.db.get_catalog_diameters", lambda database: [])
+    monkeypatch.setattr("utils.metadata.get", lambda database: {})
+    monkeypatch.setattr("utils.snapshots.create_snapshot",
+                        lambda database, reason: (_ for _ in ()).throw(RuntimeError("disk full")))
+    monkeypatch.setattr("utils.db.apply_clone_diameter",
+                        lambda **kwargs: applied.append(True) or {})
+    resp = app.test_client().post("/db/SomeDb/add-diameter", data={
+        "action": "apply", "source_dia": "10", "target_dia": "12",
+        "target_name": " 12.00 mm", "replace_from": "10.00", "replace_to": "12.00",
+    })
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "disk full" in body
+    assert applied == []
