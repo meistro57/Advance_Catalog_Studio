@@ -48,6 +48,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
+| Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
@@ -175,6 +176,19 @@ Opening an attached database shows every table and its live row count. Bolt and 
 - shortcuts to the guided diameter tool and database-wide find/replace (shear-stud catalogs get the read-only stud browser instead).
 
 Drawing-style databases show a **Drawing Style Editor** button instead of the diameter tools.
+
+### Catalog health report
+
+Every attached database has a **Health Report** page (`/db/<db>/health`). It aggregates the checks that already live in the per-type modules and groups the findings by area (catalog structure, diameters, hardware links, geometry, references), with an error / warning / note count and a row count for every table.
+
+| Catalog type | What is checked |
+| --- | --- |
+| bolt | orphan diameters (no related rows at all) and diameters with no rows in one of the documented related tables (`SetBolts`, `SetOfBolts`, `SetNutsBolts`, `ScrewNew`, `BoltsDistances`) |
+| anchor | names without any `AnchorsDefinition` length, definitions pointing at a missing anchor, hardware slots that resolve to no `SetNutsBolts` record (the configurator's own matcher), non-positive lengths/diameters and a thread longer than the rod |
+| shear stud | the browser's completeness and naming findings, unchanged |
+| drawing style | dangling in-file references from the style editor's integrity check, plus its structural notes |
+
+The report is read-only: it never repairs anything, and every finding names the table it came from so it can be inspected in the raw table editor. A clean report is not a guarantee — it only means the checks this tool knows about did not fail. Existing samples show real findings (for example `Grade5` has a 10 mm diameter with no bolts and a 3/8" diameter with no nuts/washers).
 
 ### Add / Clone Diameter wizard
 
@@ -384,6 +398,7 @@ Advance_Catalog_Studio/
 │       ├── drawing_styles.py   # Drawing-style tree, label parsing, relations
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
 │       ├── shear_studs.py      # Shear-stud (connector) browser model
+│       ├── health.py          # Cross-type read-only health report
 │       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
 │       ├── docker_ops.py       # File transfer to/from scratch SQL Server
 │       ├── metadata.py         # Catalog type/version metadata

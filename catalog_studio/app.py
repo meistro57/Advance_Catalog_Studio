@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
-from utils import shear_studs
+from utils import shear_studs, health
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -272,6 +272,22 @@ def show_database(database):
         "database.html", database=database, tables=tables, counts=counts, meta=meta,
         diameters=diameters, catalog_type=catalog_type,
     )
+
+
+@app.route("/db/<database>/health")
+def catalog_health(database):
+    """Read-only health report for the detected catalog type.
+
+    Aggregates the checks that already live in the per-type modules (bolt
+    diameter coverage, anchor pairing/hardware, shear-stud completeness,
+    drawing-style references). It reports; it never repairs.
+    """
+    try:
+        report = health.build_report(database)
+    except Exception as e:
+        flash(f"Could not build the health report: {e}", "danger")
+        return redirect(url_for("show_database", database=database))
+    return render_template("catalog_health.html", database=database, report=report)
 
 
 # --------------------------------------------------------------------------

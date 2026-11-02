@@ -258,3 +258,60 @@ def test_shear_stud_clone_preview_uses_requested_units(monkeypatch):
     assert "≈ 1/4 in" in body
     assert "≈ 5/16 in" in body
     assert "stored values (millimetres)" in body
+
+
+# --- catalog health report --------------------------------------------------
+
+def _fake_health_report():
+    from utils import health
+    findings = health.sort_findings([
+        health.finding("error", "diameter_orphan", "No related rows.",
+                       "BoltsDiameters", "diameters"),
+        health.finding("warn", "diameter_incomplete", "Missing SetBolts rows.",
+                       "BoltsDiameters", "diameters"),
+    ])
+    return {
+        "database": "SomeDb", "catalog_type": "bolt",
+        "tables": [{"name": "BoltsDiameters", "rows": 2}],
+        "findings": findings, "summary": health.summarize(findings),
+        "sections": health.sections(findings),
+    }
+
+
+def test_catalog_health_route_registered():
+    from app import app
+    assert "catalog_health" in {r.endpoint for r in app.url_map.iter_rules()}
+
+
+def test_catalog_health_renders_findings(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.health.build_report", lambda database: _fake_health_report())
+    resp = app.test_client().get("/db/SomeDb/health")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Catalog health" in body
+    assert "diameter_orphan" in body and "diameter_incomplete" in body
+    assert "Diameters" in body
+    assert "read-only" in body
+
+
+def test_catalog_health_redirects_when_the_report_fails(monkeypatch):
+    from app import app
+
+    def boom(database):
+        raise RuntimeError("no connection")
+
+    monkeypatch.setattr("utils.health.build_report", boom)
+    resp = app.test_client().get("/db/SomeDb/health")
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/db/SomeDb")
+
+
+def test_database_page_links_the_health_report(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.list_tables", lambda database: ["SetBolts"])
+    monkeypatch.setattr("utils.db.get_row_count", lambda database, table: 1)
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "bolt")
+    monkeypatch.setattr("utils.db.get_catalog_diameters", lambda database: [])
+    resp = app.test_client().get("/db/SomeDb")
+    assert resp.status_code == 200
+    assert "/db/SomeDb/health" in resp.get_data(as_text=True)

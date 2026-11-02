@@ -122,6 +122,17 @@ and display-name token replacement.
   fraction, `≈` marker); the templates call it as the `sdim` Jinja filter and
   carry `units` through filter links and the clone form. Never convert values
   before they reach SQL or the clone proposal.
+- `catalog_studio/utils/health.py` — read-only catalog health report
+  (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
+  the database page). It adds no new catalog semantics: `build_report()`
+  dispatches on `db.guess_catalog_type` and reuses `db.get_catalog_diameters`
+  (bolt diameter coverage against the documented six-table relationship),
+  `bolt_sets.parse_component_slots`/`annotate_components` (anchor hardware
+  slots), `shear_studs.get_browser_model` (stud findings) and
+  `drawing_styles.integrity_report` (dangling references). Pure collectors,
+  sorting, summary and section grouping are unit-tested; keep new rules in the
+  owning module and only aggregate here. It never repairs; a clean report is
+  not a claim of Advance Steel validity.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the
