@@ -44,6 +44,7 @@ session CSRF token.
 | `/db/<db>/drawing-style/save` | `drawing_style_save` | UPDATE style fields | required |
 | `/db/<db>/drawing-style/rule` | `drawing_style_rule` | rule copy/reorder/delete | required |
 | `/db/<db>/drawing-style/diagram` | `drawing_style_diagram` | none (redraws a figure) | required anyway (htmx posts it) |
+| `/detail-diff` | `detail_diff` | none (parses two uploaded DXFs in the request) | required anyway (a file upload is a POST) |
 
 ## Exempt POST routes (read-only)
 

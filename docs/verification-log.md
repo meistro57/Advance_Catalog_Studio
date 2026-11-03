@@ -39,6 +39,7 @@ Each entry records:
 | A4 | Drawing-style edit round trip (same-name import) | not started |
 | A5 | `AstorDetailsBase` enum labels in the AS UI | in progress — one drawing observation (A5.1), DSM list not read yet |
 | A6 | Exported `.mdf` / `.ldf` pair imports cleanly | **pass** with Windows-form file paths (A6.10); confirm with an edited export through the app |
+| A7 | DXF hand-edit diff against a real before/after pair | not started; parser and diff are covered by synthetic fixtures only |
 
 ## Known results
 
@@ -308,3 +309,22 @@ attach/detach cycle was enough to be refused.)
   Checked live: a new attach stores `C:\...`, an old-style database is re-homed
   and stays online, both survive detach.
 - Unblocks: A6 once an *edited* export made through the app imports.
+
+### A7 — DXF hand-edit diff against a real before/after pair
+
+- Date / operator: not started.
+- AS build: not recorded.
+- File(s): none yet. Needed: the same detail exported as DXF before and after a
+  hand edit, plus the style export that generated the first one.
+- Operation: open `/detail-diff`, upload both DXFs, select the style export,
+  and check the report against the edits that were actually made.
+- Expected: generated entities are recognised by their AS layer prefix or AS
+  XDATA; hand-added dimensions are reported as hand-made; each added chain
+  names the correct feature, direction, side and clearance; existing requests
+  are offered; a scale change is recognised.
+- Observed: not run. `tests/test_dxf_compare.py` proves the parser and diff on
+  synthetic ASCII DXF fixtures, which is not evidence about an Advance Steel
+  export. The layer-prefix and AS XDATA rules are inferred, not verified.
+- Evidence: none.
+- Verdict: inconclusive (not started).
+- Unblocks: issue #15 Phase 1 acceptance and Phase 2 (apply to a copy).

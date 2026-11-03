@@ -17,9 +17,10 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 387 tests; read-only bolt/anchor/stud/style views and
-the health report exist; writes are the bolt diameter clone, raw row CRUD, find
-& replace, and drawing-style field/rule edits.
+Baseline: `main` green at 521 tests; read-only bolt/anchor/stud/style views,
+the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; writes
+are the bolt diameter clone, raw row CRUD, find & replace, and drawing-style
+field/rule edits.
 
 ---
 
@@ -51,6 +52,11 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [ ] **A6 — Export/detach integrity.** Confirm the exported `.mdf`/`.ldf` pair
   from the scratch container imports without the `ASSettings_User.xml` /
   log-file problems described in the compaction request.
+- [ ] **A7 — DXF hand-edit diff against a real pair.** Generate a detail from a
+  style, export DXF, hand-edit a copy, export again, and run both through
+  `/detail-diff` with the style export. Confirm the AS layer/XData rule, the
+  added hand dimensions, the chains and the sides match the edits; record the
+  result in `docs/verification-log.md`. Unblocks issue #15 Phase 2.
 
 ## B. Bolt-set viewer/editor (issue #1)
 
@@ -132,6 +138,18 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   dimension, title) and keep the escape buttons.
 - [ ] **E8 — Health rows for styles.** When an export has more than one style,
   report shared sub-styles in the health report, with counts per table.
+- [x] **E9 — Detail diff (issue #15, Phase 1).** Read-only `/detail-diff`: two
+  ASCII DXFs plus an optional style export become a report of added, removed,
+  moved and changed entities, with the feature, direction, side and chain
+  intent, the owning style surface, existing request matches, shared sub-style
+  warnings and a scale proposal. Text content and dimension values are ignored;
+  text height, colours and the AutoCAD dimension style are reported as not a
+  style change. Pure parser/diff/style matcher unit-tested; assumptions and the
+  A7 procedure in `docs/dxf-diff.md`.
+- [!] **E9b (blocked by A4, A7) — Apply the hand-edit plan.** Turn the Phase 1
+  report into a reviewable table that writes a copy of the style (snapshot
+  first), regenerates the detail, diffs it against the hand-edited target and
+  repeats until only "style can't" edits remain.
 
 ## F. Data safety (prompted by the co-developer brief)
 
@@ -228,5 +246,7 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   (G2 part 1).
 - [x] Central CSRF guard for all POST routes plus `docs/csrf-audit.md` and a
   URL-map test (G6).
-- [x] GitHub Actions CI: `compileall`, pytest and pyflakes (G3 part 1, 387
-  tests).
+- [x] GitHub Actions CI: `compileall`, pytest and pyflakes (G3 part 1).
+- [x] DXF hand-edit diff, Phase 1 of issue #15: read-only parser, entity
+  classification, diff, chain intent, style mapping, request matching, shared
+  sub-style flags, scale detection and the `/detail-diff` page/JSON (521 tests).

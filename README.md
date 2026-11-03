@@ -52,6 +52,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
 | Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) with JSON/CSV downloads |
 | Catalog comparison (`/compare`) | Implemented (read-only: table presence, row counts, diameter coverage) |
+| Detail diff (`/detail-diff`, issue #15) | Phase 1 implemented (read-only: two DXF exports + optional style export become a hand-edit report and JSON; apply path blocked on verification) |
 | Pre-change snapshots | Implemented for the batch writes: `COPY_ONLY` backup + manifest, explicit prune (newest N), documented manual restore |
 | Delivered-library protection | Implemented (databases attached from `Astor*.mdf` are read-only) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
@@ -274,6 +275,19 @@ The same findings download as `health.json` (the full report, including tables a
 - diameter coverage for bolt, anchor and shear-stud catalogs: which keys exist on each side, their display names, related-row totals and orphan flags.
 
 It answers "what changed between my original export and this repaired copy?" without detaching or re-importing anything. Only attached databases can be compared, and nothing is written.
+
+### Detail diff (issue #15, Phase 1)
+
+`/detail-diff` (the **Detail diff** button) compares two ASCII DXF exports of the same detail: one as the drawing style generated it, one after it was hand-edited. With the style export attached as well, it becomes the read-only half of the "learn the style from a hand edit" workflow:
+
+- classifies every entity as Advance Steel or hand-made (AS layer prefix / AS XData, with the rule shown);
+- reports what was added, removed, moved or changed, ignoring part marks, m-numbers and dimension values;
+- describes a dimension chain by the feature it lands on, its direction (horizontal, along the main part, square to it), its side and its clearance from the existing chain;
+- maps each edit to the style surface that owns it (dimension strategy, representation rules, label/title, scale) or explains why no style setting can make it (text height, colours, the AutoCAD dimension style);
+- ranks existing dimension requests from the style and from the export's request library, lists reusable point rules, and flags a shared sub-style that other styles also use;
+- detects a uniform size change and proposes the new `DetViewRequest.Scale`.
+
+The page is read-only and parses both uploads in the request without storing them. The same POST returns the full report as JSON with `format=json` for an agent or an MCP server. Assumptions, the parser limits and the real-drawing verification procedure are in `docs/dxf-diff.md`; the apply path stays blocked until verification A4 passes and a real pair is checked under A7.
 
 ### Add / Clone Diameter wizard
 

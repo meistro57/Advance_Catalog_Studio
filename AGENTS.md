@@ -39,11 +39,12 @@ and display-name token replacement.
   model and clone plan, staging cleanup, connection timeouts, the diameter
   clone's replace-before-insert order, find & replace's single transaction and
   legacy-type casts, detach/backup connection recovery, the SQL file-version
-  guard, the docker commands that stage files into the container, the light/dark
-  theme hooks and shared design layer, and the inline SVG icon set / offline asset
-  rule) — no database needed. The clone and find/replace tests stub the
-  cursor, so they assert statement order and commit/rollback rather than SQL
-  Server behaviour.
+  guard, the docker commands that stage files into the container, the DXF
+  hand-edit diff (parser, classification, diff, intent, scale and style
+  matching), the light/dark theme hooks and shared design layer, and the inline
+  SVG icon set / offline asset rule) — no database needed. The clone and
+  find/replace tests stub the cursor, so they assert statement order and
+  commit/rollback rather than SQL Server behaviour.
 - **No configured linter, no Makefile, no packaging config exist.** CI exists:
   `.github/workflows/ci.yml` runs `compileall`, `pytest tests/` and
   `pyflakes catalog_studio tests *.py` on every push/PR. Verification of real
@@ -206,6 +207,25 @@ and display-name token replacement.
   fraction, `≈` marker); the templates call it as the `sdim` Jinja filter and
   carry `units` through filter links and the clone form. Never convert values
   before they reach SQL or the clone proposal.
+- `catalog_studio/utils/dxf_compare.py` — Phase 1 (read-only) of issue #15:
+  compares two ASCII DXF exports of the same detail, classifies each entity as
+  Advance Steel or hand-made (AS layer prefix / AS XDATA), diffs added, removed,
+  moved and changed entities, groups a dimension chain, infers the feature,
+  direction and side, and maps the edit to the style surface that owns it
+  (dimension strategy, representation rules, label/title, scale). It also ranks
+  existing dimension requests from the selected style and the export's request
+  library (requests and their point rules), flags sub-styles shared with other
+  styles through `style_usage`, and detects a uniform scale change (contour
+  length totals per layer). Text content and dimension values are deliberately
+  ignored; text height, colours, the title frame and the AutoCAD dimension
+  style are reported as "not a style change" (the DIMSTYLE and LAYER tables are
+  compared directly). The
+  parser is ASCII-only and refuses binary DXF; both uploads are parsed in the request and never stored.
+  Page `/detail-diff` (`detail_diff.html`, nav "Detail diff"); the same POST
+  returns JSON with `format=json`. Nothing writes and there is no apply route:
+  Phase 2 is blocked until verification A4 passes and a real before/after pair
+  is checked (A7). Assumptions and the A7 verification procedure are in
+  `docs/dxf-diff.md`.
 - `catalog_studio/utils/style_usage.py` — read-only "used by" walk and orphan
   scan for drawing-style exports (`/db/<db>/drawing-style/usage`, template
   `drawing_style_usage.html`, "Sub-style usage" button on the editor page).

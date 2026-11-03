@@ -16,6 +16,7 @@ import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
 from utils import shear_studs, health, style_usage, snapshots, compare, icons
+from utils import dxf_compare
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -522,6 +523,84 @@ def compare_catalogs():
     return render_template(
         "compare.html", attached=attached, name_a=name_a, name_b=name_b,
         result=result, meta=metadata.all_meta(),
+    )
+
+
+# --------------------------------------------------------------------------
+# Detail diff (issue #15, Phase 1: read-only hand-edit report)
+# --------------------------------------------------------------------------
+
+def _style_databases():
+    """Attached databases that look like drawing-style exports."""
+    if not docker_ops.container_is_running():
+        return []
+    try:
+        return sorted(name for name in db.list_databases()
+                      if db.guess_catalog_type(name) == "drawing style")
+    except Exception:
+        return []
+
+
+@app.route("/detail-diff", methods=["GET", "POST"])
+def detail_diff():
+    """Compare two DXF exports of one detail and report the hand edits."""
+    style_databases = _style_databases()
+    report = None
+    error = None
+    selected = ""
+    if request.method == "POST":
+        before_file = request.files.get("before")
+        after_file = request.files.get("after")
+        selected = request.form.get("style_db", "").strip()
+        try:
+            if (not before_file or not after_file
+                    or not before_file.filename or not after_file.filename):
+                raise dxf_compare.DxfError("Choose a before DXF and an after DXF.")
+            for upload in (before_file, after_file):
+                if not upload.filename.lower().endswith(".dxf"):
+                    raise dxf_compare.DxfError(
+                        f"'{upload.filename}' is not a .dxf file. Export an ASCII DXF.")
+            before_data = before_file.read(dxf_compare.MAX_DXF_BYTES + 1)
+            after_data = after_file.read(dxf_compare.MAX_DXF_BYTES + 1)
+            for upload, data in ((before_file, before_data), (after_file, after_data)):
+                if len(data) > dxf_compare.MAX_DXF_BYTES:
+                    raise dxf_compare.DxfError(
+                        f"'{upload.filename}' is larger than 64 MB.")
+            style_model = None
+            style_graph = None
+            index = []
+            if selected:
+                if selected not in style_databases:
+                    flash("That style database is not attached; the DXFs were "
+                          "compared without it.", "warning")
+                    selected = ""
+                else:
+                    try:
+                        style_model = drawing_styles.style_tree(selected)
+                        index.extend(dxf_compare.load_request_library(selected))
+                        style_graph = style_usage.load_graph(selected)
+                    except Exception as exc:
+                        flash(f"Could not read the style export '{selected}': {exc}",
+                              "warning")
+                        style_model = None
+                        style_graph = None
+                        selected = ""
+            report = dxf_compare.build_report(
+                before_data, after_data, request_index=index,
+                style_model=style_model, style_database=selected or None,
+                style_graph=style_graph)
+            if request.form.get("format") == "json":
+                return jsonify(report)
+        except dxf_compare.DxfError as exc:
+            error = str(exc)
+        except Exception as exc:
+            error = f"Could not compare the files: {exc}"
+    if request.method == "POST" and request.form.get("format") == "json" and error:
+        return jsonify({"error": error}), 400
+    return render_template(
+        "detail_diff.html", style_databases=style_databases, selected=selected,
+        report=report, error=error,
+        report_json=json.dumps(report, indent=2, default=str) if report else None,
     )
 
 
