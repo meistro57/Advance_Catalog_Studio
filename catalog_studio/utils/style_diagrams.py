@@ -397,6 +397,15 @@ LANE_COLORS = ["#0d6efd", "#198754", "#fd7e14", "#6f42c1", "#d63384", "#20a39e"]
 MAX_PLAN_LANES = 8
 
 
+def lane_colour(index):
+    """The colour the dimension plan gives chain `index` (1-based).
+
+    Public because the editor colours each chain card's number with it, so a
+    card and its lane in the plan are recognisably the same chain.
+    """
+    return LANE_COLORS[(index - 1) % len(LANE_COLORS)]
+
+
 def dimension_anatomy_svg(width=700.0, height=176.0):
     """One chain, labelled: what a chain is, what its ticks are, and what
     Above / Direction control. Static teaching figure."""
@@ -505,8 +514,7 @@ def dimension_plan_svg(dims, width=720.0):
             out.append(_line(lane_x - 5, ty, lane_x + 5, ty, "sd-dim"))
         return out
 
-    def color(index):
-        return LANE_COLORS[(index - 1) % len(LANE_COLORS)]
+    color = lane_colour
 
     for k, entry in enumerate(x_above):
         lane_y = part_y0 - pitch * (k + 0.65)

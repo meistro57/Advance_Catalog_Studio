@@ -157,3 +157,17 @@ def test_save_still_posts_one_form_for_all_panes():
     start, end = html.index('id="styleForm"'), html.index("</form>", html.index('id="saveBar"'))
     form = html[start:end]
     assert 'id="pane-dims-22001"' in form and 'id="pane-lib-sets"' in form
+
+
+def test_chain_card_numbers_use_the_dimension_plan_colours():
+    """Card #n must be drawn in the colour of lane #n in the plan."""
+    html = _render()
+    assert 'class="dx-num" style="background:#0d6efd"' in html   # chain 1
+    assert 'class="dx-num" style="background:#198754"' in html   # chain 2
+    # A long strategy keeps cycling rather than running out of colours.
+    many = _tree()
+    for i in range(3, 9):
+        cloned = dict(many["masters"][0]["style"]["requests"][0]["dims"][0])
+        many["masters"][0]["style"]["requests"][0]["dims"].append(cloned)
+    html_many = _render(many)
+    assert 'class="dx-num" style="background:#0d6efd"' in html_many  # #7 wraps to blue

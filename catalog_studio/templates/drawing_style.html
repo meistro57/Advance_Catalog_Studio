@@ -115,7 +115,8 @@
   {% set e = d.explain %}
   <details class="dx-chain" id="chain-{{ r.row.Key }}-{{ loop_index }}" {% if open_default %}open{% endif %}>
     <summary>
-      <span class="dx-num">{{ loop_index }}</span>
+      <span class="dx-num" style="background:{{ lane_colour(loop_index) }}"
+            title="Chain {{ loop_index }} — the same colour as its lane in the dimension plan">{{ loop_index }}</span>
       <span class="flex-grow-1">
         <span class="dx-name" {% if e and e.raw_name != e.name %}title="{{ e.raw_name }}"{% endif %}>{{ e.name if e else ('#' ~ d.row.RequestLinear) }}</span>
         {% if e and e.name_code %}<span class="badge bg-light text-dark border ms-1 dx-code" title="Drawing Style Manager name code">{{ e.name_code.code }}</span>{% endif %}

@@ -30,6 +30,9 @@ app.jinja_env.filters["sdim"] = shear_studs.format_dimension
 # Inline SVG icons: templates say {{ icon('health') }} instead of emoji, so the
 # chrome renders the same on hosts without a colour emoji font.
 app.jinja_env.globals["icon"] = icons.icon
+# The dimension plan and the chain cards share one palette, so the card's number
+# is the colour of that chain's lane.
+app.jinja_env.globals["lane_colour"] = style_diagrams.lane_colour
 
 
 def _csrf_token() -> str:

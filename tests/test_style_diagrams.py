@@ -370,3 +370,22 @@ def test_dimension_plan_puts_vertical_above_lanes_left():
     svg = sd.dimension_plan_svg(dims)
     lanes = re.findall(r'<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" stroke="#', svg)
     assert lanes and all(float(l[0]) < 250.0 for l in lanes)
+
+
+def test_lane_colour_is_the_shared_palette():
+    """The chain card numbers and the plan lanes must use one palette."""
+    assert [sd.lane_colour(i) for i in range(1, 7)] == sd.LANE_COLORS
+    assert sd.lane_colour(7) == sd.LANE_COLORS[0]  # wraps for long strategies
+    assert sd.lane_colour(0) == sd.LANE_COLORS[-1]  # and for the index before 1
+
+
+def test_dimension_plan_colours_each_lane_from_lane_colour():
+    dims = [
+        {"linear": {"row": {"RunName": "One", "Direction": 0, "ArrangeAbove": True}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Two", "Direction": 0, "ArrangeAbove": True}}, "points": ["A"]},
+        {"linear": {"row": {"RunName": "Three", "Direction": 1, "ArrangeAbove": False}}, "points": ["A"]},
+    ]
+    svg = sd.dimension_plan_svg(dims)
+    for index in (1, 2, 3):
+        assert f'stroke="{sd.lane_colour(index)}"' in svg
+        assert f'fill="{sd.lane_colour(index)}"' in svg  # legend swatch

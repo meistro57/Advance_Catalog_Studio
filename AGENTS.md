@@ -176,7 +176,11 @@ and display-name token replacement.
   clipping, dimension-chain anatomy, per-view dimension plan, single chain,
   hatch swatches) plus the page-level `decorate_tree()` helper. The dimension
   plan caps lanes per side (`MAX_PLAN_LANES`) and says how many it left out;
-  the anatomy figure is attached to the first view with dimensions only. Builders are pure and unit-tested; the page embeds them and redraws
+  the anatomy figure is attached to the first view with dimensions only.
+  `lane_colour(index)` is the single palette: the plan draws a chain's lane and
+  legend swatch with it, and `app.py` registers it as a Jinja global so the
+  chain card's number is the same colour (`LANE_COLORS`, six values, wrapping).
+  Builders are pure and unit-tested; the page embeds them and redraws
   live through `POST /db/<db>/drawing-style/diagram`, which reuses the same
   builders so there is one geometry implementation (no JS twin). Keep the
   "unverified" notes in the figures when touching them.
