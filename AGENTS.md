@@ -513,6 +513,14 @@ dimension logic of its own.
 
 ## SQL conventions and gotchas
 
+- **Windows-form file paths (critical).** Attach and create with
+  `db.container_windows_path(...)` (`C:\var\opt\mssql\attach\x.mdf`), never the
+  raw Linux path. The mdf records its file paths, and Advance Steel refuses an
+  import whose stored paths are Linux paths ("Source database is older than
+  Release 5.1!", verification log A6.10). Exports call
+  `db.ensure_windows_file_paths()` first; `get_physical_files()` returns the
+  Linux form for `docker cp`.
+
 - Values are always parameterized (`%s`); identifiers (table/column/db names)
   are interpolated inside brackets `[...]` and must only ever come from trusted
   sources (validated form input, or names read back from

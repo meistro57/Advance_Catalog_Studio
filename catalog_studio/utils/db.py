@@ -135,6 +135,73 @@ def require_as_compatible(mdf_path: str = None):
     return {"server": server, "file": file_version}
 
 
+# --------------------------------------------------------------------------
+# Windows-form file paths
+# --------------------------------------------------------------------------
+# An mdf records where its own data and log files live. Advance Steel's exports
+# carry Windows paths (S:\...\style.mdf). Attached here as /var/opt/mssql/...,
+# the file comes back carrying a Linux path, and Advance Steel refuses the
+# import ("Source database is older than Release 5.1!"), even with no edits.
+# SQL Server on Linux maps C:\ onto its own root, so attaching as
+# C:\var\opt\mssql\attach\x.mdf opens the same file and stores a Windows path.
+# Verified: verification log A6.10 (a Linux-path round trip refused, the
+# Windows-path round trip of the same file imported).
+
+_WINDOWS_PATH = re.compile(r"^[A-Za-z]:\\")
+
+
+def container_windows_path(path: str) -> str:
+    """/var/opt/mssql/attach/x.mdf -> C:\\var\\opt\\mssql\\attach\\x.mdf"""
+    if _WINDOWS_PATH.match(path or ""):
+        return path
+    if not str(path).startswith("/"):
+        raise ValueError(f"Expected an absolute container path, got {path!r}.")
+    return "C:" + str(path).replace("/", "\\")
+
+
+def container_linux_path(path: str) -> str:
+    """C:\\var\\opt\\x.mdf -> /var/opt/x.mdf (what docker cp needs). Linux
+    paths pass through unchanged."""
+    text = str(path or "")
+    if text[:3].upper() == "C:\\":
+        return "/" + text[3:].replace("\\", "/")
+    return text
+
+
+def ensure_windows_file_paths(db_name: str) -> list:
+    """Re-home a database attached with Linux paths (before this fix) so its
+    files record Windows-form paths. Same files, same place; only the path
+    the mdf stores changes. Takes effect after an offline/online cycle, done
+    here. Returns the logical file names that were changed."""
+    if not valid_identifier(db_name):
+        raise ValueError("Invalid database name.")
+    conn, cur = connect()
+    try:
+        cur.execute("""
+            SELECT mf.name, mf.physical_name
+            FROM sys.master_files mf
+            JOIN sys.databases d ON mf.database_id = d.database_id
+            WHERE d.name = %s
+        """, (db_name,))
+        rows = cur.fetchall()
+        changed = []
+        for r in rows:
+            if _WINDOWS_PATH.match(r["physical_name"]):
+                continue
+            target = container_windows_path(r["physical_name"])
+            if "'" in target or "'" in r["name"]:
+                raise ValueError("Unsafe file name.")
+            cur.execute(f"ALTER DATABASE [{db_name}] MODIFY FILE "
+                        f"(NAME = N'{r['name']}', FILENAME = N'{target}')")
+            changed.append(r["name"])
+    finally:
+        conn.close()
+    if changed:
+        with offline_database(db_name):
+            pass
+    return changed
+
+
 def attach_database(db_name: str, mdf_filename: str, ldf_filename: str):
     if not valid_identifier(db_name):
         raise ValueError("Database name must be letters, numbers, underscores only.")
@@ -144,8 +211,8 @@ def attach_database(db_name: str, mdf_filename: str, ldf_filename: str):
     conn, cur = connect()
     cur.execute(f"""
         CREATE DATABASE [{db_name}] ON
-        (FILENAME = N'{mdf_path}'),
-        (FILENAME = N'{ldf_path}')
+        (FILENAME = N'{container_windows_path(mdf_path)}'),
+        (FILENAME = N'{container_windows_path(ldf_path)}')
         FOR ATTACH;
     """)
     conn.close()
@@ -542,9 +609,9 @@ def create_empty_database(db_name: str):
     conn, cur = connect()
     cur.execute(f"""
         CREATE DATABASE [{db_name}] ON
-        (NAME = N'{db_name}', FILENAME = N'{mdf_path}')
+        (NAME = N'{db_name}', FILENAME = N'{container_windows_path(mdf_path)}')
         LOG ON
-        (NAME = N'{db_name}_log', FILENAME = N'{ldf_path}');
+        (NAME = N'{db_name}_log', FILENAME = N'{container_windows_path(ldf_path)}');
     """)
     conn.close()
 
@@ -564,10 +631,11 @@ def get_physical_files(database: str) -> dict:
     conn.close()
     result = {}
     for r in rows:
+        # docker cp needs the Linux form; the database may record C:\\...
         if r["type_desc"] == "ROWS":
-            result["mdf"] = r["physical_name"]
+            result["mdf"] = container_linux_path(r["physical_name"])
         elif r["type_desc"] == "LOG":
-            result["ldf"] = r["physical_name"]
+            result["ldf"] = container_linux_path(r["physical_name"])
     return result
 
 
