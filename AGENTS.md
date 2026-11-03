@@ -92,7 +92,10 @@ and display-name token replacement.
   `pymssql.connect` elsewhere. The dashboard checks the container first and
   skips the database query when it is down.
 - `catalog_studio/utils/docker_ops.py` — shells out to `docker cp`/`exec`/
-  `inspect` to move files in/out of the container.
+  `inspect` to move files in/out of the container. Files copied into
+  `/var/opt/mssql/attach` are chowned to `mssql` **by owner only**: the
+  SQL Server 2019 image (the one `SCRATCH_SQL_IMAGE` documents) runs that user
+  with gid 0 and has no `mssql` group, so `chown mssql:mssql` fails there.
 - `catalog_studio/utils/metadata.py` — per-database `catalog_type`, `library` and
   `as_version`, stored in a local JSON sidecar
   (`catalog_studio/catalog_metadata.json`), deliberately **not** written into

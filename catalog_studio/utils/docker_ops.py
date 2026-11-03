@@ -17,9 +17,11 @@ def _run(cmd):
 
 def ensure_attach_dir():
     _run(["docker", "exec", CONTAINER_NAME, "mkdir", "-p", CONTAINER_ATTACH_PATH])
+    # Owner only, never `mssql:mssql`: the SQL Server 2019 image runs the mssql
+    # user with gid 0 and has no mssql group, so a group name fails there.
     _run([
         "docker", "exec", "-u", "root", CONTAINER_NAME,
-        "chown", "mssql:mssql", CONTAINER_ATTACH_PATH,
+        "chown", "mssql", CONTAINER_ATTACH_PATH,
     ])
 
 
@@ -31,7 +33,7 @@ def copy_into_container(host_path: str, container_filename: str):
     _run(["docker", "cp", host_path, dest])
     _run([
         "docker", "exec", "-u", "root", CONTAINER_NAME,
-        "chown", "mssql:mssql", f"{CONTAINER_ATTACH_PATH}/{container_filename}",
+        "chown", "mssql", f"{CONTAINER_ATTACH_PATH}/{container_filename}",
     ])
 
 
