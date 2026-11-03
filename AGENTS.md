@@ -38,8 +38,9 @@ and display-name token replacement.
   scan, catalog health report, fabrication sheet model, shear-stud browser
   model and clone plan, staging cleanup, connection timeouts, the diameter
   clone's replace-before-insert order, find & replace's single transaction and
-  legacy-type casts, detach/backup connection recovery, and the light/dark
-  theme hooks) — no database needed. The clone and find/replace tests stub the
+  legacy-type casts, detach/backup connection recovery, the light/dark theme
+  hooks and shared design layer, and the inline SVG icon set / offline asset
+  rule) — no database needed. The clone and find/replace tests stub the
   cursor, so they assert statement order and commit/rollback rather than SQL
   Server behaviour.
 - **No configured linter, no Makefile, no packaging config exist.** CI exists:
@@ -129,7 +130,11 @@ and display-name token replacement.
   flashed messages into `#flashHost`. Keep the plain `form="ruleForm"` submit
   path working as the no-JS fallback, and keep `fld` in
   `_drawing_macros.html` (imported `with context`). htmx 2.0.4 is vendored at
-  `static/vendor/htmx/htmx.min.js` so the tool stays offline.
+  `static/vendor/htmx/htmx.min.js` so the tool stays offline. The libraries card
+  at the bottom of the page uses Bootstrap **collapse** (`data-bs-parent="#libPanes"`),
+  not `data-bs-toggle="tab"`: one library pane is open at a time and clicking the
+  open tab closes it. Keep `aria-expanded`/`aria-controls` in sync, and keep the
+  panes' content unconditional (they are hidden, never server-gated).
 - `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
   schematic SVG figures (style overview, print-scale ruler, view box, length
   clipping, dimension-chain anatomy, per-view dimension plan, single chain,
@@ -230,6 +235,17 @@ and display-name token replacement.
   `base.html` so they inherit the theme, and keep SVG/drawing surfaces on light
   "paper" (`.cs-paper`, `.bp-host`, `.label-preview`, the Three.js canvas, the
   printable fabrication sheet) — their strokes and dimension text assume it.
+- `catalog_studio/utils/icons.py` — the chrome's inline SVG icon set, exposed
+  to templates as the `icon('name')` Jinja global (registered in `app.py`).
+  Icons are 24x24 stroke paths that inherit `currentColor`, so no icon font and
+  no colour-emoji font is needed (a missing emoji font renders tofu boxes on
+  minimal Linux and in headless browsers). `tests/test_icons.py` fails on an
+  unknown icon name, on colour emoji in a template, or on a CDN asset reference
+  in `base.html`. Add new glyphs to `ICONS`, never inline `<svg>` in a template.
+- `catalog_studio/static/vendor/bootstrap/` — **pinned local** Bootstrap 5.3.3
+  (`bootstrap.min.css`, `bootstrap.bundle.min.js`), loaded by `base.html` so the
+  workbench works offline like htmx and Three.js. `static/img/` holds the
+  navbar brand mark and the SVG favicon. Never switch either back to a CDN.
 - `catalog_studio/static/vendor/three/` — **pinned local** Three.js r160
   (`three.module.js`, `OrbitControls.js`) so the workshop works offline. The
   viewer template loads it via an import map (`three` and `three/addons/`

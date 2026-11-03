@@ -15,12 +15,12 @@
 
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h4 class="mb-0">&#128295; Anchor Configurator <span class="text-muted fs-6">(graphical viewer)</span></h4>
+        <h4 class="mb-0">{{ icon('bolt', 18) }} Anchor Configurator <span class="text-muted fs-6">(graphical viewer)</span></h4>
         <span class="text-muted small">Schematic anchor from catalog records &mdash; rod, thread, concrete plane, hardware, and bottom termination.</span>
     </div>
-    <span class="badge bg-secondary text-uppercase">anchor catalog</span>
+    <span class="badge bg-secondary text-uppercase align-self-start">anchor catalog</span>
 </div>
 
 <!-- Selection toolbar -->
@@ -51,7 +51,7 @@
             </div>
             <div class="col-lg-2 d-flex justify-content-end">
                 <a id="sheetLink" class="btn btn-sm btn-outline-primary d-none" target="_blank"
-                   title="Open a printable fabrication detail sheet for the selected anchor">&#128196; Detail Sheet</a>
+                   title="Open a printable fabrication detail sheet for the selected anchor">{{ icon('file') }} Detail Sheet</a>
             </div>
         </div>
     </div>

@@ -1,13 +1,22 @@
 /* static/css/theme.css
  *
- * Light/dark tokens for the app chrome, plus the remaps needed because the
- * templates hardcode a few light-only Bootstrap utilities (bg-white, bg-light,
- * text-dark). Mounted once from base.html, after Bootstrap.
+ * The app chrome's design layer. Mounted once from base.html, after Bootstrap.
+ *
+ * Layout of this file:
+ *   1. Tokens (light + dark)      - every colour the chrome uses comes from here
+ *   2. Base elements              - page shell, focus ring, code, links
+ *   3. Navigation                 - brand mark, skip link, theme toggle
+ *   4. Tables                     - sticky head, zebra, hover, tabular digits
+ *   5. Bootstrap bridges          - light-only utilities the templates use
+ *   6. Page stylesheet bridges    - dark fixes for per-page classes
+ *   7. Motion and responsive      - reduced motion, small-screen spacing
  *
  * Engineering drawings (the Three.js canvas, the dimensioned bolt profile, the
  * drawing-style schematic figures and label previews) stay on light "paper" in
  * both themes so the dark strokes and dimension text remain legible.
  */
+
+/* ---- 1. Tokens ----------------------------------------------------------- */
 
 :root {
     --cs-page-bg: #f5f6f8;
@@ -25,6 +34,13 @@
     --cs-shadow: 0 1px 3px rgba(0, 0, 0, .08);
     --cs-paper: #ffffff;
     --cs-paper-ink: #212529;
+    --cs-code-bg: #eef1f5;
+    --cs-code-ink: #8a1f52;
+    --cs-row-hover: #eef4fb;
+    --cs-row-zebra: #f4f6f9;
+    --cs-focus: #0d6efd;
+    --cs-nav-bg: #212529;
+    --cs-radius: .5rem;
 }
 
 [data-bs-theme="dark"] {
@@ -49,7 +65,15 @@
     --cs-help-ink: #bcd6ff;
     --cs-changed-bg: #43380f;
     --cs-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+    --cs-code-bg: #263039;
+    --cs-code-ink: #ffb3d1;
+    --cs-row-hover: #222d38;
+    --cs-row-zebra: #1d242c;
+    --cs-focus: #6ea8fe;
+    --cs-nav-bg: #0f141a;
 }
+
+/* ---- 2. Base elements ---------------------------------------------------- */
 
 html body {
     padding: 2rem;
@@ -57,13 +81,76 @@ html body {
     color: var(--cs-ink);
 }
 
-/* Templates use these light-only utilities as surface colours. `text-dark` is
- * only remapped inside `.bg-light` (badges on the neutral surface); on the
- * coloured badges (bg-info / bg-warning) dark text is still the right answer. */
-.bg-white { background-color: var(--cs-surface) !important; }
-.bg-light { background-color: var(--cs-surface-alt) !important; }
-[data-bs-theme="dark"] .bg-light.text-dark { color: var(--cs-ink) !important; }
-.border { border-color: var(--cs-border) !important; }
+a { color: var(--bs-link-color); }
+a:hover { color: var(--bs-link-hover-color); }
+
+:focus-visible {
+    outline: 2px solid var(--cs-focus);
+    outline-offset: 2px;
+}
+
+code,
+kbd,
+samp {
+    padding: .1rem .35rem;
+    border-radius: .25rem;
+    background: var(--cs-code-bg);
+    color: var(--cs-code-ink);
+    font-size: .9em;
+}
+
+pre code { padding: 0; background: none; }
+
+/* Inline SVG icons (utils/icons.py). They inherit currentColor, so a button's
+ * text colour drives the icon in both themes, and they never depend on an emoji
+ * font being installed. */
+.cs-icon {
+    flex: 0 0 auto;
+    vertical-align: -.125em;
+}
+
+.btn .cs-icon,
+.card-header .cs-icon,
+.alert .cs-icon,
+h4 .cs-icon,
+h5 .cs-icon,
+h6 .cs-icon {
+    margin-right: .4rem;
+}
+
+h4, h5, h6 { letter-spacing: -.01em; }
+
+/* ---- 3. Navigation ------------------------------------------------------- */
+
+.cs-brand-mark {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
+}
+
+.navbar-brand span { letter-spacing: -.01em; }
+
+.cs-skip-link {
+    position: absolute;
+    left: -999px;
+    top: 0;
+    z-index: 1080;
+    padding: .5rem .75rem;
+    background: var(--cs-surface);
+    color: var(--cs-ink);
+    border-radius: 0 0 var(--cs-radius) 0;
+}
+
+.cs-skip-link:focus { left: 0; }
+
+#themeToggle { min-width: 5rem; }
+#themeToggle .theme-icon { line-height: 1; }
+
+/* ---- 4. Tables ----------------------------------------------------------- */
+
+.table-wrap { max-height: 70vh; overflow: auto; }
+
+td { white-space: nowrap; }
 
 table.data-table th {
     position: sticky;
@@ -72,9 +159,74 @@ table.data-table th {
     color: var(--cs-head-ink);
 }
 
-.table-wrap { max-height: 70vh; overflow: auto; }
-td { white-space: nowrap; }
+table.data-table th,
+table.data-table td { font-variant-numeric: tabular-nums; }
+
+table.data-table tbody tr:nth-child(even) { background: var(--cs-row-zebra); }
+table.data-table tbody tr:hover { background: var(--cs-row-hover); }
+
 .badge-missing { background: #dc3545; }
+
+/* Compact chips: the tables a database contains, one chip per table. */
+.cs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem .6rem;
+    border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius);
+    background: var(--cs-surface-alt);
+    color: var(--cs-ink);
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+.cs-chip:hover,
+.cs-chip:focus {
+    background: var(--cs-row-hover);
+    color: var(--cs-ink);
+}
+
+.cs-chip .badge { font-variant-numeric: tabular-nums; }
+
+/* One-line status figures above the dashboard cards. */
+.cs-stat {
+    height: 100%;
+    padding: .6rem .75rem;
+    border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius);
+    background: var(--cs-surface);
+    box-shadow: var(--cs-shadow);
+}
+
+.cs-stat-k {
+    display: block;
+    font-size: .75rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--cs-muted);
+}
+
+.cs-stat-v {
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Filter bar above a data table: one surface, so the row reads as a group. */
+.cs-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    padding: .35rem .5rem;
+    border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius);
+    background: var(--cs-surface);
+    box-shadow: var(--cs-shadow);
+}
+
+.cs-toolbar form { margin: 0; }
 
 /* Paper surfaces: drawings keep a light background in both themes. */
 .bp-host,
@@ -86,10 +238,17 @@ td { white-space: nowrap; }
 .label-preview { color: var(--cs-paper-ink); }
 .label-preview .text-muted { color: #6c757d !important; }
 
-#themeToggle { min-width: 5rem; }
-#themeToggle .theme-icon { line-height: 1; }
+/* ---- 5. Bootstrap bridges ------------------------------------------------ */
 
-/* ---- dark overrides for the per-page stylesheets ------------------------- */
+/* Templates use these light-only utilities as surface colours. `text-dark` is
+ * only remapped inside `.bg-light` (badges on the neutral surface); on the
+ * coloured badges (bg-info / bg-warning) dark text is still the right answer. */
+.bg-white { background-color: var(--cs-surface) !important; }
+.bg-light { background-color: var(--cs-surface-alt) !important; }
+[data-bs-theme="dark"] .bg-light.text-dark { color: var(--cs-ink) !important; }
+.border { border-color: var(--cs-border) !important; }
+
+/* ---- 6. Page stylesheet bridges ------------------------------------------ */
 
 [data-bs-theme="dark"] .bs-help,
 [data-bs-theme="dark"] .ds-help {
@@ -126,4 +285,22 @@ td { white-space: nowrap; }
 [data-bs-theme="dark"] .sd-step {
     background: var(--cs-surface-alt);
     border-color: var(--cs-border);
+}
+
+/* ---- 7. Motion and responsive -------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    html body { padding: .75rem; }
+    .table-wrap { max-height: none; }
 }

@@ -160,3 +160,21 @@ def test_page_uses_the_vendored_htmx_copy():
     assert "vendor/htmx/htmx.min.js" in template
     vendor = os.path.join(app.root_path, "static", "vendor", "htmx", "htmx.min.js")
     assert os.path.getsize(vendor) > 20000
+
+
+def test_library_tabs_are_collapsible():
+    """Each library tab folds its own pane; one is open at a time and the open
+    one can be closed again by clicking it."""
+    import os
+
+    from app import app
+
+    template = open(os.path.join(app.root_path, "templates", "drawing_style.html")).read()
+    assert 'data-bs-toggle="collapse"' in template
+    assert 'data-bs-toggle="tab"' not in template
+    assert 'data-bs-parent="#libPanes"' in template
+    assert 'id="libPanes"' in template
+    # Exactly one pane starts open, and exactly one tab reports itself expanded
+    # (the stylesheet also matches [aria-expanded="true"], hence the longer form).
+    assert template.count('class="collapse show"') == 1
+    assert template.count('aria-expanded="true" aria-controls=') == 1

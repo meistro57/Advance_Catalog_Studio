@@ -10,6 +10,35 @@
 </div>
 {% endif %}
 
+<div class="row g-2 g-lg-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="cs-stat">
+            <span class="cs-stat-k">SQL Server</span>
+            <span class="cs-stat-v {% if container_up %}text-success{% else %}text-danger{% endif %}">
+                {% if container_up %}running{% else %}stopped{% endif %}
+            </span>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="cs-stat">
+            <span class="cs-stat-k">Attached databases</span>
+            <span class="cs-stat-v">{{ attached|length }}</span>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="cs-stat">
+            <span class="cs-stat-k">Staged pairs</span>
+            <span class="cs-stat-v">{{ staged|length }}{% if orphan_files %}<span class="text-muted small"> +{{ orphan_files|length }} orphan</span>{% endif %}</span>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="cs-stat">
+            <span class="cs-stat-k">Exports ready</span>
+            <span class="cs-stat-v">{{ exports|length }}</span>
+        </div>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card">
@@ -223,7 +252,10 @@
 
     <div class="col-lg-6">
         <div class="card">
-            <div class="card-header">Attached databases</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Attached databases</span>
+                <span class="badge bg-secondary">{{ attached|length }}</span>
+            </div>
             <div class="card-body">
                 {% if attached %}
                     <div class="list-group">
@@ -243,7 +275,7 @@
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button class="btn btn-sm btn-outline-danger"
                                         onclick="return confirm('Detach {{ name }} and export it? It will be removed from the live SQL Server session.');">
-                                    Detach &amp; Export
+                                    {{ icon('download') }} Detach &amp; Export
                                 </button>
                             </form>
                         </div>
@@ -256,14 +288,17 @@
         </div>
 
         <div class="card mt-4">
-            <div class="card-header">Exports ready to import into Advance Steel</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Exports ready to import into Advance Steel</span>
+                <span class="badge bg-secondary">{{ exports|length }}</span>
+            </div>
             <div class="card-body">
                 {% if exports %}
                     <ul class="list-group">
                         {% for f in exports %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             {{ f }}
-                            <a class="btn btn-sm btn-outline-primary" href="/exports/{{ f }}">Download</a>
+                            <a class="btn btn-sm btn-outline-primary" href="/exports/{{ f }}">{{ icon('download') }} Download</a>
                         </li>
                         {% endfor %}
                     </ul>

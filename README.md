@@ -59,6 +59,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Raw table editing and filtering | Implemented (composite-key safe) |
 | Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), read-only sub-style usage and orphan scan |
 | Interface theme | Light and dark, remembered per browser; drawings stay on light paper |
+| Interface assets | Bootstrap 5.3.3, htmx and Three.js vendored under `static/vendor/` (works offline); icons are inline SVG, not emoji |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -128,9 +129,11 @@ fabrication sheet model, staging cleanup, connection timeouts, and route
 smoke tests. It also pins the write-safety behaviour of the guided tools: the
 diameter clone replaces the target before inserting, find & replace commits once
 or rolls back, detach and backup always close (and detach restores multi-user
-mode), and the theme hooks stay in place. Those database tests stub the cursor,
-so they check the statements and commit/rollback calls rather than a live SQL
-Server:
+mode). The interface is pinned too: the light/dark tokens and shared design
+layer, the inline SVG icon set (no colour emoji, no CDN assets), and the
+drawing-style editor's collapsible library tabs. Those database tests stub the
+cursor, so they check the statements and commit/rollback calls rather than a live
+SQL Server:
 
 ```bash
 pip install -r requirements-dev.txt   # adds pytest
@@ -192,7 +195,7 @@ A **Dark / Light** button in the navigation bar switches the interface theme. Th
 
 The chrome re-themes: navigation, cards, tables, forms, alerts, badges and the drawing-style editor, including its helper panels and "changed cell" highlight. Engineering drawings deliberately stay on light "paper" in both themes - the Three.js schematic, the dimensioned bolt profile, the drawing-style schematic figures and label previews - because their strokes, dimension text and part colours are drawn for a light background. The printable fabrication sheet is always light.
 
-Bootstrap 5.3.3's own `data-bs-theme` attribute drives the standard components; `static/css/theme.css` holds the colour tokens and the remaps for the light-only utility classes the templates use (`bg-white`, `bg-light`, `text-dark` inside `bg-light`).
+Bootstrap 5.3.3's own `data-bs-theme` attribute drives the standard components; `static/css/theme.css` holds the colour tokens and the remaps for the light-only utility classes the templates use (`bg-white`, `bg-light`, `text-dark` inside `bg-light`). Bootstrap, htmx and Three.js are all vendored under `static/vendor/`, so the workbench runs with no network access, and the toolbar glyphs are inline SVG (`utils/icons.py`) rather than emoji, which render as tofu boxes on a host without a colour emoji font.
 
 ### Database overview
 
@@ -315,7 +318,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **In-place rule edits** — move / copy / delete / renumber swap only that view's rules block (htmx, vendored locally) instead of reloading the page, so a long style keeps its scroll position; saving fields posts in the background and reports through the page's flash area. Both paths still work without JavaScript.
 - **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension section with a "how to read a chain" explainer, a plan of every chain in the view (X chains above/below the part, Y chains beside it, numbered into a legend), and a chain sketch per request (collapsed behind a summary once a view has more than six). They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
-- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles.
+- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. The four tabs are collapsible: one pane is open at a time and clicking the open tab folds it away, so a long style keeps the libraries out of the way until you need them.
 - **Integrity check** — every in-file reference is checked before you export.
 - **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
 
@@ -466,13 +469,16 @@ Advance_Catalog_Studio/
 │   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
 │   │   ├── js/anchor-configurator.js # Three.js anchor viewer
 │   │   ├── js/theme.js            # Light/dark toggle (persistence, icons)
-│   │   ├── css/theme.css          # Light/dark tokens + Bootstrap remaps
+│   │   ├── css/theme.css          # Design tokens, tables, chips, Bootstrap remaps
 │   │   ├── css/                   # bolt-set-viewer.css, fabrication-sheet.css
+│   │   ├── img/                   # Brand mark + SVG favicon
 │   │   └── vendor/
+│   │       ├── bootstrap/          # Pinned local Bootstrap 5.3.3 (offline)
 │   │       ├── three/              # Pinned local Three.js r160 (offline)
 │   │       └── htmx/               # Pinned htmx 2.0.4 (offline partial updates)
 │   └── utils/
 │       ├── anchor_sets.py      # Anchor view model for the configurator
+│       ├── icons.py            # Inline SVG icon set for the chrome
 │       ├── bolt_sets.py        # Bolt-set view model for the viewer
 │       ├── bolt_profile.py     # Dimensioned 2D assembly profile (SVG)
 │       ├── fabrication.py      # Detail-sheet model: dims, validation, SVG

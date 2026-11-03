@@ -59,6 +59,17 @@
   .token-palette button { font-family:monospace; font-size:.72rem; }
   .hatch-cell { width:64px; }
   .hatch-cell .sd-svg { width:54px; }
+
+  /* Library tabs are collapsible: the tab strip stays a tab strip, but the pane
+     folds away and clicking the open tab again closes it. */
+  .nav-tabs .nav-link { display:inline-flex; align-items:center; gap:.35rem; }
+  .nav-tabs .nav-link[aria-expanded="true"] {
+    background:#fff; border-color:#dee2e6 #dee2e6 #fff; color:#212529; font-weight:600;
+  }
+  .ds-caret { display:inline-block; width:.5rem; height:.5rem;
+    border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor;
+    transform:rotate(45deg) translateY(-1px); transition:transform .15s; }
+  .nav-link[aria-expanded="false"] .ds-caret { transform:rotate(-45deg); }
 </style>
 
 {% from "_drawing_macros.html" import fld with context %}
@@ -80,7 +91,7 @@
 <script src="{{ url_for('static', filename='vendor/htmx/htmx.min.js') }}"></script>
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-  <h4 class="mb-0">&#128208; Drawing Style Editor <small class="text-muted">{{ database }}</small>
+  <h4 class="mb-0">{{ icon('drawing', 18) }} Drawing Style Editor <small class="text-muted">{{ database }}</small>
     {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
   </h4>
   <div class="d-flex gap-2">
@@ -144,12 +155,12 @@
 {# ---------------- style identity ---------------- #}
 <div class="card ds-card">
   <div class="card-header d-flex justify-content-between">
-    <span>&#127991; Style: <strong>{{ m.row.RunName }}</strong></span>
+    <span>{{ icon('tag') }} Style: <strong>{{ m.row.RunName }}</strong></span>
     <span class="small text-white-50">Master #{{ m.row.Key }} &middot; category {{ m.row.BaseCategory }}/{{ m.row.SubCategory }}</span>
   </div>
   <div class="card-body">
     <div class="alert alert-light border small py-2 mb-2">
-      &#128161; Want a variant instead of overwriting? Rename it here before exporting, then import the copy beside your original.
+      {{ icon('hint') }} Want a variant instead of overwriting? Rename it here before exporting, then import the copy beside your original.
       (How Advance Steel's importer treats a same-name style hasn't been tested yet &mdash; renaming avoids the question.)
     </div>
     {% if m.style %}
@@ -187,7 +198,7 @@
     {# ---------------- view request ---------------- #}
     <div class="border rounded p-3 mt-3" id="req-{{ r.row.Key }}">
       <div class="d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">&#128065; View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
+        <h6 class="mb-0">{{ icon('preview') }} View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
         <a class="small" href="/db/{{ database }}/DetViewRequest/{{ r.token }}/edit?return_to=/db/{{ database }}/drawing-style">all fields &rarr;</a>
       </div>
       <div class="ds-grid mt-2">
@@ -346,16 +357,20 @@
 
 {# ---------------- libraries ---------------- #}
 <div class="card ds-card" id="lib">
-  <div class="card-header">&#128218; Label formulas &amp; libraries</div>
+  <div class="card-header">{{ icon('library') }} Label formulas &amp; libraries</div>
   <div class="card-body">
-    <ul class="nav nav-tabs small" role="tablist">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-labels" type="button">Label formulas</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-strat" type="button">Label strategies</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-app" type="button">Appearances</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-sets" type="button">Object sets</button></li>
+    <ul class="nav nav-tabs small">
+      <li class="nav-item"><button class="nav-link active" type="button" data-bs-toggle="collapse"
+                data-bs-target="#t-labels" aria-expanded="true" aria-controls="t-labels">Label formulas <span class="ds-caret" aria-hidden="true"></span></button></li>
+      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
+                data-bs-target="#t-strat" aria-expanded="false" aria-controls="t-strat">Label strategies <span class="ds-caret" aria-hidden="true"></span></button></li>
+      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
+                data-bs-target="#t-app" aria-expanded="false" aria-controls="t-app">Appearances <span class="ds-caret" aria-hidden="true"></span></button></li>
+      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
+                data-bs-target="#t-sets" aria-expanded="false" aria-controls="t-sets">Object sets <span class="ds-caret" aria-hidden="true"></span></button></li>
     </ul>
-    <div class="tab-content pt-3">
-      <div class="tab-pane fade show active" id="t-labels">
+    <div class="tab-content pt-3" id="libPanes">
+      <div class="collapse show" id="t-labels" data-bs-parent="#libPanes">
         <div class="ds-hint mb-1">Click a token to insert it into the formula you last clicked in:</div>
         <div class="token-palette mb-2">
           {% for t in label_tokens %}<button type="button" class="btn btn-sm btn-outline-primary py-0 token-insert" data-token="%{{ t }}">%{{ t }}</button>{% endfor %}
@@ -381,7 +396,7 @@
         {% endfor %}
       </div>
 
-      <div class="tab-pane fade" id="t-strat">
+      <div class="collapse" id="t-strat" data-bs-parent="#libPanes">
         <table class="table table-sm small">
           <thead class="table-light"><tr><th>#</th><th>Name</th><th>Label formula</th><th>Arranger</th><th>Group</th><th>On object</th><th>Merge dist</th></tr></thead>
           <tbody>
@@ -400,7 +415,7 @@
         </table>
       </div>
 
-      <div class="tab-pane fade" id="t-app">
+      <div class="collapse" id="t-app" data-bs-parent="#libPanes">
         <div class="ds-hint mb-2">Body/axis/symbol columns are AS built-in display settings (numbers). Hatch columns resolve to this file's hatch presets.</div>
         <table class="table table-sm small">
           <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th>Swatches</th><th></th></tr></thead>
@@ -425,7 +440,7 @@
         </table>
       </div>
 
-      <div class="tab-pane fade" id="t-sets">
+      <div class="collapse" id="t-sets" data-bs-parent="#libPanes">
         <div class="ds-hint mb-2">Object sets select what a rule applies to: AS object-type numbers plus optional model roles.</div>
         <table class="table table-sm small">
           <thead class="table-light"><tr><th>#</th><th>Name</th><th>Members (object type · model role)</th></tr></thead>
@@ -448,7 +463,7 @@
   <span id="dirtyMsg" class="small text-white-50">No unsaved changes.</span>
   <div class="d-flex gap-2">
     <button type="button" class="btn btn-sm btn-outline-light" onclick="location.reload()">Discard</button>
-    <button type="submit" class="btn btn-sm btn-warning fw-bold">&#128190; Save changes</button>
+    <button type="submit" class="btn btn-sm btn-warning fw-bold">{{ icon('save') }} Save changes</button>
   </div>
 </div>
 </form>

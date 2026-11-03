@@ -3,63 +3,71 @@
 {% block title %}{{ database }}.{{ table }}{% endblock %}
 {% block content %}
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
     <h4 class="mb-0">{{ database }}.{{ table }}</h4>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <form method="get" class="d-flex align-items-center gap-1">
-            <select name="filter_col" class="form-select form-select-sm" style="width:140px">
-                <option value="">Filter column...</option>
-                {% for col in columns %}
-                <option value="{{ col }}" {% if col == filter_col %}selected{% endif %}>{{ col }}</option>
-                {% endfor %}
-            </select>
-            <select name="filter_op" class="form-select form-select-sm" style="width:100px">
-                <option value="=" {% if filter_op == '=' %}selected{% endif %}>equals</option>
-                <option value="contains" {% if filter_op == 'contains' %}selected{% endif %}>contains</option>
-            </select>
-            <input type="text" name="filter_val" class="form-control form-control-sm" style="width:120px"
-                   placeholder="value" value="{{ filter_val }}">
-            <button class="btn btn-sm btn-outline-primary" type="submit">Go</button>
-            {% if filter_col and filter_val %}
-            <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
-            {% endif %}
-        </form>
+    <div class="d-flex align-items-end gap-2 flex-wrap">
+        <div class="cs-toolbar">
+            <form method="get" class="d-flex align-items-center gap-1">
+                <select name="filter_col" class="form-select form-select-sm" style="width:140px"
+                        aria-label="Filter column">
+                    <option value="">Filter column...</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col == filter_col %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <select name="filter_op" class="form-select form-select-sm" style="width:100px"
+                        aria-label="Filter operator">
+                    <option value="=" {% if filter_op == '=' %}selected{% endif %}>equals</option>
+                    <option value="contains" {% if filter_op == 'contains' %}selected{% endif %}>contains</option>
+                </select>
+                <input type="text" name="filter_val" class="form-control form-control-sm" style="width:120px"
+                       placeholder="value" aria-label="Filter value" value="{{ filter_val }}">
+                <button class="btn btn-sm btn-outline-primary" type="submit">Go</button>
+                {% if filter_col and filter_val %}
+                <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
 
-        {% if virtual %}
-        <form method="get" class="d-flex align-items-center gap-1 border-start ps-2">
-            <label class="small text-muted mb-0">{{ virtual.label }}</label>
-            <select name="virtual_val" class="form-select form-select-sm" style="width:110px" onchange="this.form.submit()">
-                <option value="">(any)</option>
-                {% for v in virtual_values %}
-                <option value="{{ v }}" {% if virtual_val|string == v|string %}selected{% endif %}>{{ v }}</option>
-                {% endfor %}
-            </select>
-            {% if virtual_val %}
-            <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+            {% if virtual %}
+            <form method="get" class="d-flex align-items-center gap-1 border-start ps-2">
+                <label class="small text-muted mb-0">{{ virtual.label }}</label>
+                <select name="virtual_val" class="form-select form-select-sm" style="width:110px" onchange="this.form.submit()">
+                    <option value="">(any)</option>
+                    {% for v in virtual_values %}
+                    <option value="{{ v }}" {% if virtual_val|string == v|string %}selected{% endif %}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+                {% if virtual_val %}
+                <a href="/db/{{ database }}/{{ table }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
             {% endif %}
-        </form>
-        {% endif %}
 
-        <input id="quickFilter" class="form-control form-control-sm" style="width:180px" placeholder="Quick text filter...">
-        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#findReplaceModal">
-            Find &amp; Replace
-        </button>
-        {% if pk_cols %}
-        {% if pk_cols|length > 1 %}<span class="badge bg-info text-dark" title="Rows are addressed by all key columns together">key: {{ pk_cols|join(' + ') }}</span>{% endif %}
-        <a class="btn btn-sm btn-primary" href="/db/{{ database }}/{{ table }}/add">+ Add Row</a>
-        {% else %}
-        <span class="badge bg-secondary">no primary key detected — read only</span>
-        {% endif %}
+            <input id="quickFilter" class="form-control form-control-sm" style="width:180px"
+                   placeholder="Quick text filter..." aria-label="Quick text filter">
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#findReplaceModal">
+                Find &amp; Replace
+            </button>
+            {% if pk_cols %}
+            {% if pk_cols|length > 1 %}<span class="badge bg-info text-dark" title="Rows are addressed by all key columns together">key: {{ pk_cols|join(' + ') }}</span>{% endif %}
+            <a class="btn btn-sm btn-primary" href="/db/{{ database }}/{{ table }}/add">{{ icon('add') }} Add Row</a>
+            {% else %}
+            <span class="badge bg-secondary">no primary key detected &mdash; read only</span>
+            {% endif %}
+        </div>
     </div>
 </div>
 
 {% if table == 'BoltsDiameters' %}
 <div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3">
     <div>
-        <strong>&#128161; Need to add a new diameter to this catalog?</strong>
+        <strong>{{ icon('hint') }} Need to add a new diameter to this catalog?</strong>
         <span class="small d-block text-muted">Adding a raw row here only registers the lookup string. To automatically cascade the diameter across all related tables (rules, distances, assemblies, nuts/washers, bolt lengths), use the <strong>Add / Clone Diameter</strong> wizard.</span>
     </div>
-    <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary text-nowrap ms-3">&#128297; Add / Clone Diameter</a>
+    <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary text-nowrap ms-3">{{ icon('add') }} Add / Clone Diameter</a>
 </div>
 {% endif %}
 

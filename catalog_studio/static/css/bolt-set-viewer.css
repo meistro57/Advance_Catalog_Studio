@@ -1,7 +1,7 @@
 /* static/css/bolt-set-viewer.css */
 #viewer3d {
     width: 100%;
-    height: 540px;
+    height: clamp(320px, 48vh, 520px);
     background:
         linear-gradient(180deg, #fbfdff 0%, #eef2f6 100%);
     cursor: grab;
@@ -46,6 +46,17 @@
     color: #6c757d; font-size: .72rem; text-transform: uppercase; letter-spacing: .02em;
 }
 
+/* Info panels: keep the key on one line and let only the value wrap, so a long
+ * reading such as "across flats x high (6 sides assumed)" no longer pushes the
+ * label around. */
+#boltInfoPanel .row-item .k,
+#detailPanel .row-item .k,
+#anchorInfoPanel .row-item .k { flex: 0 0 auto; }
+
+#boltInfoPanel .row-item > :last-child,
+#detailPanel .row-item > :last-child,
+#anchorInfoPanel .row-item > :last-child { flex: 1 1 auto; min-width: 0; }
+
 /* ---- page-level help + profile ------------------------------------------- */
 .bs-help {
     background: #eef4ff;
@@ -54,8 +65,6 @@
     padding: .55rem .75rem;
 }
 .bs-help strong { color: #0b3d91; }
-
-#viewer3d { height: 460px; }
 
 .bp-host { width: 100%; overflow-x: auto; }
 .bp-svg {

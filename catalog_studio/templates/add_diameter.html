@@ -6,7 +6,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h4 class="mb-0">&#128297; Add / Clone Diameter to <strong>{{ database }}</strong></h4>
+        <h4 class="mb-0">{{ icon('add', 18) }} Add / Clone Diameter to <strong>{{ database }}</strong></h4>
         <span class="text-muted small">Cascades a new nominal diameter across all related tables (rules, distances, assemblies, nuts/washers, and bolt lengths).</span>
     </div>
     <div>
@@ -150,7 +150,7 @@
                     <!-- Buttons -->
                     <div class="d-flex gap-2 justify-content-between pt-2">
                         <button type="submit" name="action" value="preview" class="btn btn-outline-primary">
-                            &#128065; Preview Changes
+                            {{ icon('preview') }} Preview Changes
                         </button>
                         <button type="submit" name="action" value="apply" class="btn btn-success"
                                 onclick="return confirm('Generate this diameter across all tables in {{ database }}?');">
@@ -255,7 +255,7 @@
         <!-- Helper Card when no preview is yet loaded -->
         <div class="card shadow-sm border-0 mb-4 bg-light">
             <div class="card-body p-4">
-                <h5 class="fw-bold mb-3">&#128161; How Cascading Diameters Works</h5>
+                <h5 class="fw-bold mb-3">{{ icon('hint', 18) }} How Cascading Diameters Works</h5>
                 <p class="text-muted small">
                     Advance Steel does not store bolt catalogs in a flat list. A functioning bolt diameter requires synchronized entries across 6 distinct database tables:
                 </p>

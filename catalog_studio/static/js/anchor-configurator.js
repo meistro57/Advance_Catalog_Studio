@@ -143,10 +143,18 @@ function initScene() {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(40, host.clientWidth / host.clientHeight, 1, 20000);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa7b4, 1.15));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-    dir.position.set(60, 120, 90);
-    scene.add(dir);
+    // Same three-point rig as the bolt-set viewer, so both schematic pages
+    // shade the same way.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa7b4, 0.85));
+    const key = new THREE.DirectionalLight(0xffffff, 1.25);
+    key.position.set(70, 130, 110);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xdce8f5, 0.55);
+    fill.position.set(-120, 40, 60);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.45);
+    rim.position.set(-40, 60, -140);
+    scene.add(rim);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;

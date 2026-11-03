@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
-from utils import shear_studs, health, style_usage, snapshots, compare
+from utils import shear_studs, health, style_usage, snapshots, compare, icons
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -27,6 +27,9 @@ app.jinja_env.filters["fin_fraction"] = fabrication.format_in
 app.jinja_env.filters["f_dim"] = fabrication.format_dim_text
 # Shear-stud browser dimensions: stored millimetres, displayed in mm or inches.
 app.jinja_env.filters["sdim"] = shear_studs.format_dimension
+# Inline SVG icons: templates say {{ icon('health') }} instead of emoji, so the
+# chrome renders the same on hosts without a colour emoji font.
+app.jinja_env.globals["icon"] = icons.icon
 
 
 def _csrf_token() -> str:

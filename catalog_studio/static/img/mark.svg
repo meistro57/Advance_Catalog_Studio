@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Catalog Studio">
+  <g fill="#7cc3ff">
+    <rect x="9" y="10" width="30" height="6.5" rx="1"/>
+    <rect x="20.75" y="16.5" width="6.5" height="15"/>
+    <rect x="9" y="31.5" width="30" height="6.5" rx="1"/>
+  </g>
+  <g stroke="#e8eef4" stroke-width="1.5" stroke-linecap="round" opacity=".85">
+    <path d="M7 10v6.5"/><path d="M7 31.5v6.5"/>
+    <path d="M7 13.25h2M7 34.75h2"/>
+  </g>
+</svg>

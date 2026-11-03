@@ -199,10 +199,19 @@ function initScene() {
     orthoCamera = new THREE.OrthographicCamera(-100 * aspect, 100 * aspect, 100, -100, -5000, 20000);
     camera = perspCamera;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa7b4, 1.15));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-    dir.position.set(60, 120, 90);
-    scene.add(dir);
+    // Three-point rig for a schematic on light paper: a bright key from the
+    // upper front-left, a cool fill opposite it and a rim from behind, so the
+    // cylinders and hex flats keep a readable edge with no post-processing.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa7b4, 0.85));
+    const key = new THREE.DirectionalLight(0xffffff, 1.25);
+    key.position.set(70, 130, 110);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xdce8f5, 0.55);
+    fill.position.set(-120, 40, 60);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.45);
+    rim.position.set(-40, 60, -140);
+    scene.add(rim);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;

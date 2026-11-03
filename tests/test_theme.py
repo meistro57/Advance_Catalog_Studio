@@ -29,6 +29,22 @@ def test_theme_stylesheet_defines_both_themes():
     assert ".bp-host" in css and "--cs-paper" in css
 
 
+def test_theme_stylesheet_ships_the_design_layer():
+    """The chrome's shared primitives live in theme.css, not per-page CSS."""
+    css = (STATIC / "css" / "theme.css").read_text()
+    for selector in (".cs-icon", ".cs-chip", ".cs-toolbar", ".cs-stat", ".cs-skip-link"):
+        assert selector in css, f"{selector} missing from theme.css"
+    # Both themes must drive the same token set.
+    assert css.count("--cs-surface:") == 2
+
+
+def test_viewer_canvas_height_is_declared_once():
+    """The canvas height was declared twice (540px, then 460px); keep one rule."""
+    css = (STATIC / "css" / "bolt-set-viewer.css").read_text()
+    assert css.count("#viewer3d {") == 1
+    assert "clamp(" in css
+
+
 def test_theme_script_handles_the_switch_and_storage():
     js = (STATIC / "js" / "theme.js").read_text()
     assert "catalogStudioTheme" in js
