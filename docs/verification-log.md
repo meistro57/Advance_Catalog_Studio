@@ -174,6 +174,108 @@ report instead of applying.
 - Verdict: **fixed** (code + tests). This also explains the 16:16 export
   failure that A6.3 was investigating.
 
+### A6.5 — The scratch container rewrites the log to 4 KB sectors
+
+- Date / operator: 2026-11-03 / after A6.4.
+- Observed: importing `column.mdf`, exported by Advance Steel itself and never
+  opened by Catalog Studio, gives **no error**. The same style exported through
+  the scratch container is refused.
+- Difference found: every log file attached to the container is rewritten
+  ("The tail of the log ... rewritten to match the new sector size of 4096
+  bytes") — confirmed for `Marks_6_-_Railing`, `ladder`, `zz_off`,
+  `zz_root_ladder`, `zz_i` and `column` itself. Advance Steel's own logs are
+  512-byte-sector files; the container's disk is 4 KB, so any `.ldf` that has
+  been attached here leaves as a 4 KB-sector log. The `.mdf` differs only in
+  SQL bookkeeping (12 720 bytes across 71 of 920 pages, no row or schema change).
+- Reading: the rewritten `.ldf` is the one artefact a round trip creates that
+  Advance Steel never produces itself, and a mismatched log is enough to make an
+  attach fail — which AS reports with the same generic "Source database is older
+  than Release 5.1!" message it used for the 2022 files.
+- Next experiment: import the exported `.mdf` **without any `_log.ldf` beside
+  it**, so the target instance rebuilds the log at its own sector size. If that
+  imports, `Export a copy` should stop shipping the log (or ship it with a
+  warning).
+- Verdict: **open**, prime suspect identified.
+
+### A6.6 — The log is not the cause; the round-tripped mdf is
+
+- Date / operator: 2026-11-03, after A6.5.
+- Observed: Advance Steel imports `column.mdf` **with no log file beside it**
+  without error — so it rebuilds the log itself, and the 4 KB-sector `.ldf` the
+  scratch container writes cannot be what it rejects. The same test with
+  `mark_rail.mdf` (a file that has been through the container) fails with the
+  usual "older than Release 5.1".
+- Difference now isolated to the `.mdf` written by the container. A round trip
+  of the known-good file changes 12 720 bytes over 71 of 920 pages: 40 data
+  pages (3 826 body bytes), 29 index pages (7 975 body bytes), the boot page and
+  one PFS page. Attaching a database created by SQL Server 2014
+  (`dbi_createVersion` 782) to this 2019 instance lets SQL upgrade/reorganise
+  catalog pages, which is the kind of change Advance Steel may read as an
+  unexpected release.
+- Next experiment: import a round-tripped **but unedited** copy of
+  `5 - Column` (`as-import-test-roundtrip/column.mdf`). Accepting it means the
+  edit path is at fault; rejecting it means no file that passes through this
+  container can be imported, whatever was edited.
+- Verdict: **open**, narrowed to the mdf.
+
+### A6.7 — Content survives; the container's page bookkeeping does not
+
+- Date / operator: 2026-11-03, after A6.6.
+- Observed: a round-tripped **unedited** copy of `5 - Column` is refused by
+  Advance Steel, while the same database exported by AS is accepted. Data is
+  untouched by the round trip: `CHECKSUM_AGG(BINARY_CHECKSUM(*))` and row
+  counts are identical for **all 45 tables** between a pristine attach and a
+  round-tripped attach of the same file.
+- What does differ: 71 of 920 pages (40 data pages, 29 index pages, boot page,
+  one PFS page) and, on the boot page, **18 bytes** — page-header LSN/checksum
+  plus a handful of DBINFO fields. `dbi_version`, `dbi_createVersion`,
+  `dbi_status`, `dbi_dbccFlags`, `dbi_cmptlevel` and the collation are all
+  unchanged.
+- Reading: the exported file is semantically the same database, but it carries
+  bookkeeping (recovery/LSN state) written by this container's SQL Server that
+  AS's own export never has. That is the only remaining explanation for the
+  refusal, and it means any file that passes through the scratch server is
+  suspect regardless of what was edited.
+- Next step to test: have the **user's** SQL Server attach and detach the
+  exported file, so the bookkeeping is written by the instance AS trusts, then
+  import. If that works, the round trip has to hand over a `.bak` plus a
+  documented restore-and-detach instead of raw mdf/ldf.
+- Verdict: **open**; export format (raw files) is the problem, not the data.
+
+### A6.8 — The control works, so the bytes are decisive
+
+- Date / operator: 2026-11-03, after A6.7.
+- Control: an exact byte copy of the known-good export (different filename,
+  `cmp`-verified) imports without error, so the earlier accept/reject results
+  are reproducible and the difference really is in the file bytes.
+- Since all 45 tables are value-identical either way, the candidate is the boot
+  page: a round-tripped file whose boot page (page 1) is restored byte-for-byte
+  from Advance Steel's own export attaches cleanly here
+  (`FOR ATTACH_REBUILD_LOG`, state ONLINE), so the patch is structurally valid.
+- Next experiment: hand that patched file to Advance Steel. Accepting it pins
+  the refusal to boot-page state, and the fix is to re-apply the original boot
+  page on export (capture it when the file is attached, restore it when the
+  copy is written). Rejecting it means the difference lies in data/index page
+  bookkeeping and the export has to be rebuilt another way.
+- Verdict: **open**, narrowed to the boot page.
+
+### A6.9 — Boot page cleared; the difference is page bookkeeping
+
+- Date / operator: 2026-11-03, after A6.8.
+- Observed: the round-tripped file with Advance Steel's own boot page restored
+  is still refused. The boot page is therefore not what AS reads.
+- What is left: 40 data pages and 29 index pages rewritten by this container's
+  SQL Server (page checksums, LSNs, row slot layout) while every one of the 45
+  user tables holds identical values. No SQL command restores those pages to
+  the shape a Windows instance writes, and hand-patching them would mean
+  recomputing page checksums.
+- Consequence: exports from the Docker/WSL scratch server cannot be imported by
+  Advance Steel on this machine, whatever was edited. A Windows SQL Server for
+  the scratch instance (separate from AS's own) is the only path left that
+  keeps AS's database untouched.
+- Verdict: **open, blocked on environment**. A6 stays open until an export from
+  a Windows-hosted scratch instance is imported.
+
 ### A6.10 — Advance Steel refuses Linux file paths stored in the mdf
 
 (Numbered after A6.5–A6.9 in the local investigation log, which established
