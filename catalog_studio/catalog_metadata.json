@@ -14,10 +14,5 @@
   "US_Headed_Anchors_mark": {
     "catalog_type": "anchor",
     "as_version": 2026
-  },
-  "RailTest": {
-    "catalog_type": "drawing style",
-    "as_version": 2026,
-    "library": ""
   }
 }
