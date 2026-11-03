@@ -57,7 +57,7 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
-| Drawing-style editor (Drawing Style Manager exports) | Style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), read-only sub-style usage and orphan scan |
+| Drawing-style editor (Drawing Style Manager exports) | Menu-driven screens per view; style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), plain-language dimension request cards, read-only sub-style usage and orphan scan |
 | Interface theme | Light and dark, remembered per browser; drawings stay on light paper |
 | Interface assets | Bootstrap 5.3.3, htmx and Three.js vendored under `static/vendor/` (works offline); icons are inline SVG, not emoji |
 | Multi-user or internet deployment | Not supported |
@@ -131,7 +131,7 @@ diameter clone replaces the target before inserting, find & replace commits once
 or rolls back, detach and backup always close (and detach restores multi-user
 mode). The interface is pinned too: the light/dark tokens and shared design
 layer, the inline SVG icon set (no colour emoji, no CDN assets), and the
-drawing-style editor's collapsible library tabs. Those database tests stub the
+drawing-style editor's menu screens. Those database tests stub the
 cursor, so they check the statements and commit/rollback calls rather than a live
 SQL Server:
 
@@ -312,13 +312,14 @@ From the anchor configurator, any selection can open a **printable fabrication d
 
 Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected as `drawing style` and get a one-page editor at `/db/<db>/drawing-style` instead of the Style Manager's nested dialogs:
 
+- **Menu screens** — a sticky menu lists the style, each view, its representation rules and its dimensions, then the shared libraries and the help page. One screen is shown at a time (the URL hash names it, prev/next walk the list), so a style with many views stays navigable instead of being one endless page.
 - **Style identity** — picker name, help text, owner, title and cut-view title formulas with a live rendered preview.
 - **Each view** — scale (shown as `1:16 (3/4" = 1'-0")`), representation map, dimension strategy, view-box depth, length clipping. Lengths display in feet-inches and accept either mm or ft-in (`2'-6 1/2"`).
 - **Dimension setup** — every request row shows its point count and names, its axis and Above flag, and the file's own AS switches (global arrangement, grouping, combine, auto-separate, group number, label formula) as labelled badges with an "all fields" link.
 - **In-place rule edits** — move / copy / delete / renumber swap only that view's rules block (htmx, vendored locally) instead of reloading the page, so a long style keeps its scroll position; saving fields posts in the background and reports through the page's flash area. Both paths still work without JavaScript.
 - **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension section with a "how to read a chain" explainer, a plan of every chain in the view (X chains above/below the part, Y chains beside it, numbered into a legend), and a chain sketch per request (collapsed behind a summary once a view has more than six). They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
-- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. The four tabs are collapsible: one pane is open at a time and clicking the open tab folds it away, so a long style keeps the libraries out of the way until you need them.
+- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. Each library is its own menu screen rather than a tab strip, so it is reachable directly by hash and never pushes the style content down the page.
 - **Integrity check** — every in-file reference is checked before you export.
 - **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
 

@@ -23,7 +23,6 @@
   .rule-label { max-width:240px; }
   .rule-label .label-preview { padding:.1rem .35rem; min-height:0; font-size:11px; }
   #saveBar { position:sticky; bottom:0; z-index:20; }
-  .ds-toc a { text-decoration:none; }
   .repr-block.htmx-request { opacity:.55; transition:opacity .15s; }
   textarea.formula { font-family:monospace; font-size:.8rem; }
   .ds-help { background:#eef4ff; border-left:3px solid #0d6efd; border-radius:.3rem; padding:.55rem .75rem; font-size:.84rem; }
@@ -60,32 +59,173 @@
   .hatch-cell { width:64px; }
   .hatch-cell .sd-svg { width:54px; }
 
-  /* Library tabs are collapsible: the tab strip stays a tab strip, but the pane
-     folds away and clicking the open tab again closes it. */
-  .nav-tabs .nav-link { display:inline-flex; align-items:center; gap:.35rem; }
-  .nav-tabs .nav-link[aria-expanded="true"] {
-    background:#fff; border-color:#dee2e6 #dee2e6 #fff; color:#212529; font-weight:600;
-  }
-  .ds-caret { display:inline-block; width:.5rem; height:.5rem;
-    border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor;
-    transform:rotate(45deg) translateY(-1px); transition:transform .15s; }
-  .nav-link[aria-expanded="false"] .ds-caret { transform:rotate(-45deg); }
+  /* menu + panes */
+  .ds-nav { position:sticky; top:.75rem; max-height:calc(100vh - 1.5rem); overflow-y:auto; font-size:.84rem; }
+  .ds-nav .ds-nav-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--cs-muted, #6c757d); font-weight:700; margin:.8rem 0 .25rem .5rem; }
+  .ds-nav a { display:flex; justify-content:space-between; align-items:center; gap:.4rem; padding:.22rem .55rem; border-radius:.3rem; color:var(--cs-ink, #212529); text-decoration:none; }
+  .ds-nav a:hover { background:var(--cs-surface-alt, #f1f3f5); }
+  .ds-nav a.active { background:#0d6efd; color:#fff; }
+  .ds-nav a.active .badge { background:#fff !important; color:#0d6efd !important; }
+  .ds-nav .ds-nav-view { font-weight:600; }
+  .ds-nav .ds-nav-sub { padding-left:1.4rem; font-size:.8rem; }
+  .ds-nav .dirty-dot { width:.5rem; height:.5rem; border-radius:50%; background:#fd7e14; display:none; flex:none; }
+  .ds-nav a.dirty .dirty-dot { display:inline-block; }
+  .ds-pane[hidden] { display:none !important; }
+  .ds-crumb { font-size:.75rem; color:var(--cs-muted, #6c757d); }
+  .ds-pager { display:flex; justify-content:space-between; gap:.5rem; margin:1rem 0; }
+
+  /* dimension explainer */
+  .dx-chain { border:1px solid var(--cs-border, #dee2e6); border-radius:.45rem; margin-bottom:.75rem; background:var(--cs-surface, #fff); }
+  .dx-chain > summary { list-style:none; cursor:pointer; padding:.55rem .75rem; display:flex; gap:.6rem; align-items:flex-start; }
+  .dx-chain > summary::-webkit-details-marker { display:none; }
+  .dx-chain[open] > summary { border-bottom:1px solid var(--cs-border, #e9ecef); background:var(--cs-surface-alt, #f8f9fa); border-radius:.45rem .45rem 0 0; }
+  .dx-num { flex:none; width:1.7rem; height:1.7rem; border-radius:.3rem; background:#0d6efd; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.8rem; }
+  .dx-name { font-weight:600; }
+  .dx-summary { font-size:.86rem; color:var(--cs-ink, #343a40); }
+  .dx-body { padding:.75rem; }
+  .dx-section { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--cs-muted, #6c757d); font-weight:700; margin-bottom:.35rem; }
+  .dx-point { display:flex; gap:.5rem; align-items:flex-start; padding:.35rem .45rem; border:1px solid var(--cs-border, #e9ecef); border-radius:.35rem; margin-bottom:.3rem; font-size:.84rem; }
+  .dx-point.ref { background:var(--cs-surface-alt, #fbfbfb); border-style:dashed; }
+  .dx-point .dx-pidx { flex:none; font-weight:700; color:var(--cs-muted, #6c757d); width:1.2rem; }
+  .dx-switch { display:flex; gap:.45rem; align-items:flex-start; font-size:.84rem; padding:.2rem 0; }
+  .dx-switch .dx-icon { flex:none; width:1.1rem; text-align:center; }
+  .dx-code { font-family:monospace; font-weight:700; letter-spacing:.08em; }
+  .basis { font-size:.62rem; font-weight:600; border-radius:.2rem; padding:.05rem .3rem; vertical-align:middle; white-space:nowrap; }
+  .basis-guide { background:#e7f1ff; color:#0a58ca; }
+  .basis-name { background:#f1f3f5; color:#495057; }
+  .basis-data { background:#d1e7dd; color:#0f5132; }
+  .basis-raw { background:#fff3cd; color:#664d03; }
+  .basis-observed { background:#e2d9f3; color:#432874; }
+  .dx-glossary dt { font-size:.84rem; }
+  .dx-glossary dd { font-size:.82rem; color:var(--cs-muted, #495057); margin-bottom:.5rem; }
 </style>
 
 {% from "_drawing_macros.html" import fld with context %}
 
-{% macro dims_figures(r) -%}
-  <div class="row g-2 mt-2">
-    {% for d in r.diagrams.dims %}
-    <div class="col-lg-6">
-      <div class="sd-figure-card">
-        <div class="sd-title">{{ d.name }}</div>
-        <div data-diagram="dims" data-table="DetViewDimRequestLinear" data-block="#req-{{ r.row.Key }}" data-points="{{ d.points|join('\n') }}">{{ d.svg|safe }}</div>
-        <div class="sd-caption">Points: {{ d.points|join(' · ') if d.points else 'none listed' }}</div>
+{% macro basis(b) -%}
+  {%- if b == 'guide' %}<span class="basis basis-guide" title="Meaning from the Advance Steel Drawing Style Manager guide">DSM guide</span>
+  {%- elif b == 'name' %}<span class="basis basis-name" title="Read from the rule's name, which describes intent, not stored settings">from name</span>
+  {%- elif b == 'data' %}<span class="basis basis-data" title="Read directly from the stored row">stored</span>
+  {%- elif b == 'observed' %}<span class="basis basis-observed" title="Seen in Advance Steel's own output for a real export; not yet confirmed in the DSM option list">observed</span>
+  {%- elif b == 'raw' %}<span class="basis basis-raw" title="An Advance Steel number whose label isn't in the export">AS number</span>
+  {%- endif %}
+{%- endmacro %}
+
+{% macro chain_card(r, d, loop_index, open_default) -%}
+  {% set e = d.explain %}
+  <details class="dx-chain" id="chain-{{ r.row.Key }}-{{ loop_index }}" {% if open_default %}open{% endif %}>
+    <summary>
+      <span class="dx-num">{{ loop_index }}</span>
+      <span class="flex-grow-1">
+        <span class="dx-name" {% if e and e.raw_name != e.name %}title="{{ e.raw_name }}"{% endif %}>{{ e.name if e else ('#' ~ d.row.RequestLinear) }}</span>
+        {% if e and e.name_code %}<span class="badge bg-light text-dark border ms-1 dx-code" title="Drawing Style Manager name code">{{ e.name_code.code }}</span>{% endif %}
+        {% if e and e.warnings %}<span class="badge bg-warning text-dark ms-1">&#9888; {{ e.warnings|length }}</span>{% endif %}
+        <div class="dx-summary mt-1">{{ e.summary if e and not e.missing else (e.warnings[0] if e else '') }}</div>
+      </span>
+    </summary>
+    {% if e and not e.missing %}
+    <div class="dx-body">
+      {% for w in e.warnings %}<div class="alert alert-warning py-1 px-2 small mb-2">&#9888; {{ w }}</div>{% endfor %}
+
+      <div class="row g-3">
+        <div class="col-xl-6">
+          <div class="dx-section">1 · What it measures</div>
+          {% for p in e.measured %}
+          <div class="dx-point">
+            <span class="dx-pidx">{{ p.index }}</span>
+            <span class="flex-grow-1">
+              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
+              <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
+              </div>
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              </details>{% endif %}
+            </span>
+          </div>
+          {% else %}
+          <div class="ds-hint">No measured points.</div>
+          {% endfor %}
+          {% if e.reference %}
+          <div class="dx-section mt-2">Reference points <span class="text-lowercase fw-normal">(only used when the chain already has something to measure)</span></div>
+          {% for p in e.reference %}
+          <div class="dx-point ref">
+            <span class="dx-pidx">{{ p.index }}</span>
+            <span class="flex-grow-1">
+              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
+              <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
+              </div>
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              </details>{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+          {% endif %}
+          {% if d.point_rows %}
+          <div class="ds-hint mt-1">Edit a point rule:
+            {% for pr in d.point_rows %}<a href="/db/{{ database }}/DetViewDimPointSelection/{{ pr.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}" class="me-2" title="{{ pr.row.RunName }}">{{ loop.index }} &rarr;</a>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="col-xl-6">
+          <div class="dx-section">2 · Which way it runs</div>
+          <div class="dx-switch"><span class="dx-icon">&#8596;</span>
+            <span>The chain {{ e.direction.text }} {{ basis(e.direction.basis) }}
+              {% if e.direction.note %}<div class="ds-hint">{{ e.direction.note }}</div>{% endif %}</span>
+          </div>
+          {% if e.dim_type %}
+          <div class="dx-switch"><span class="dx-icon">&#8866;</span>
+            <span>Drawn as a {{ e.dim_type.text }} {{ basis(e.dim_type.basis) }}<div class="ds-hint">{{ e.dim_type.note }}</div></span>
+          </div>
+          {% endif %}
+          <div class="dx-section mt-2">3 · Where it goes on the drawing</div>
+          <div class="ds-hint mb-1">Hover a line for the DSM option it comes from.</div>
+          {% for s in e.placement %}
+          <div class="dx-switch" title="{{ s.help }}">
+            <span class="dx-icon">{{ '&#10003;'|safe if s.on else '&#8211;'|safe }}</span>
+            <span>{{ s.text }} {{ basis(s.basis) }}</span>
+          </div>
+          {% endfor %}
+          {% if e.name_code %}
+          <div class="ds-hint mt-2">Name code <span class="dx-code">{{ e.name_code.code }}</span>:
+            {% for a in e.name_code.agree %}<span class="badge bg-success-subtle text-success-emphasis border ms-1" title="{{ a.text }}">{{ a.letter }} &check;</span>{% endfor %}
+            {% for a in e.name_code.disagree %}<span class="badge bg-danger-subtle text-danger-emphasis border ms-1" title="Name says {{ a.text }}; stored switch disagrees">{{ a.letter }} &#10007;</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if e.label %}<div class="ds-hint mt-1">Dimension label text: <code>{{ e.label }}</code></div>{% endif %}
+          {% if e.group_name %}<div class="ds-hint mt-1">Filed in the DSM under <strong>{{ e.group_name }}</strong> {{ basis('data') }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-xl-6">
+          <div class="sd-figure-card">
+            <div class="sd-title">Sketch</div>
+            <div data-diagram="dims" data-table="DetViewDimRequestLinear" data-block="#chain-{{ r.row.Key }}-{{ loop_index }}" data-points="{{ d.points|join('\n') }}">{{ d.svg|safe }}</div>
+          </div>
+        </div>
+        <div class="col-xl-6">
+          <div class="dx-section">Edit</div>
+          <div class="ds-grid">
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName, label='Request name') }}
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y'),(4,'4 · along main part (observed)')], label='Direction') }}
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool', label='Above (left if vertical)') }}
+          </div>
+          <div class="ds-hint mt-2">
+            Shared: editing this request changes every view that uses it.
+            <a href="/db/{{ database }}/DetViewDimRequestLinear/{{ d.linear.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}">all fields &rarr;</a>
+          </div>
+          {% if e.extras %}
+          <details class="mt-2"><summary class="ds-hint">Other stored columns ({{ e.extras|length }})</summary>
+            <div class="mt-1">{% for x in e.extras %}<span class="badge bg-light text-dark border me-1 mb-1" title="{{ x.column }}">{{ x.label }} = {{ x.value }}</span>{% endfor %}</div>
+          </details>
+          {% endif %}
+        </div>
       </div>
     </div>
-    {% endfor %}
-  </div>
+    {% endif %}
+  </details>
 {%- endmacro %}
 
 <script src="{{ url_for('static', filename='vendor/htmx/htmx.min.js') }}"></script>
@@ -116,35 +256,44 @@
 <div class="alert alert-success py-2 small mb-3">&#10004; Integrity check: {{ report.checked }} in-file relations checked, no dangling references. Safe to export.</div>
 {% endif %}
 
-<div class="ds-help mb-3">
-  <strong>How to read this page</strong>
-  <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-    <span class="badge bg-dark">1 · Style</span> picker name, title formulas
-    <span class="text-muted">&rarr;</span>
-    <span class="badge bg-dark">2 · Views</span> one drawing each, with print scale and view box
-    <span class="text-muted">&rarr;</span>
-    <span class="badge bg-dark">3 · Representation rules</span> first matching rule draws the object
-    <span class="text-muted">&rarr;</span>
-    <span class="badge bg-dark">4 · Dimensions</span> which points get chained, on which axis
-  </div>
-  <div class="mt-2">Each view carries a picture of what its numbers mean. The pictures are
-    schematic &mdash; drawn from the row values, not Advance Steel's own output &mdash; and they
-    label anything that is still unverified.</div>
-</div>
-
-<div class="ds-toc small mb-3">
-  Jump to:
-  {% for m in tree.masters %}{% if m.style %}{% for r in m.style.requests %}{% if not r.missing %}
-    <a href="#req-{{ r.row.Key }}" class="badge bg-light text-dark border">{{ r.row.RunName }}</a>
-    <a href="#rules-{{ r.row.ObjReprMap }}" class="badge bg-light text-dark border">Representation rules</a>
-  {% endif %}{% endfor %}{% endif %}{% endfor %}
-  <a href="#lib" class="badge bg-light text-dark border">Label formulas &amp; libraries</a>
-</div>
-
 <form id="ruleForm" method="post" action="/db/{{ database }}/drawing-style/rule">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 </form>
 
+<div class="row g-3">
+{# ================= menu ================= #}
+<nav class="col-lg-3">
+  <div class="ds-nav border rounded bg-white p-2" id="dsNav">
+    {% for m in tree.masters %}
+      <div class="ds-nav-head">Style</div>
+      <a href="#pane-style-{{ m.row.Key }}" data-pane="pane-style-{{ m.row.Key }}"><span>{{ icon('tag') }} {{ m.row.RunName }}</span><span class="dirty-dot"></span></a>
+      {% if m.style %}
+      <div class="ds-nav-head">Views ({{ m.style.requests|length }})</div>
+      {% for r in m.style.requests %}{% if not r.missing %}
+        <a class="ds-nav-view" href="#pane-view-{{ r.row.Key }}" data-pane="pane-view-{{ r.row.Key }}">
+          <span title="{{ r.row.RunName }}">{{ icon('preview') }} {{ r.short_name or r.row.RunName }}</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span><span class="badge bg-secondary">{{ r.scale_label }}</span></span></a>
+        <a class="ds-nav-sub" href="#pane-rules-{{ r.row.Key }}" data-pane="pane-rules-{{ r.row.Key }}">
+          <span>Representation rules</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span><span class="badge bg-light text-dark border">{{ r.repr_items|length }}</span></span></a>
+        <a class="ds-nav-sub" href="#pane-dims-{{ r.row.Key }}" data-pane="pane-dims-{{ r.row.Key }}">
+          <span>Dimensions</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span>
+            {% set nwarn = r.dims|selectattr('explain')|map(attribute='explain')|selectattr('warnings')|list|length %}
+            {% if nwarn %}<span class="badge bg-warning text-dark" title="chains with warnings">&#9888; {{ nwarn }}</span>{% endif %}
+            <span class="badge bg-light text-dark border">{{ r.dims|length }}</span></span></a>
+      {% endif %}{% endfor %}
+      {% endif %}
+    {% endfor %}
+    <div class="ds-nav-head">Libraries</div>
+    <a href="#pane-lib-labels" data-pane="pane-lib-labels"><span>Label formulas</span><span class="dirty-dot"></span></a>
+    <a href="#pane-lib-strat" data-pane="pane-lib-strat"><span>Label strategies</span><span class="dirty-dot"></span></a>
+    <a href="#pane-lib-app" data-pane="pane-lib-app"><span>Appearances</span><span class="dirty-dot"></span></a>
+    <a href="#pane-lib-sets" data-pane="pane-lib-sets"><span>Object sets</span><span class="dirty-dot"></span></a>
+    <div class="ds-nav-head">Help</div>
+    <a href="#pane-guide-dims" data-pane="pane-guide-dims"><span>{{ icon('library') }} Reading a dimension request</span></a>
+  </div>
+</nav>
+
+{# ================= panes ================= #}
+<div class="col-lg-9">
 <form id="styleForm" method="post" action="/db/{{ database }}/drawing-style/save"
       hx-post="{{ url_for('drawing_style_save', database=database) }}" hx-swap="none"
       hx-on::after-request="if (event.detail.successful) window.__dsAfterSave()">
@@ -153,12 +302,28 @@
 
 {% for m in tree.masters %}
 {# ---------------- style identity ---------------- #}
+<section class="ds-pane" id="pane-style-{{ m.row.Key }}" data-title="Style · {{ m.row.RunName }}">
 <div class="card ds-card">
   <div class="card-header d-flex justify-content-between">
     <span>{{ icon('tag') }} Style: <strong>{{ m.row.RunName }}</strong></span>
     <span class="small text-white-50">Master #{{ m.row.Key }} &middot; category {{ m.row.BaseCategory }}/{{ m.row.SubCategory }}</span>
   </div>
   <div class="card-body">
+    <div class="ds-help mb-3">
+      <strong>How this editor is laid out</strong>
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+        <span class="badge bg-dark">Style</span> picker name, title formulas
+        <span class="text-muted">&rarr;</span>
+        <span class="badge bg-dark">View</span> one drawing each: scale and view box
+        <span class="text-muted">&rarr;</span>
+        <span class="badge bg-dark">Representation rules</span> first matching rule draws the object
+        <span class="text-muted">&rarr;</span>
+        <span class="badge bg-dark">Dimensions</span> what each chain measures and where it lands
+      </div>
+      <div class="mt-2">Use the menu on the left; each item opens on its own. Edits on every screen are kept until you
+        press <strong>Save changes</strong>, and menu items with unsaved edits get an orange dot. Pictures are schematic
+        &mdash; drawn from the row values, not Advance Steel's own output &mdash; and label anything still unverified.</div>
+    </div>
     <div class="alert alert-light border small py-2 mb-2">
       {{ icon('hint') }} Want a variant instead of overwriting? Rename it here before exporting, then import the copy beside your original.
       (How Advance Steel's importer treats a same-name style hasn't been tested yet &mdash; renaming avoids the question.)
@@ -190,273 +355,330 @@
       <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'TitleFormat', s.row.TitleFormat, 'formula', rows=3, label='View title formula') }}</div>
       <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'CutViewTitleFormat', s.row.CutViewTitleFormat, 'formula', rows=3, label='Cut-view title formula') }}</div>
     </div>
-
-    {% for r in s.requests %}
-    {% if r.missing %}
+    {% for r in s.requests %}{% if r.missing %}
       <div class="alert alert-danger mt-3">View request #{{ r.missing }} is referenced but not in this file.</div>
-    {% else %}
-    {# ---------------- view request ---------------- #}
-    <div class="border rounded p-3 mt-3" id="req-{{ r.row.Key }}">
-      <div class="d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">{{ icon('preview') }} View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
-        <a class="small" href="/db/{{ database }}/DetViewRequest/{{ r.token }}/edit?return_to=/db/{{ database }}/drawing-style">all fields &rarr;</a>
-      </div>
-      <div class="ds-grid mt-2">
-        {{ fld('DetViewRequest', r.token, 'RunName', r.row.RunName, label='View name') }}
-        {{ fld('DetViewRequest', r.token, 'Scale', r.row.Scale, 'select', scale_choices, label='Scale') }}
-        {{ fld('DetViewRequest', r.token, 'CalloutTitleTemplate', r.row.CalloutTitleTemplate, label='Callout title template') }}
-        {{ fld('DetViewRequest', r.token, 'UsedForCutsAndCallouts', r.row.UsedForCutsAndCallouts, 'select', [(1,'Yes'),(0,'No')], label='Used for cuts & callouts') }}
-        {{ fld('DetViewRequest', r.token, 'ObjReprMap', r.row.ObjReprMap, 'select', options.DetViewRequest.ObjReprMap, label='Representation map') }}
-        {{ fld('DetViewRequest', r.token, 'DimStrategy', r.row.DimStrategy, 'select', options.DetViewRequest.DimStrategy, label='Dimension strategy') }}
-      </div>
-
-      <div class="row g-2 mt-2">
-        <div class="col-lg-4">
-          <div class="sd-figure-card">
-            <div class="sd-title">Print scale</div>
-            <div data-diagram="scale" data-table="DetViewRequest" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.scale|safe }}</div>
-            <div class="sd-caption">{{ r.scale_label }}</div>
-          </div>
-        </div>
-        {% if r.diagrams.viewbox %}
-        <div class="col-lg-8">
-          <div class="sd-figure-card">
-            <div class="sd-title">View box &mdash; what the view captures</div>
-            <div data-diagram="viewbox" data-table="DetViewSystemAndBox" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.viewbox|safe }}</div>
-            <div class="sd-caption">Extents are measured from the view's own coordinate system; depth is split in front of and behind the view plane.</div>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-      {% if r.diagrams.clip %}
-      <div class="sd-figure-card mt-2">
-        <div class="sd-title">Length clipping &mdash; where the break lines sit</div>
-        <div data-diagram="clip" data-table="DetViewLengthClip" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.clip|safe }}</div>
-        <div class="sd-caption">The member is drawn once; the brackets show which distance each column measures.</div>
-      </div>
-      {% endif %}
-
-      {% if r.sysbox %}{% set b = r.sysbox %}
-      <div class="ds-sub">View box &mdash; {{ b.row.RunName }}</div>
-      <div class="ds-grid">
-        {{ fld('DetViewSystemAndBox', b.token, 'RunName', b.row.RunName, label='Box preset name') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'zDeltaFront', b.row.zDeltaFront, 'length', label='Depth in front') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'zDeltaRear', b.row.zDeltaRear, 'length', label='Depth behind') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'xDelta', b.row.xDelta, 'length', label='X extend') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'yDelta', b.row.yDelta, 'length', label='Y extend') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'xyMode', b.row.xyMode, label='XY mode (AS enum)') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'zMode', b.row.zMode, label='Z mode (AS enum)') }}
-        {{ fld('DetViewSystemAndBox', b.token, 'EnlargeByEnv', b.row.EnlargeByEnv, 'bool', label='Enlarge by environment') }}
-      </div>
-      {% endif %}
-
-      {% if r.clip %}{% set c = r.clip %}
-      <div class="ds-sub">Length clipping &mdash; {{ c.row.RunName }}</div>
-      <div class="ds-grid">
-        {{ fld('DetViewLengthClip', c.token, 'X Clip', c.row['X Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in X') }}
-        {{ fld('DetViewLengthClip', c.token, 'Y Clip', c.row['Y Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in Y') }}
-        {{ fld('DetViewLengthClip', c.token, 'MinRemainingLength', c.row.MinRemainingLength, 'length', label='Min remaining length') }}
-        {{ fld('DetViewLengthClip', c.token, 'MinClipIntervalLength', c.row.MinClipIntervalLength, 'length', label='Min clip interval') }}
-        {{ fld('DetViewLengthClip', c.token, 'Extension', c.row.Extension, 'length', label='Extension') }}
-        {{ fld('DetViewLengthClip', c.token, 'ClippingGap', c.row.ClippingGap, label='Clipping gap (units unverified)') }}
-      </div>
-      {% endif %}
-
-      {# ---------------- representation rules ---------------- #}
-      {% with block = {'map_key': r.row.ObjReprMap, 'repr_map': r.repr_map, 'repr_items': r.repr_items},
-              options = options.DetObjReprMapItems %}
-      {% include "_drawing_rules.html" %}
-      {% endwith %}
-
-      {# ---------------- dimensions ---------------- #}
-      {% if r.dims %}
-      <div class="ds-sub d-flex justify-content-between align-items-end">
-        <span>Dimensions &mdash; {{ r.dim_strategy.row.RunName if r.dim_strategy else '' }} ({{ r.dims|length }})</span>
-        {% if r.dim_strategy %}<a class="small" href="/db/{{ database }}/DetViewDimStrategyNew/{{ r.dim_strategy.token }}/edit?return_to=/db/{{ database }}/drawing-style">strategy fields &rarr;</a>{% endif %}
-      </div>
-      <div class="ds-hint mb-2">
-        A dimension strategy is an ordered list, and each row is one chain: the points it measures, the axis it
-        runs along, and whether it lands above or below the part. Advance Steel reads the values from the model;
-        this editor only chooses which points are chained and where the chain goes.
-      </div>
-      <div class="row g-2 mb-2">
-        {% if r.diagrams.anatomy %}
-        <div class="col-lg-5">
-          <div class="sd-figure-card">
-            <div class="sd-title">How to read a chain</div>
-            {{ r.diagrams.anatomy|safe }}
-          </div>
-        </div>
-        {% endif %}
-        <div class="col-lg-{{ '7' if r.diagrams.anatomy else '12' }}">
-          <div class="sd-figure-card">
-            <div class="sd-title">All chains in this view</div>
-            {{ r.diagrams.plan|safe }}
-            <div class="sd-caption">Numbers match the table rows below. Lane spacing is schematic.</div>
-          </div>
-        </div>
-      </div>
-      <table class="table table-sm small mb-0">
-        <thead class="table-light"><tr>
-          <th>#</th><th>Dimension request</th><th>Direction</th><th>Above</th>
-          <th>Points</th><th>Setup flags</th><th></th>
-        </tr></thead>
-        <tbody>
-        {% for d in r.dims %}
-          <tr>
-            <td>{{ d.row.Order }}</td>
-            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName) }}{% else %}#{{ d.row.RequestLinear }}{% endif %}</td>
-            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y')]) }}{% endif %}</td>
-            <td>{% if d.linear %}{{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool') }}{% endif %}</td>
-            <td>
-              {% if d.points %}
-                <span class="badge bg-light text-dark border">{{ d.points|length }} pt</span>
-                <span class="text-muted">{{ d.points[:3]|join(' · ') }}{% if d.points|length > 3 %} +{{ d.points|length - 3 }} more{% endif %}</span>
-              {% else %}<span class="text-muted">none listed</span>{% endif %}
-            </td>
-            <td>
-              {% if d.linear %}{% set lin = d.linear.row %}
-                {% for flag, label, title in [
-                  ('ArrangeGlobally', 'global', 'AS flag: arrange all chains of this axis together (meaning unconfirmed).'),
-                  ('GroupRelatedDimensions', 'grouped', 'AS flag: keep related dimensions in one group (meaning unconfirmed).'),
-                  ('OneChainPerObjectInPoints1', 'per object', 'AS flag: one chain per object for the Points1 list (meaning unconfirmed).'),
-                  ('AllowCombine', 'combine', 'AS flag: chains may be combined (meaning unconfirmed).'),
-                  ('AutomaticallySeparate', 'auto-split', 'AS flag: chains may be separated automatically (meaning unconfirmed).')
-                ] %}
-                  {% if lin[flag] %}<span class="badge bg-light text-dark border" title="{{ title }}">{{ label }}</span> {% endif %}
-                {% endfor %}
-                <span class="badge bg-light text-dark border" title="Group number in DetViewDimRequestLinear">group {{ lin.Group }}</span>
-                {% if lin.LabelContents %}<span class="badge bg-light text-dark border" title="LabelContents formula: {{ lin.LabelContents }}">{{ lin.LabelContents|truncate(22, True, '…') }}</span>{% endif %}
-              {% endif %}
-            </td>
-            <td class="text-nowrap">
-              {% if d.linear %}<a class="small" href="/db/{{ database }}/DetViewDimRequestLinear/{{ d.linear.token }}/edit?return_to=/db/{{ database }}/drawing-style%23req-{{ r.row.Key }}">all fields &rarr;</a>{% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      {% if r.diagrams.dims %}
-      {% if r.diagrams.dims|length > 6 %}
-      <details class="mt-2">
-        <summary class="small">Dimension chains ({{ r.diagrams.dims|length }})</summary>
-        {{ dims_figures(r) }}
-      </details>
-      {% else %}
-      {{ dims_figures(r) }}
-      {% endif %}
-      {% endif %}
-      {% endif %}
-    </div>
-    {% endif %}
-    {% endfor %}
+    {% endif %}{% endfor %}
     {% endif %}
   </div>
 </div>
-{% endfor %}
+</section>
 
-{# ---------------- libraries ---------------- #}
-<div class="card ds-card" id="lib">
-  <div class="card-header">{{ icon('library') }} Label formulas &amp; libraries</div>
-  <div class="card-body">
-    <ul class="nav nav-tabs small">
-      <li class="nav-item"><button class="nav-link active" type="button" data-bs-toggle="collapse"
-                data-bs-target="#t-labels" aria-expanded="true" aria-controls="t-labels">Label formulas <span class="ds-caret" aria-hidden="true"></span></button></li>
-      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
-                data-bs-target="#t-strat" aria-expanded="false" aria-controls="t-strat">Label strategies <span class="ds-caret" aria-hidden="true"></span></button></li>
-      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
-                data-bs-target="#t-app" aria-expanded="false" aria-controls="t-app">Appearances <span class="ds-caret" aria-hidden="true"></span></button></li>
-      <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="collapse"
-                data-bs-target="#t-sets" aria-expanded="false" aria-controls="t-sets">Object sets <span class="ds-caret" aria-hidden="true"></span></button></li>
-    </ul>
-    <div class="tab-content pt-3" id="libPanes">
-      <div class="collapse show" id="t-labels" data-bs-parent="#libPanes">
-        <div class="ds-hint mb-1">Click a token to insert it into the formula you last clicked in:</div>
-        <div class="token-palette mb-2">
-          {% for t in label_tokens %}<button type="button" class="btn btn-sm btn-outline-primary py-0 token-insert" data-token="%{{ t }}">%{{ t }}</button>{% endfor %}
-          {% for c in label_commands %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="{{ c }}">{{ c }}</button>{% endfor %}
-          {% for e in label_escapes %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="%%{{ e }}" title="symbol escape">%%{{ e }}</button>{% endfor %}
-        </div>
-        <div class="ds-hint mb-2">
-          Tokens: <code>%Field</code> = model property &middot; <code>#Newline</code> &middot; <code>#Height(mm)</code> &middot;
-          <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed &middot;
-          <code>%%c</code> &Oslash; &middot; <code>%%d</code> &deg; &middot; <code>%%p</code> &plusmn; &middot; <code>%%%</code> %.
-          Preview uses sample values; orange fields aren't in the sample list (still fine in AS).
-        </div>
-        {% for e in tree.libraries.get('DetAnnotationType', []) %}
-        <div class="row g-2 mb-3 border-bottom pb-2">
-          <div class="col-md-3">
-            {{ fld('DetAnnotationType', e.token, 'RunName', e.row.RunName, label='Name #' ~ e.row.Key) }}
-            <div class="ds-hint">Object qualifier: {{ e.row.ObjectQualifier }} (AS enum)</div>
-            <a class="small" href="/db/{{ database }}/DetAnnotationType/{{ e.token }}/duplicate"
-               onclick="event.preventDefault(); if(confirm('Duplicate this label formula as a new entry?')){ const f=document.createElement('form'); f.method='post'; f.action=this.href; document.body.appendChild(f); f.submit(); }">duplicate as new &rarr;</a>
-          </div>
-          <div class="col-md-9">{{ fld('DetAnnotationType', e.token, 'Content', e.row.Content, 'formula', rows=2, label='Formula') }}</div>
-        </div>
-        {% endfor %}
+{% if m.style %}
+{% for r in m.style.requests %}{% if not r.missing %}
+{# ---------------- view setup ---------------- #}
+<section class="ds-pane" id="pane-view-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · View">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }}</div>
+<div class="card ds-card"><div class="card-body" id="req-{{ r.row.Key }}">
+  <div class="d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">{{ icon('preview') }} View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
+    <a class="small" href="/db/{{ database }}/DetViewRequest/{{ r.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-view-{{ r.row.Key }}">all fields &rarr;</a>
+  </div>
+  <div class="ds-grid mt-2">
+    {{ fld('DetViewRequest', r.token, 'RunName', r.row.RunName, label='View name') }}
+    {{ fld('DetViewRequest', r.token, 'Scale', r.row.Scale, 'select', scale_choices, label='Scale') }}
+    {{ fld('DetViewRequest', r.token, 'CalloutTitleTemplate', r.row.CalloutTitleTemplate, label='Callout title template') }}
+    {{ fld('DetViewRequest', r.token, 'UsedForCutsAndCallouts', r.row.UsedForCutsAndCallouts, 'select', [(1,'Yes'),(0,'No')], label='Used for cuts & callouts') }}
+    {{ fld('DetViewRequest', r.token, 'ObjReprMap', r.row.ObjReprMap, 'select', options.DetViewRequest.ObjReprMap, label='Representation map') }}
+    {{ fld('DetViewRequest', r.token, 'DimStrategy', r.row.DimStrategy, 'select', options.DetViewRequest.DimStrategy, label='Dimension strategy') }}
+  </div>
+
+  <div class="row g-2 mt-2">
+    <div class="col-lg-4">
+      <div class="sd-figure-card">
+        <div class="sd-title">Print scale</div>
+        <div data-diagram="scale" data-table="DetViewRequest" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.scale|safe }}</div>
+        <div class="sd-caption">{{ r.scale_label }}</div>
       </div>
-
-      <div class="collapse" id="t-strat" data-bs-parent="#libPanes">
-        <table class="table table-sm small">
-          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Label formula</th><th>Arranger</th><th>Group</th><th>On object</th><th>Merge dist</th></tr></thead>
-          <tbody>
-          {% for e in tree.libraries.get('DetObjAnnotationStrategy', []) %}
-            <tr>
-              <td>{{ e.row.Key }}</td>
-              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'RunName', e.row.RunName) }}</td>
-              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'AnnotationType', e.row.AnnotationType, 'select', options.DetObjAnnotationStrategy.AnnotationType) }}</td>
-              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'ArrangerStrategy', e.row.ArrangerStrategy, 'select', options.DetObjAnnotationStrategy.ArrangerStrategy) }}</td>
-              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'Group', e.row.Group, 'select', options.DetObjAnnotationStrategy.Group) }}</td>
-              <td>{{ fld('DetObjAnnotationStrategy', e.token, 'SystemByObject', e.row.SystemByObject, 'bool') }}</td>
-              <td style="width:6rem">{{ fld('DetObjAnnotationStrategy', e.token, 'MergeMaxDist', e.row.MergeMaxDist) }}</td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+    </div>
+    {% if r.diagrams.viewbox %}
+    <div class="col-lg-8">
+      <div class="sd-figure-card">
+        <div class="sd-title">View box &mdash; what the view captures</div>
+        <div data-diagram="viewbox" data-table="DetViewSystemAndBox" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.viewbox|safe }}</div>
+        <div class="sd-caption">Extents are measured from the view's own coordinate system; depth is split in front of and behind the view plane.</div>
       </div>
+    </div>
+    {% endif %}
+  </div>
+  {% if r.diagrams.clip %}
+  <div class="sd-figure-card mt-2">
+    <div class="sd-title">Length clipping &mdash; where the break lines sit</div>
+    <div data-diagram="clip" data-table="DetViewLengthClip" data-block="#req-{{ r.row.Key }}">{{ r.diagrams.clip|safe }}</div>
+    <div class="sd-caption">The member is drawn once; the brackets show which distance each column measures.</div>
+  </div>
+  {% endif %}
 
-      <div class="collapse" id="t-app" data-bs-parent="#libPanes">
-        <div class="ds-hint mb-2">Body/axis/symbol columns are AS built-in display settings (numbers). Hatch columns resolve to this file's hatch presets.</div>
-        <table class="table table-sm small">
-          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th>Swatches</th><th></th></tr></thead>
-          <tbody>
-          {% for e in tree.libraries.get('DetObjAppearance', []) %}
-            <tr>
-              <td>{{ e.row.Key }}</td>
-              <td>{{ fld('DetObjAppearance', e.token, 'RunName', e.row.RunName) }}</td>
-              <td>{{ e.row.BodyVisible }}</td><td>{{ e.row.BodyHidden }}</td><td>{{ e.row.Axis }}</td><td>{{ e.row.CutFacesFront }}</td>
-              <td>{{ fld('DetObjAppearance', e.token, 'HatchVisible', e.row.HatchVisible, 'select', options.DetObjAppearance.HatchVisible) }}</td>
-              <td>{{ fld('DetObjAppearance', e.token, 'HatchHidden', e.row.HatchHidden, 'select', options.DetObjAppearance.HatchHidden) }}</td>
-              <td class="hatch-cell">
-                <div class="d-flex gap-1">
-                  <figure class="mb-0 text-center">{{ e.hatch_visible_svg|safe }}<figcaption class="ds-hint">vis.</figcaption></figure>
-                  <figure class="mb-0 text-center">{{ e.hatch_hidden_svg|safe }}<figcaption class="ds-hint">hid.</figcaption></figure>
-                </div>
-              </td>
-              <td><a href="/db/{{ database }}/DetObjAppearance/{{ e.token }}/edit?return_to=/db/{{ database }}/drawing-style">all &rarr;</a></td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+  {% if r.sysbox %}{% set b = r.sysbox %}
+  <div class="ds-sub">View box &mdash; {{ b.row.RunName }}</div>
+  <div class="ds-grid">
+    {{ fld('DetViewSystemAndBox', b.token, 'RunName', b.row.RunName, label='Box preset name') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'zDeltaFront', b.row.zDeltaFront, 'length', label='Depth in front') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'zDeltaRear', b.row.zDeltaRear, 'length', label='Depth behind') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'xDelta', b.row.xDelta, 'length', label='X extend') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'yDelta', b.row.yDelta, 'length', label='Y extend') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'xyMode', b.row.xyMode, label='XY mode (AS enum)') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'zMode', b.row.zMode, label='Z mode (AS enum)') }}
+    {{ fld('DetViewSystemAndBox', b.token, 'EnlargeByEnv', b.row.EnlargeByEnv, 'bool', label='Enlarge by environment') }}
+  </div>
+  {% endif %}
+
+  {% if r.clip %}{% set c = r.clip %}
+  <div class="ds-sub">Length clipping &mdash; {{ c.row.RunName }}</div>
+  <div class="ds-grid">
+    {{ fld('DetViewLengthClip', c.token, 'X Clip', c.row['X Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in X') }}
+    {{ fld('DetViewLengthClip', c.token, 'Y Clip', c.row['Y Clip'], 'select', [(0,'Off'),(1,'On')], label='Clip in Y') }}
+    {{ fld('DetViewLengthClip', c.token, 'MinRemainingLength', c.row.MinRemainingLength, 'length', label='Min remaining length') }}
+    {{ fld('DetViewLengthClip', c.token, 'MinClipIntervalLength', c.row.MinClipIntervalLength, 'length', label='Min clip interval') }}
+    {{ fld('DetViewLengthClip', c.token, 'Extension', c.row.Extension, 'length', label='Extension') }}
+    {{ fld('DetViewLengthClip', c.token, 'ClippingGap', c.row.ClippingGap, label='Clipping gap (units unverified)') }}
+  </div>
+  {% endif %}
+</div></div>
+</section>
+
+{# ---------------- representation rules ---------------- #}
+<section class="ds-pane" id="pane-rules-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · Representation rules">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }} &rsaquo; Representation rules</div>
+<div class="card ds-card"><div class="card-body">
+  {% with block = {'map_key': r.row.ObjReprMap, 'repr_map': r.repr_map, 'repr_items': r.repr_items},
+          options = options.DetObjReprMapItems %}
+  {% include "_drawing_rules.html" %}
+  {% endwith %}
+</div></div>
+</section>
+
+{# ---------------- dimensions ---------------- #}
+<section class="ds-pane" id="pane-dims-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · Dimensions">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }} &rsaquo; Dimensions</div>
+<div class="card ds-card"><div class="card-body" id="dims-{{ r.row.Key }}">
+  {% if r.dims %}
+  <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+    <h6 class="mb-0">Dimension strategy: {{ r.dim_strategy.row.RunName if r.dim_strategy else '?' }}
+      <span class="badge bg-light text-dark border">{{ r.dims|length }} chain{{ '' if r.dims|length == 1 else 's' }}</span></h6>
+    <span class="small">
+      <a href="#pane-guide-dims">how to read these &rarr;</a>
+      {% if r.dim_strategy %}&middot; <a href="/db/{{ database }}/DetViewDimStrategyNew/{{ r.dim_strategy.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}">strategy fields &rarr;</a>{% endif %}
+    </span>
+  </div>
+  <div class="ds-hint mt-1 mb-2">
+    Each numbered card is one dimension chain in this view, in the order Advance Steel builds them. The first line
+    says what it measures and where it lands; open a card for the point rules and the placement switches behind it.
+    Tags show where each statement comes from: {{ basis('guide') }} {{ basis('data') }} {{ basis('observed') }} {{ basis('name') }} {{ basis('raw') }}.
+  </div>
+
+  <div class="row g-2 mb-3">
+    {% if r.diagrams.anatomy %}
+    <div class="col-lg-5">
+      <div class="sd-figure-card">
+        <div class="sd-title">How to read a chain</div>
+        {{ r.diagrams.anatomy|safe }}
       </div>
-
-      <div class="collapse" id="t-sets" data-bs-parent="#libPanes">
-        <div class="ds-hint mb-2">Object sets select what a rule applies to: AS object-type numbers plus optional model roles.</div>
-        <table class="table table-sm small">
-          <thead class="table-light"><tr><th>#</th><th>Name</th><th>Members (object type · model role)</th></tr></thead>
-          <tbody>
-          {% for e in tree.libraries.get('DetObjQualifierSet', []) %}
-            <tr>
-              <td>{{ e.row.Key }}</td>
-              <td>{{ fld('DetObjQualifierSet', e.token, 'RunName', e.row.RunName) }}</td>
-              <td>{% for it in tree.qset_items.get(e.row.Key, []) %}<span class="badge bg-light text-dark border me-1">{{ it.ObjQualifier }}{% if it.ModelRole %} · {{ it.ModelRole }}{% endif %}</span>{% endfor %}</td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+    </div>
+    {% endif %}
+    <div class="col-lg-{{ '7' if r.diagrams.anatomy else '12' }}">
+      <div class="sd-figure-card">
+        <div class="sd-title">All chains in this view</div>
+        {{ r.diagrams.plan|safe }}
+        <div class="sd-caption">Numbers match the cards below. Lane spacing is schematic.</div>
       </div>
     </div>
   </div>
+
+  <div class="d-flex justify-content-end gap-2 mb-2 small">
+    <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-dx-toggle="open">Open all</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-dx-toggle="close">Close all</button>
+  </div>
+  {% for d in r.dims %}
+    {% if d.linear %}{{ chain_card(r, d, loop.index, r.dims|length <= 3) }}
+    {% else %}
+    <div class="alert alert-danger py-1 small">Chain {{ loop.index }} points at dimension request #{{ d.row.RequestLinear }}, which is not in this file.</div>
+    {% endif %}
+  {% endfor %}
+  {% else %}
+  <div class="text-muted small">This view has no dimension strategy, so Advance Steel draws no automatic dimensions in it.</div>
+  {% endif %}
+</div></div>
+</section>
+{% endif %}{% endfor %}
+{% endif %}
+{% endfor %}
+
+{# ---------------- libraries ---------------- #}
+<section class="ds-pane" id="pane-lib-labels" data-title="Label formulas">
+<div class="card ds-card" id="lib">
+  <div class="card-header">{{ icon('library') }} Label formulas</div>
+  <div class="card-body">
+    <div class="ds-hint mb-1">Click a token to insert it into the formula you last clicked in:</div>
+    <div class="token-palette mb-2">
+      {% for t in label_tokens %}<button type="button" class="btn btn-sm btn-outline-primary py-0 token-insert" data-token="%{{ t }}">%{{ t }}</button>{% endfor %}
+      {% for c in label_commands %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="{{ c }}">{{ c }}</button>{% endfor %}
+      {% for e in label_escapes %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 token-insert" data-token="%%{{ e }}" title="symbol escape">%%{{ e }}</button>{% endfor %}
+    </div>
+    <div class="ds-hint mb-2">
+      Tokens: <code>%Field</code> = model property &middot; <code>#Newline</code> &middot; <code>#Height(mm)</code> &middot;
+      <code>#Bold(0/1)</code> &middot; <code>#Underline(0/1)</code> &middot; <code>#Color(ACI)</code> &middot; <code>#Rounded</code>&hellip;<code>#End</code> = framed &middot;
+      <code>%%c</code> &Oslash; &middot; <code>%%d</code> &deg; &middot; <code>%%p</code> &plusmn; &middot; <code>%%%</code> %.
+      Preview uses sample values; orange fields aren't in the sample list (still fine in AS).
+    </div>
+    {% for e in tree.libraries.get('DetAnnotationType', []) %}
+    <div class="row g-2 mb-3 border-bottom pb-2">
+      <div class="col-md-3">
+        {{ fld('DetAnnotationType', e.token, 'RunName', e.row.RunName, label='Name #' ~ e.row.Key) }}
+        <div class="ds-hint">Object qualifier: {{ e.row.ObjectQualifier }} (AS enum)</div>
+        <a class="small" href="/db/{{ database }}/DetAnnotationType/{{ e.token }}/duplicate"
+           onclick="event.preventDefault(); if(confirm('Duplicate this label formula as a new entry?')){ const f=document.createElement('form'); f.method='post'; f.action=this.href; document.body.appendChild(f); f.submit(); }">duplicate as new &rarr;</a>
+      </div>
+      <div class="col-md-9">{{ fld('DetAnnotationType', e.token, 'Content', e.row.Content, 'formula', rows=2, label='Formula') }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+</section>
+
+<section class="ds-pane" id="pane-lib-strat" data-title="Label strategies">
+<div class="card ds-card">
+  <div class="card-header">{{ icon('library') }} Label strategies</div>
+  <div class="card-body">
+    <table class="table table-sm small">
+      <thead class="table-light"><tr><th>#</th><th>Name</th><th>Label formula</th><th>Arranger</th><th>Group</th><th>On object</th><th>Merge dist</th></tr></thead>
+      <tbody>
+      {% for e in tree.libraries.get('DetObjAnnotationStrategy', []) %}
+        <tr>
+          <td>{{ e.row.Key }}</td>
+          <td>{{ fld('DetObjAnnotationStrategy', e.token, 'RunName', e.row.RunName) }}</td>
+          <td>{{ fld('DetObjAnnotationStrategy', e.token, 'AnnotationType', e.row.AnnotationType, 'select', options.DetObjAnnotationStrategy.AnnotationType) }}</td>
+          <td>{{ fld('DetObjAnnotationStrategy', e.token, 'ArrangerStrategy', e.row.ArrangerStrategy, 'select', options.DetObjAnnotationStrategy.ArrangerStrategy) }}</td>
+          <td>{{ fld('DetObjAnnotationStrategy', e.token, 'Group', e.row.Group, 'select', options.DetObjAnnotationStrategy.Group) }}</td>
+          <td>{{ fld('DetObjAnnotationStrategy', e.token, 'SystemByObject', e.row.SystemByObject, 'bool') }}</td>
+          <td style="width:6rem">{{ fld('DetObjAnnotationStrategy', e.token, 'MergeMaxDist', e.row.MergeMaxDist) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<section class="ds-pane" id="pane-lib-app" data-title="Appearances">
+<div class="card ds-card">
+  <div class="card-header">{{ icon('library') }} Appearances</div>
+  <div class="card-body">
+    <div class="ds-hint mb-2">Body/axis/symbol columns are AS built-in display settings (numbers). Hatch columns resolve to this file's hatch presets.</div>
+    <table class="table table-sm small">
+      <thead class="table-light"><tr><th>#</th><th>Name</th><th>Body vis.</th><th>Body hid.</th><th>Axis</th><th>Cut front</th><th>Hatch visible</th><th>Hatch hidden</th><th>Swatches</th><th></th></tr></thead>
+      <tbody>
+      {% for e in tree.libraries.get('DetObjAppearance', []) %}
+        <tr>
+          <td>{{ e.row.Key }}</td>
+          <td>{{ fld('DetObjAppearance', e.token, 'RunName', e.row.RunName) }}</td>
+          <td>{{ e.row.BodyVisible }}</td><td>{{ e.row.BodyHidden }}</td><td>{{ e.row.Axis }}</td><td>{{ e.row.CutFacesFront }}</td>
+          <td>{{ fld('DetObjAppearance', e.token, 'HatchVisible', e.row.HatchVisible, 'select', options.DetObjAppearance.HatchVisible) }}</td>
+          <td>{{ fld('DetObjAppearance', e.token, 'HatchHidden', e.row.HatchHidden, 'select', options.DetObjAppearance.HatchHidden) }}</td>
+          <td class="hatch-cell">
+            <div class="d-flex gap-1">
+              <figure class="mb-0 text-center">{{ e.hatch_visible_svg|safe }}<figcaption class="ds-hint">vis.</figcaption></figure>
+              <figure class="mb-0 text-center">{{ e.hatch_hidden_svg|safe }}<figcaption class="ds-hint">hid.</figcaption></figure>
+            </div>
+          </td>
+          <td><a href="/db/{{ database }}/DetObjAppearance/{{ e.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-lib-app">all &rarr;</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<section class="ds-pane" id="pane-lib-sets" data-title="Object sets">
+<div class="card ds-card">
+  <div class="card-header">{{ icon('library') }} Object sets</div>
+  <div class="card-body">
+    <div class="ds-hint mb-2">Object sets select what a rule (or a dimension point rule) applies to: AS object-type numbers plus optional model roles.</div>
+    <table class="table table-sm small">
+      <thead class="table-light"><tr><th>#</th><th>Name</th><th>Members (object type · model role)</th></tr></thead>
+      <tbody>
+      {% for e in tree.libraries.get('DetObjQualifierSet', []) %}
+        <tr>
+          <td>{{ e.row.Key }}</td>
+          <td>{{ fld('DetObjQualifierSet', e.token, 'RunName', e.row.RunName) }}</td>
+          <td>{% for it in tree.qset_items.get(e.row.Key, []) %}<span class="badge bg-light text-dark border me-1">{{ it.ObjQualifier }}{% if it.ModelRole %} · {{ it.ModelRole }}{% endif %}</span>{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+{# ---------------- help: reading a dimension request ---------------- #}
+<section class="ds-pane" id="pane-guide-dims" data-title="Reading a dimension request">
+<div class="card ds-card">
+  <div class="card-header">{{ icon('library') }} Reading a dimension request</div>
+  <div class="card-body small">
+    <p>In the Drawing Style Manager a <strong>dimension strategy</strong> is the list of chains one view draws, and each
+      chain is a <strong>dimension request</strong>. A request answers three questions. This editor shows them in the
+      same order on every chain card.</p>
+    <ol>
+      <li><strong>What does it measure?</strong> A list of <em>point selection rules</em>. Each rule picks objects
+        (an object set such as Beams or Holes) and which of their points count: holes, system line, overall size,
+        outline, cut features, center, attached parts, and so on.</li>
+      <li><strong>Which way does it run?</strong> The chain direction: along the view, along the main part, along an
+        object, or one of the internal bolt/hole directions. Any of them can be reversed (negative).</li>
+      <li><strong>Where does it go?</strong> The "Arrangement on the drawing" switches: above or below, how much
+        geometry it must stay clear of, and whether found objects share one chain or get one each.</li>
+    </ol>
+
+    <h6 class="mt-3">"As reference" points</h6>
+    <p>A point rule marked <em>as reference</em> only adds points when the chain already has something else to measure.
+      Example from the guide: <code>Holes - All</code> plus <code>Main Part - Extreme as reference</code> dimensions the
+      holes back to the ends of the part, and if the part has no holes, no chain is drawn at all.</p>
+
+    <h6 class="mt-3">The three-letter name code</h6>
+    <p>Request names usually end in a code that spells out the arrangement switches, e.g.
+      <span class="dx-code">Mp X - Extreme GTA</span>: overall size of the main part, kept clear of the whole detail,
+      on top, all in one chain. The cards check the code against the stored switches and flag any mismatch &mdash;
+      the switches are what Advance Steel uses.</p>
+    <table class="table table-sm w-auto">
+      <thead class="table-light"><tr><th>Letter</th><th>Meaning</th><th>Stored column</th></tr></thead>
+      <tbody>
+        <tr><td class="dx-code">G / L</td><td>Global: stay clear of the whole detail &middot; Local: only the dimensioned part</td><td><code>ArrangeGlobally</code></td></tr>
+        <tr><td class="dx-code">T / B</td><td>Top / Bottom (left / right in a vertical view)</td><td><code>ArrangeAbove</code></td></tr>
+        <tr><td class="dx-code">S / A</td><td>Single: one chain per object found &middot; All: one chain for everything</td><td><code>OneChainPerObjectInPoints1</code></td></tr>
+      </tbody>
+    </table>
+
+    <h6 class="mt-3">Point types you'll see in rule names</h6>
+    <dl class="dx-glossary row">
+      <dt class="col-sm-3">Extreme / Size</dt><dd class="col-sm-9">The outer extreme points in the chain direction &mdash; overall length or width.</dd>
+      <dt class="col-sm-3">System</dt><dd class="col-sm-9">The object's system (work) line points, not its faces.</dd>
+      <dt class="col-sm-3">Holes</dt><dd class="col-sm-9">Hole centers.</dd>
+      <dt class="col-sm-3">Contour</dt><dd class="col-sm-9">Outline points, including those made by shortenings and notches.</dd>
+      <dt class="col-sm-3">Features</dt><dd class="col-sm-9">Points of finite cuts, such as rectangular contour processings.</dd>
+      <dt class="col-sm-3">Center</dt><dd class="col-sm-9">The object's center point.</dd>
+      <dt class="col-sm-3">Attaching parts</dt><dd class="col-sm-9">Where attached parts sit on the object.</dd>
+      <dt class="col-sm-3">Beam end processing</dt><dd class="col-sm-9">Beam-end contour points, including finite cuts at the end.</dd>
+      <dt class="col-sm-3">Bended beam inside/outside</dt><dd class="col-sm-9">The inside or outside face of a bent beam.</dd>
+      <dt class="col-sm-3">Collision / Development / Template / Stencil</dt><dd class="col-sm-9">Main-part collision points, bend development lines, template reference point, stencil points.</dd>
+    </dl>
+
+    <h6 class="mt-3">What the tags mean</h6>
+    <ul class="list-unstyled">
+      <li>{{ basis('guide') }} the meaning comes from Autodesk's Drawing Style Manager guide; for the switches, the column is matched to the DSM option by name and checked against the name code.</li>
+      <li>{{ basis('data') }} read straight from the stored row.</li>
+      <li>{{ basis('observed') }} seen in Advance Steel's own output for a real export, not yet confirmed in the DSM list (evidence in <code>docs/verification-log.md</code>).</li>
+      <li>{{ basis('name') }} read from a rule's name. Names say what the author intended; the point type itself is stored as a number this file can't label.</li>
+      <li>{{ basis('raw') }} an Advance Steel number whose label lives in its built-in database, which an export doesn't include.</li>
+    </ul>
+    <p class="ds-hint mb-0">Sources: Advance Steel Drawing Style Manager Guide (2016), chapter 6 "Dimension Request";
+      Drawing Style Manager Guide 6.1; AU handout FAB22624. The 2026 export stores these settings as columns, and
+      matching each column to its DSM option is still on the verification list (TODO A5).</p>
+  </div>
+</div>
+</section>
+
+<div class="ds-pager" id="dsPager">
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="dsPrev">&larr; <span></span></button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="dsNext"><span></span> &rarr;</button>
 </div>
 
 <div id="saveBar" class="bg-dark text-white rounded p-2 d-flex justify-content-between align-items-center shadow">
@@ -467,11 +689,62 @@
   </div>
 </div>
 </form>
+</div>
+</div>
 
 <script>
 (function () {
   const form = document.getElementById('styleForm');
   const msg = document.getElementById('dirtyMsg');
+
+  // ---- menu: one pane at a time, driven by the URL hash ----
+  const panes = [...document.querySelectorAll('.ds-pane')];
+  const links = [...document.querySelectorAll('#dsNav a[data-pane]')];
+  const prevBtn = document.getElementById('dsPrev');
+  const nextBtn = document.getElementById('dsNext');
+  let current = null;
+
+  function paneFor(id) {
+    if (!id) return null;
+    const el = document.getElementById(id);
+    if (!el) return null;
+    return el.classList.contains('ds-pane') ? el : el.closest('.ds-pane');
+  }
+  function show(pane, target) {
+    if (!pane) pane = panes[0];
+    if (!pane) return;
+    panes.forEach(p => { p.hidden = p !== pane; });
+    links.forEach(a => a.classList.toggle('active', a.dataset.pane === pane.id));
+    current = pane;
+    const i = panes.indexOf(pane);
+    const prev = panes[i - 1], next = panes[i + 1];
+    prevBtn.hidden = !prev; nextBtn.hidden = !next;
+    if (prev) prevBtn.querySelector('span').textContent = prev.dataset.title || '';
+    if (next) nextBtn.querySelector('span').textContent = next.dataset.title || '';
+    if (target && target !== pane) {
+      const det = target.closest('details'); if (det) det.open = true;
+      target.scrollIntoView({block: 'start'});
+    } else {
+      window.scrollTo({top: 0});
+    }
+  }
+  function fromHash() {
+    const id = decodeURIComponent((location.hash || '').slice(1));
+    const target = id ? document.getElementById(id) : null;
+    show(paneFor(id), target);
+  }
+  window.addEventListener('hashchange', fromHash);
+  prevBtn.addEventListener('click', () => { const p = panes[panes.indexOf(current) - 1]; if (p) location.hash = p.id; });
+  nextBtn.addEventListener('click', () => { const p = panes[panes.indexOf(current) + 1]; if (p) location.hash = p.id; });
+  document.querySelectorAll('[data-dx-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const open = btn.dataset.dxToggle === 'open';
+      btn.closest('.ds-pane').querySelectorAll('details.dx-chain').forEach(d => { d.open = open; });
+    });
+  });
+  fromHash();
+
+  // ---- unsaved-change tracking (whole form, all panes) ----
   function refresh() {
     let n = 0;
     form.querySelectorAll('.ds-in').forEach(el => {
@@ -479,6 +752,10 @@
       el.classList.toggle('changed', changed);
       const tr = el.closest('tr'); if (tr) tr.classList.toggle('changed', !!tr.querySelector('.ds-in.changed'));
       if (changed) n++;
+    });
+    links.forEach(a => {
+      const pane = document.getElementById(a.dataset.pane);
+      a.classList.toggle('dirty', !!(pane && pane.querySelector('.ds-in.changed')));
     });
     msg.textContent = n ? n + ' unsaved change' + (n > 1 ? 's' : '') : 'No unsaved changes.';
     msg.className = 'small ' + (n ? 'text-warning fw-bold' : 'text-white-50');
@@ -488,9 +765,7 @@
   form.addEventListener('change', refresh);
   form.addEventListener('submit', () => {
     window.__dirty = false;
-    const sec = [...document.querySelectorAll('[id^="req-"],[id^="rules-"],#lib')]
-      .filter(e => e.getBoundingClientRect().top < window.innerHeight / 2).pop();
-    document.getElementById('anchorField').value = sec ? sec.id : '';
+    document.getElementById('anchorField').value = current ? current.id : '';
   });
 
   window.__dsAfterSave = () => {
@@ -554,6 +829,7 @@
     const table = match ? match[1] : null;
     figures.forEach(f => {
       if (table && f.table !== table) return;
+      if (f.block && !f.block.contains(ev.target)) return;
       if (f.kind === 'dims' && ev.type === 'input') return;
       clearTimeout(f.timer);
       f.timer = setTimeout(() => drawFigure(f), 250);

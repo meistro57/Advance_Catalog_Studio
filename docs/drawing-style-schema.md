@@ -215,6 +215,9 @@ same row values, so the geometry always follows the columns:
   many were left out.
 - **chain anatomy** — a static explainer for one chain (line, ticks, Above,
   Direction), shown once per style.
+- **vertical chains** — `ArrangeAbove` on a Y chain is drawn on the **left**.
+  The DSM guide (2016, p.72): *"In the vertical detail views above is left and
+  below is right."* Earlier figures put it on the right.
 - **dimension setup flags** — `ArrangeGlobally`, `GroupRelatedDimensions`,
   `OneChainPerObjectInPoints1`, `AllowCombine`, `AutomaticallySeparate`,
   `Group` and `LabelContents` are surfaced as badges in the editor table; their
@@ -226,6 +229,72 @@ same row values, so the geometry always follows the columns:
 Two readings above are interpretation, not source data: the box extents as
 "front/behind around a plane", and the clipping columns as the distances drawn.
 Both are called out in the figure footers.
+
+## Dimension request explainer
+
+`catalog_studio/utils/dim_explain.py` turns one `DetViewDimRequestLinear` row
+and its `DetViewDimPointSelection` rows into sentences, shown as one card per
+chain on the view's **Dimensions** screen. It follows the DSM's own three
+questions (guide 2016, ch. 6): what is measured (point selection rules), which
+way the chain runs (direction), where it goes (arrangement switches).
+
+Every line carries a basis tag so a reading is never presented as fact:
+
+| Tag | Source |
+| --- | --- |
+| DSM guide | Meaning from the Drawing Style Manager guide; switch columns matched to the DSM option by name |
+| stored | Read straight from the row (object set name, point count, Direction 0/1) |
+| from name | Parsed from a rule's `RunName` (`Holes - All`, `Main Part - Extreme as reference`) |
+| AS number | A built-in enum value whose label is not in the export; shown unchanged |
+| observed | Seen in Advance Steel output for a real export (verification log A5.1), not yet read from the DSM list |
+
+Column ↔ DSM option matches (by name, cross-checked by the name code):
+
+| Column | DSM option | Name code |
+| --- | --- | --- |
+| `ArrangeGlobally` | Dimension line must not overlap the total geometry | G / L |
+| `ArrangeAbove` | Arrange dimension line above and not below (left/right in vertical views) | T / B |
+| `OneChainPerObjectInPoints1` | Create a separate dimension chain for each item marked with * | S / A |
+| `GroupRelatedDimensions` | Group only related dimensions | — |
+| `AllowCombine` | inverse of "Do not combine with other dimensions" | — |
+| `AutomaticallySeparate` | not described in the guides | — |
+
+The DSM writes the arrangement into the request name (`Mp X - Extreme GTA`).
+The explainer decodes that suffix and warns when it disagrees with the stored
+switches. Across real exports, agreement is evidence that the column matches
+above are right (feeds TODO A5). It also warns when `Number of Points`
+disagrees with the filled `Point1..15`, when a chain has no points, and when
+every point rule is "as reference" (the guide: reference points only appear
+when the chain already has something to measure).
+
+Real exports (the railing style, A5.1) also showed:
+
+- point rule names in the form `Objects | Point kind | Position`
+  (`Railings - Posts Landing | System | Bottom-Any`); the explainer reads the
+  position part against the DSM's position list ("Bottom-Any" = bottom points
+  of the object, any on the main part);
+- `DetViewDimStrategyItems.Type` (→ `AstorDetailsBase.DetRequestTypes`, the
+  DSM dimension type) and `DetViewDimRequestLinear.Group`
+  (→ `DetViewDimRequestLinearGroup`, the DSM folder: Mp / Railings / Others);
+- `DetViewDimStrategyNew.Items`, which names the strategy's item list (equal to
+  its own `Key` in every export seen; the tree follows `Items` when set);
+- `Direction` values 4 and 5 in addition to 0/1.
+
+Not decoded: the point type, position-on-object and visibility columns of
+`DetViewDimPointSelection`, and `Direction` values other than 0/1. The guide
+lists the options (≈20 directions, 27 point types, 15 positions, 3 visibility
+states) but the number → option table is in `AstorDetailsBase`. Those columns
+are listed raw on each card.
+
+## Editor layout
+
+The editor is one form split into screens by a left-hand menu: the style, then
+each view as **View** (setup, scale, box, clipping), **Representation rules**
+and **Dimensions**, then the four libraries and a help screen on reading a
+dimension request. Only one screen shows at a time (`#pane-…` in the URL);
+hidden screens still submit, so one **Save changes** covers every screen and
+menu items with unsaved edits get an orange dot. Old anchors (`#req-<view>`,
+`#rules-<map>`, `#lib`) still resolve to the screen that contains them.
 
 ## Editor behaviour (htmx)
 

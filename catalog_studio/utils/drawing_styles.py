@@ -31,6 +31,8 @@ Advance Steel 2026 exports.
 import re
 from fractions import Fraction
 
+from utils import dim_explain
+
 # ---------------------------------------------------------------------------
 # Pure helpers (unit-tested, no database)
 # ---------------------------------------------------------------------------
@@ -426,6 +428,26 @@ def _label_map(database, table, display="RunName"):
         return {}
 
 
+def set_short_view_names(requests):
+    """Menu labels: drop "Copy of" prefixes and the words every view of the
+    style shares, so "6 - Railing (Mp is Handrail) - Front" reads "Front"."""
+    live = [r for r in requests if not r.get("missing")]
+    names = [dim_explain.clean_name(r["row"].get("RunName")) or f"view {r['row'].get('Key')}" for r in live]
+    cut = 0
+    if len(names) > 1:
+        prefix = names[0]
+        for n in names[1:]:
+            while not n.startswith(prefix):
+                prefix = prefix[:-1]
+        # cut back to the last separator so a word is never split
+        m = max(prefix.rfind(" - "), prefix.rfind(" | "))
+        cut = m + 3 if m >= 0 else 0
+    for r, n in zip(live, names):
+        short = n[cut:].strip() if cut and n[cut:].strip() else n
+        r["short_name"] = short
+    return requests
+
+
 def style_tree(database):
     """Everything the editor page needs, resolved to names."""
     db = _db()
@@ -443,6 +465,7 @@ def style_tree(database):
         "linetype": _label_map(database, "Linetypes", "LinetypeName"),
         "annot_type": _label_map(database, "DetAnnotationType"),
         "point": _label_map(database, "DetViewDimPointSelection"),
+        "dim_group": _label_map(database, "DetViewDimRequestLinearGroup"),
     }
     annot_types = _by_key(_rows(database, "SELECT * FROM DetAnnotationType")) if "DetAnnotationType" in tables else {}
     strategies = _by_key(_rows(database, "SELECT * FROM DetObjAnnotationStrategy")) if "DetObjAnnotationStrategy" in tables else {}
@@ -463,6 +486,7 @@ def style_tree(database):
     dstrats = _by_key(_rows(database, "SELECT * FROM DetViewDimStrategyNew")) if "DetViewDimStrategyNew" in tables else {}
     ditems = _rows(database, "SELECT * FROM DetViewDimStrategyItems ORDER BY [Key], [Order]") if "DetViewDimStrategyItems" in tables else []
     dlins = _by_key(_rows(database, "SELECT * FROM DetViewDimRequestLinear")) if "DetViewDimRequestLinear" in tables else {}
+    dpoints = _by_key(_rows(database, "SELECT * FROM DetViewDimPointSelection")) if "DetViewDimPointSelection" in tables else {}
 
     def build_request(rk):
         r = requests.get(rk)
@@ -482,20 +506,32 @@ def style_tree(database):
             })
             items.append(d)
         dims = []
+        # DetViewDimStrategyNew.Items names the item list; it has matched the
+        # strategy's own Key in every export seen, so fall back to that.
+        strat = dstrats.get(r.get("DimStrategy")) or {}
+        items_key = strat.get("Items") if strat.get("Items") not in NULL_REFS else r.get("DimStrategy")
         for di in ditems:
-            if di["Key"] != r.get("DimStrategy"):
+            if di["Key"] != items_key:
                 continue
             lin = dlins.get(di["RequestLinear"])
-            pts = []
+            pts, pkeys = [], []
             if lin:
                 for i in range(1, int(lin.get("Number of Points") or 0) + 1):
                     pkey = lin.get(f"Point{i}")
                     pts.append(names["point"].get(pkey, f"#{pkey}"))
+                    pkeys.append(pkey)
             dims.append({
                 **tokrow("DetViewDimStrategyItems", di),
                 "linear": tokrow("DetViewDimRequestLinear", lin) if lin else None,
                 "points": pts,
+                "point_keys": pkeys,
             })
+        explained = dim_explain.explain_strategy(dims, dpoints, names["qset"], names["dim_group"])
+        for d, e in zip(dims, explained):
+            d["explain"] = e
+            d["point_rows"] = [
+                tokrow("DetViewDimPointSelection", dpoints[k]) for k in d["point_keys"] if k in dpoints
+            ]
         sb = sysbox.get(r.get("SystemAndBox"))
         cl = clips.get(r.get("LengthclipXY"))
         rm = rmaps.get(r.get("ObjReprMap"))
@@ -526,6 +562,7 @@ def style_tree(database):
                 "cut_title_preview": parse_label_format(s.get("CutViewTitleFormat")),
                 "requests": [build_request(k) for k in reqs],
             }
+            set_short_view_names(style["requests"])
         masters.append({**tokrow("DetailMasterTable", m), "style": style})
 
     libraries = {}

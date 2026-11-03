@@ -203,3 +203,24 @@ def test_label_parse_guide_tokens_preview_as_values():
     samples = [s["sample"] for s in p["lines"][0] if s["kind"] == "field"]
     assert samples == ["1/2\"", "8\"", "Beam", "EN-2", "UA10"]
     assert all(s["known"] for s in p["lines"][0] if s["kind"] == "field")
+
+
+def test_short_view_names_drop_copy_and_the_shared_words():
+    reqs = [{"row": {"Key": 1, "RunName": "Copy of 6 - Railing (Mp is Handrail) - Front"}},
+            {"missing": 9},
+            {"row": {"Key": 2, "RunName": "Copy of 6 - Railing (Mp is Handrail) - Top"}}]
+    ds.set_short_view_names(reqs)
+    assert reqs[0]["short_name"] == "Front" and reqs[2]["short_name"] == "Top"
+    assert "short_name" not in reqs[1]
+
+
+def test_short_view_names_keep_a_single_view_whole():
+    reqs = [{"row": {"Key": 1, "RunName": "Copy of Elevation - Full"}}]
+    ds.set_short_view_names(reqs)
+    assert reqs[0]["short_name"] == "Elevation - Full"
+
+
+def test_short_view_names_never_split_a_word():
+    reqs = [{"row": {"Key": 1, "RunName": "Plan North"}}, {"row": {"Key": 2, "RunName": "Plan Nest"}}]
+    ds.set_short_view_names(reqs)
+    assert reqs[0]["short_name"] == "Plan North" and reqs[1]["short_name"] == "Plan Nest"

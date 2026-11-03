@@ -130,11 +130,17 @@ and display-name token replacement.
   flashed messages into `#flashHost`. Keep the plain `form="ruleForm"` submit
   path working as the no-JS fallback, and keep `fld` in
   `_drawing_macros.html` (imported `with context`). htmx 2.0.4 is vendored at
-  `static/vendor/htmx/htmx.min.js` so the tool stays offline. The libraries card
-  at the bottom of the page uses Bootstrap **collapse** (`data-bs-parent="#libPanes"`),
-  not `data-bs-toggle="tab"`: one library pane is open at a time and clicking the
-  open tab closes it. Keep `aria-expanded`/`aria-controls` in sync, and keep the
-  panes' content unconditional (they are hidden, never server-gated).
+  `static/vendor/htmx/htmx.min.js` so the tool stays offline.
+- The drawing-style editor is **menu-driven**: a sticky `<nav>` of `data-pane`
+  links plus one visible `section.ds-pane` at a time, selected by
+  `location.hash` (`#pane-style-…`, `#pane-view-…`, `#pane-rules-…`,
+  `#pane-dims-…`, `#pane-lib-…`, `#pane-guide-dims`) with prev/next buttons.
+  Rule actions and saves redirect to those fragments, so a pane id is part of
+  the route contract — `tests/test_drawing_style_page.py` pins the pane list,
+  the redirect targets and the single save form. Panes are hidden in the
+  browser, never server-gated: every screen stays in the one form so one POST
+  saves the whole style. The old library tab strip is gone; do not reintroduce
+  `data-bs-toggle="tab"` or a second scroll container.
 - `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
   schematic SVG figures (style overview, print-scale ruler, view box, length
   clipping, dimension-chain anatomy, per-view dimension plan, single chain,
