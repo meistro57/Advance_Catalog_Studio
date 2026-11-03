@@ -97,6 +97,7 @@ def _stub_pipeline(monkeypatch, tmp_path, payload=(b"mdf-bytes", b"ldf-bytes")):
     copies = []
     offline_calls = []
 
+    monkeypatch.setattr(db, "ensure_windows_file_paths", lambda database: [])
     monkeypatch.setattr(db, "get_physical_files", lambda database: {
         "mdf": "/var/opt/mssql/attach/SomeDb.mdf",
         "ldf": "/var/opt/mssql/attach/SomeDb_log.ldf",
@@ -157,6 +158,7 @@ def test_export_copy_failure_returns_to_the_page_that_asked(monkeypatch):
     import app as app_module
     from utils import db
 
+    monkeypatch.setattr(db, "ensure_windows_file_paths", lambda database: [])
     monkeypatch.setattr(db, "get_physical_files", lambda database: {"mdf": "a", "ldf": "b"})
 
     @contextlib.contextmanager
@@ -177,6 +179,7 @@ def test_export_copy_failure_returns_to_the_page_that_asked(monkeypatch):
 def test_export_copy_failure_ignores_a_forged_return_to(monkeypatch):
     from utils import db
 
+    monkeypatch.setattr(db, "ensure_windows_file_paths", lambda database: [])
     monkeypatch.setattr(db, "get_physical_files", lambda database: {})
 
     client = _client_with_csrf()

@@ -38,7 +38,7 @@ Each entry records:
 | A3 | Shear-stud clone round trip and `ConnectorRelations.Key` | not started |
 | A4 | Drawing-style edit round trip (same-name import) | not started |
 | A5 | `AstorDetailsBase` enum labels in the AS UI | in progress — one drawing observation (A5.1), DSM list not read yet |
-| A6 | Exported `.mdf` / `.ldf` pair imports cleanly | failed on SQL 2022 (A6.1); fix in place, re-test pending |
+| A6 | Exported `.mdf` / `.ldf` pair imports cleanly | **pass** with Windows-form file paths (A6.10); confirm with an edited export through the app |
 
 ## Known results
 
@@ -173,3 +173,36 @@ report instead of applying.
   the style database had been exported minutes earlier.
 - Verdict: **fixed** (code + tests). This also explains the 16:16 export
   failure that A6.3 was investigating.
+
+### A6.10 — Advance Steel refuses Linux file paths stored in the mdf
+
+(Numbered after A6.5–A6.9 in the local investigation log, which established
+that data, schema release, compatibility level, boot page, line endings and
+the `.ldf` were all identical or irrelevant, and that one unedited
+attach/detach cycle was enough to be refused.)
+
+- Date / operator: 2026-11-03 / Mark Hubrich (imports); files built in a
+  `mssql/server:2019-latest` scratch container.
+- AS build: Advance Steel 2026 (build not recorded).
+- File(s): `Marks 6 - Railing (Mp is Handrail)` style export, original pair.
+- Operation: two unedited round trips of the same file, each under a name
+  never imported before, then Drawing Style Manager → Import:
+  - **A** attached as `/var/opt/mssql/attach/RT.mdf` (how the app attached
+    until now);
+  - **B** attached as `C:\var\opt\mssql\attach\W2.mdf` (SQL Server on Linux
+    maps `C:\` to its root, so it is the same file).
+- Expected: if the stored file path is the cause, A refused and B accepted.
+- Observed: the paths the mdf records (`DBCC CHECKPRIMARYFILE (file, 3)`):
+  original `S:\AS-Anchors\Marks 6 - Railing (Mp is Handrail).mdf`, A
+  `/var/opt/mssql/attach/RT.mdf`, B `C:\var\opt\mssql\attach\W2.mdf`; both
+  904; A and B differ in 322 bytes. **B imported; A did not.**
+- Verdict: **pass** for B. Advance Steel rejects a file whose stored paths are
+  not Windows paths and reports it as "Source database is older than Release
+  5.1!". Fresh names alone (A) did not help, so reused names were not the cause.
+- Change: `db.attach_database` / `create_empty_database` give SQL Server
+  `C:\...` paths; `db.ensure_windows_file_paths` re-homes databases attached
+  the old way (MODIFY FILE + offline/online) before **Export a copy** and
+  **Detach & Export**; `get_physical_files` converts back for `docker cp`.
+  Checked live: a new attach stores `C:\...`, an old-style database is re-homed
+  and stays online, both survive detach.
+- Unblocks: A6 once an *edited* export made through the app imports.

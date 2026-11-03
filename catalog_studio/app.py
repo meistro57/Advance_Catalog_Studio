@@ -1037,6 +1037,7 @@ def export_copy(database):
     by side. The pair also stays in ``exports/`` for the dashboard links.
     """
     try:
+        db.ensure_windows_file_paths(database)  # Advance Steel refuses Linux paths
         files = db.get_physical_files(database)
         if not files.get("mdf") or not files.get("ldf"):
             raise RuntimeError(f"Couldn't find the physical mdf/ldf for '{database}'.")
@@ -1078,6 +1079,7 @@ def detach(database):
         # Ask SQL Server where the files really live BEFORE detaching -- the
         # physical names needn't match the database name, and docker cp needs
         # an absolute in-container path.
+        db.ensure_windows_file_paths(database)  # Advance Steel refuses Linux paths
         files = db.get_physical_files(database)
         if not files.get("mdf") or not files.get("ldf"):
             raise RuntimeError(f"Couldn't find the physical mdf/ldf for '{database}'.")
