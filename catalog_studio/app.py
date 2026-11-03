@@ -1198,6 +1198,10 @@ def drawing_style_rule(database):
     An htmx request gets just that map's rules block back, so reordering or
     copying a rule keeps the page (and scroll position) intact; a plain form
     post still redirects to the rebuilt page.
+
+    `uid` ("<view key>-<map key>") comes back with the action so the returned
+    fragment keeps the same element ids: one representation map can be shared by
+    several views, and each one renders its own copy of the block.
     """
     blocked = _blocked_write(database)
     if blocked:
@@ -1205,6 +1209,10 @@ def drawing_style_rule(database):
     raw_op = request.form.get("op", "")
     parts = raw_op.split(":")
     map_key = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+    # View key first, map key second; anything else is ignored, never echoed.
+    uid = request.form.get("uid", "")
+    if not uid or not all(part.isdigit() for part in uid.split("-")) or len(uid.split("-")) > 2:
+        uid = None
     error = None
     try:
         action, key, order = parts
@@ -1231,14 +1239,18 @@ def drawing_style_rule(database):
         flash_html = render_template("_flash_oob.html")
         if map_key is None:
             return Response(flash_html, mimetype="text/html")
-        block = drawing_styles.repr_block(database, map_key, _style_relations_or_none(database))
+        block = drawing_styles.repr_block(
+            database, map_key, _style_relations_or_none(database), uid=uid)
         rules_html = render_template(
             "_drawing_rules.html", database=database, block=block,
             options=block["options"], rule_error=error,
             ftin=drawing_styles.format_ft_in,
         )
         return Response(rules_html + flash_html, mimetype="text/html")
-    return redirect(url_for("drawing_style", database=database) + f"#rules-{map_key or ''}")
+    # No-JS fallback: land on the rules screen of the view that sent the action.
+    view_key = uid.split("-")[0] if uid and "-" in uid else None
+    anchor = f"#pane-rules-{view_key}" if view_key else f"#pane-rules-{map_key or ''}"
+    return redirect(url_for("drawing_style", database=database) + anchor)
 
 
 @app.route("/db/<database>/drawing-style/label-preview", methods=["POST"])

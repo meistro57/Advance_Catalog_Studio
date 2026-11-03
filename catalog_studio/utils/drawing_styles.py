@@ -582,11 +582,15 @@ def style_tree(database):
     return {"masters": masters, "libraries": libraries, "qset_items": qset_items}
 
 
-def repr_block(database, map_key, relations=None):
+def repr_block(database, map_key, relations=None, uid=None):
     """One representation map's rules, for an in-place partial re-render.
 
     Rule actions (move / copy / delete / renumber) only need this block, so
     the editor can swap it without rebuilding the whole style page.
+
+    `uid` scopes the block's element ids. A representation map can be shared by
+    several views, so the page passes "<view key>-<map key>"; the standalone
+    fragment falls back to the map key, which is unique within one request.
     """
     db = _db()
     tables = set(db.list_tables(database))
@@ -631,6 +635,7 @@ def repr_block(database, map_key, relations=None):
         items.append(entry)
 
     return {
+        "uid": uid or str(map_key),
         "map_key": map_key,
         "repr_map": {"row": rmap, "token": rmap_token},
         "repr_items": items,

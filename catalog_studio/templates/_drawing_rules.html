@@ -1,17 +1,20 @@
 {% from "_drawing_macros.html" import fld with context %}
 {#- One representation map's rules (ladder + editable table). Rendered inside
     the editor page and re-rendered on its own by the rule actions, so a
-    reorder never costs a full page load. Needs: block (map_key, repr_map,
-    repr_items, options), database, csrf_token. Optional: rule_error. -#}
-<div id="repr-{{ block.map_key }}" class="repr-block">
+    reorder never costs a full page load. Needs: block (uid, map_key, repr_map,
+    repr_items, options), database, csrf_token. Optional: rule_error.
+    `uid` scopes the ids: two views can share one representation map, so the
+    page passes "<view key>-<map key>" and the ids stay unique. -#}
+<div id="repr-{{ block.uid }}" class="repr-block">
+  <input type="hidden" form="ruleForm" name="uid" value="{{ block.uid }}">
   {% if rule_error %}<div class="alert alert-danger py-1 px-2 small mb-2">{{ rule_error }}</div>{% endif %}
-  <div class="ds-sub d-flex justify-content-between align-items-end" id="rules-{{ block.map_key }}">
+  <div class="ds-sub d-flex justify-content-between align-items-end" id="rules-{{ block.uid }}">
     <span>Representation rules &mdash; {{ block.repr_map.row.RunName if block.repr_map and block.repr_map.row else '?' }} ({{ block.repr_items|length }})</span>
     <button type="submit" form="ruleForm" name="op" value="renumber:{{ block.map_key }}:0"
             class="btn btn-sm btn-outline-secondary py-0"
             hx-post="{{ url_for('drawing_style_rule', database=database) }}"
-            hx-vals='{"op": "renumber:{{ block.map_key }}:0"}'
-            hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+            hx-vals='{"op": "renumber:{{ block.map_key }}:0", "uid": "{{ block.uid }}"}'
+            hx-target="closest .repr-block" hx-swap="outerHTML"
             hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">Renumber</button>
   </div>
   <div class="ds-hint mb-1">Rules run top to bottom; each object set is drawn by the first rule that matches it. Repeated sets with a different
@@ -53,27 +56,27 @@
           <button type="submit" form="ruleForm" name="op" value="up:{{ it.row.Key }}:{{ it.row.Order }}"
                   class="btn btn-sm btn-outline-secondary py-0" title="Move up" {% if loop.first %}disabled{% endif %}
                   hx-post="{{ url_for('drawing_style_rule', database=database) }}"
-                  hx-vals='{"op": "up:{{ it.row.Key }}:{{ it.row.Order }}"}'
-                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-vals='{"op": "up:{{ it.row.Key }}:{{ it.row.Order }}", "uid": "{{ block.uid }}"}'
+                  hx-target="closest .repr-block" hx-swap="outerHTML"
                   hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&uarr;</button>
           <button type="submit" form="ruleForm" name="op" value="down:{{ it.row.Key }}:{{ it.row.Order }}"
                   class="btn btn-sm btn-outline-secondary py-0" title="Move down" {% if loop.last %}disabled{% endif %}
                   hx-post="{{ url_for('drawing_style_rule', database=database) }}"
-                  hx-vals='{"op": "down:{{ it.row.Key }}:{{ it.row.Order }}"}'
-                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-vals='{"op": "down:{{ it.row.Key }}:{{ it.row.Order }}", "uid": "{{ block.uid }}"}'
+                  hx-target="closest .repr-block" hx-swap="outerHTML"
                   hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&darr;</button>
           <button type="submit" form="ruleForm" name="op" value="copy:{{ it.row.Key }}:{{ it.row.Order }}"
                   class="btn btn-sm btn-outline-success py-0" title="Copy below"
                   hx-post="{{ url_for('drawing_style_rule', database=database) }}"
-                  hx-vals='{"op": "copy:{{ it.row.Key }}:{{ it.row.Order }}"}'
-                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-vals='{"op": "copy:{{ it.row.Key }}:{{ it.row.Order }}", "uid": "{{ block.uid }}"}'
+                  hx-target="closest .repr-block" hx-swap="outerHTML"
                   hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&#10697;</button>
           <button type="submit" form="ruleForm" name="op" value="delete:{{ it.row.Key }}:{{ it.row.Order }}"
                   class="btn btn-sm btn-outline-danger py-0" title="Delete"
                   hx-confirm="Delete rule {{ it.row.Order }} ({{ it.qset_name }})?"
                   hx-post="{{ url_for('drawing_style_rule', database=database) }}"
-                  hx-vals='{"op": "delete:{{ it.row.Key }}:{{ it.row.Order }}"}'
-                  hx-target="#repr-{{ block.map_key }}" hx-swap="outerHTML"
+                  hx-vals='{"op": "delete:{{ it.row.Key }}:{{ it.row.Order }}", "uid": "{{ block.uid }}"}'
+                  hx-target="closest .repr-block" hx-swap="outerHTML"
                   hx-include="#ruleForm [name=csrf_token]" hx-disabled-elt="this">&times;</button>
         </td>
       </tr>

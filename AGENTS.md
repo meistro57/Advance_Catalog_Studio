@@ -131,6 +131,17 @@ and display-name token replacement.
   path working as the no-JS fallback, and keep `fld` in
   `_drawing_macros.html` (imported `with context`). htmx 2.0.4 is vendored at
   `static/vendor/htmx/htmx.min.js` so the tool stays offline.
+- Rule blocks are **scoped to a view**, not to the map: one representation map
+  can be shared by several views, so the page passes
+  `block.uid = "<view key>-<map key>"` and the ids become
+  `#repr-<view>-<map>` / `#rules-<view>-<map>`. The buttons use
+  `hx-target="closest .repr-block"` (never `#repr-<map>`, which would swap the
+  first view's block) and send `uid` back through `hx-vals`; a hidden
+  `form="ruleForm"` input carries it on the no-JS path. `drawing_style_rule`
+  re-renders the fragment with the same uid and falls back to the map key when
+  none is given; a uid that is not digits and at most one dash is dropped, never
+  echoed. `tests/test_drawing_style_page.py` renders two views aliasing one map
+  and fails on any duplicate `id`.
 - The drawing-style editor is **menu-driven**: a sticky `<nav>` of `data-pane`
   links plus one visible `section.ds-pane` at a time, selected by
   `location.hash` (`#pane-style-…`, `#pane-view-…`, `#pane-rules-…`,

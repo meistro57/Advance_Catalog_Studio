@@ -440,7 +440,8 @@
 <section class="ds-pane" id="pane-rules-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · Representation rules">
 <div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }} &rsaquo; Representation rules</div>
 <div class="card ds-card"><div class="card-body">
-  {% with block = {'map_key': r.row.ObjReprMap, 'repr_map': r.repr_map, 'repr_items': r.repr_items},
+  {% with block = {'uid': r.row.Key ~ '-' ~ r.row.ObjReprMap, 'map_key': r.row.ObjReprMap,
+                   'repr_map': r.repr_map, 'repr_items': r.repr_items},
           options = options.DetObjReprMapItems %}
   {% include "_drawing_rules.html" %}
   {% endwith %}

@@ -25,6 +25,7 @@ def _item(order, key=22001, **overrides):
 
 def _block():
     return {
+        "uid": "22001",
         "map_key": 22001,
         "repr_map": {"row": {"Key": 22001, "RunName": "Column - Top"}, "token": "map-tok"},
         "repr_items": [_item(0), _item(1)],
@@ -57,9 +58,12 @@ def test_rules_partial_contains_ladder_table_and_htmx_wiring():
     assert html.count('class="sd-step"') == 2
     assert 'class="ord">0<' in html and 'class="ord">1<' in html
     assert 'hx-post="/db/Demo/drawing-style/rule"' in html
-    assert 'hx-vals=\'{"op": "up:22001:1"}\'' in html
-    assert 'hx-target="#repr-22001"' in html and 'hx-swap="outerHTML"' in html
+    assert 'hx-vals=\'{"op": "up:22001:1", "uid": "22001"}\'' in html
+    # Class-relative target: one representation map can appear under several views.
+    assert 'hx-target="closest .repr-block"' in html and 'hx-swap="outerHTML"' in html
+    assert 'hx-target="#repr-' not in html
     assert 'hx-include="#ruleForm [name=csrf_token]"' in html
+    assert '<input type="hidden" form="ruleForm" name="uid" value="22001">' in html
     assert 'hx-confirm="Delete rule 0 (Beams)?"' in html
     assert "renumber:22001:0" in html
 
@@ -83,7 +87,7 @@ def test_rule_action_answers_htmx_with_the_block(monkeypatch):
 
     client = _client()
     resp = client.post("/db/Demo/drawing-style/rule",
-                       data={"op": "up:22001:1", "csrf_token": "tok"},
+                       data={"op": "up:22001:1", "uid": "22001-22001", "csrf_token": "tok"},
                        headers={"HX-Request": "true"})
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
@@ -99,7 +103,43 @@ def test_rule_action_without_htmx_still_redirects(monkeypatch):
     resp = client.post("/db/Demo/drawing-style/rule",
                        data={"op": "renumber:22001:0", "csrf_token": "tok"})
     assert resp.status_code == 302
-    assert "#rules-22001" in resp.headers["Location"]
+    assert resp.headers["Location"].endswith("#pane-rules-22001")
+
+
+def test_rule_action_redirects_to_the_view_that_sent_it(monkeypatch):
+    """The no-JS fallback must land on the rules screen of the sending view, not
+    on a shared map's anchor (which may belong to another view)."""
+    import app as app_module
+    monkeypatch.setattr(app_module.drawing_styles, "compact_repr_orders", lambda *a, **k: None)
+    client = _client()
+    resp = client.post("/db/Demo/drawing-style/rule",
+                       data={"op": "renumber:900:0", "uid": "22002-900", "csrf_token": "tok"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("#pane-rules-22002")
+
+
+def test_rule_action_ignores_a_forged_uid(monkeypatch):
+    """A uid is echoed into element ids, so anything but digits and one dash is
+    dropped instead of reaching the template."""
+    import app as app_module
+    seen = {}
+
+    def fake_repr_block(database, map_key, relations=None, uid=None):
+        seen["uid"] = uid
+        block = _block()
+        block["uid"] = uid or str(map_key)
+        return block
+
+    monkeypatch.setattr(app_module.drawing_styles, "repr_block", fake_repr_block)
+    monkeypatch.setattr(app_module.drawing_styles, "move_repr_item", lambda *a, **k: None)
+    monkeypatch.setattr(app_module, "_style_relations_or_none", lambda database: None)
+    client = _client()
+    resp = client.post("/db/Demo/drawing-style/rule",
+                       data={"op": "up:22001:1", "uid": '"><script>', "csrf_token": "tok"},
+                       headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    assert seen["uid"] is None
+    assert '<script>' not in resp.get_data(as_text=True)
 
 
 def test_rule_action_error_is_flashed_and_shown(monkeypatch):

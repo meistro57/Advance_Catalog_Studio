@@ -3,6 +3,7 @@ setup / rules / dimensions, libraries, help) and every dimension chain gets a
 plain-language card. Rendered from a synthetic tree; no SQL Server needed."""
 
 from collections import defaultdict
+import re
 
 from flask import render_template
 
@@ -26,35 +27,42 @@ POINTS = {
 }
 
 
-def _tree():
-    dims = []
-    for order, (key, name, above) in enumerate([(400, "Mp X - Extreme GTA", True),
-                                                (401, "Mp X - Holes GBA", True)]):
-        dims.append({
-            "row": {"Key": 300, "Order": order, "RequestLinear": key},
-            "token": f"item-{order}",
-            "linear": {"row": _linear(key, name, above), "token": f"lin-{key}"},
-            "points": ["Holes - All", "Main Part - Extreme as reference"],
-            "point_keys": [500, 501],
-            "point_rows": [{"row": POINTS[500], "token": "pt-500"}, {"row": POINTS[501], "token": "pt-501"}],
+def _tree(view_keys=(22001,)):
+    """One style whose views all alias representation map 900 and dimension
+    strategy 300, the shape that used to emit duplicate element ids."""
+    requests = []
+    for view_key in view_keys:
+        dims = []
+        for order, (key, name, above) in enumerate([(400, "Mp X - Extreme GTA", True),
+                                                    (401, "Mp X - Holes GBA", True)]):
+            dims.append({
+                "row": {"Key": 300, "Order": order, "RequestLinear": key},
+                "token": f"item-{order}",
+                "linear": {"row": _linear(key, name, above), "token": f"lin-{key}"},
+                "points": ["Holes - All", "Main Part - Extreme as reference"],
+                "point_keys": [500, 501],
+                "point_rows": [{"row": POINTS[500], "token": "pt-500"},
+                               {"row": POINTS[501], "token": "pt-501"}],
+            })
+        for d, e in zip(dims, dim_explain.explain_strategy(dims, POINTS, {70: "Holes"})):
+            d["explain"] = e
+        requests.append({
+            "row": {"Key": view_key, "RunName": "Elevation" if view_key == 22001 else f"View {view_key}",
+                    "Scale": 0.0625, "ObjReprMap": 900, "DimStrategy": 300},
+            "token": "req-tok" if view_key == 22001 else f"req-tok-{view_key}",
+            "scale_label": '3/4" = 1\'-0"', "scale_denom": 16,
+            "sysbox": None, "clip": None,
+            "repr_map": {"row": {"Key": 900, "RunName": "Elevation map"}, "token": "map-tok"},
+            "repr_items": [],
+            "dim_strategy": {"row": {"Key": 300, "RunName": "Beam elevation"}, "token": "ds-tok"},
+            "dims": dims,
         })
-    for d, e in zip(dims, dim_explain.explain_strategy(dims, POINTS, {70: "Holes"})):
-        d["explain"] = e
-    request = {
-        "row": {"Key": 22001, "RunName": "Elevation", "Scale": 0.0625, "ObjReprMap": 900, "DimStrategy": 300},
-        "token": "req-tok", "scale_label": '3/4" = 1\'-0"', "scale_denom": 16,
-        "sysbox": None, "clip": None,
-        "repr_map": {"row": {"Key": 900, "RunName": "Elevation map"}, "token": "map-tok"},
-        "repr_items": [],
-        "dim_strategy": {"row": {"Key": 300, "RunName": "Beam elevation"}, "token": "ds-tok"},
-        "dims": dims,
-    }
     tree = {
         "masters": [{
             "row": {"Key": 1, "RunName": "3 - Elevation", "BaseCategory": 1, "SubCategory": 2},
             "token": "m-tok",
             "style": {"row": {"Key": 10, "RunName": "Elevation"}, "token": "s-tok",
-                      "title_preview": None, "cut_title_preview": None, "requests": [request]},
+                      "title_preview": None, "cut_title_preview": None, "requests": requests},
         }],
         "libraries": {},
         "qset_items": {},
@@ -62,12 +70,12 @@ def _tree():
     return style_diagrams.decorate_tree(tree)
 
 
-def _render():
+def _render(tree=None):
     from app import app
     options = defaultdict(lambda: defaultdict(list))
     with app.test_request_context("/"):
         return render_template(
-            "drawing_style.html", database="Demo", tree=_tree(), options=options,
+            "drawing_style.html", database="Demo", tree=tree or _tree(), options=options,
             report={"dangling": [], "notes": [], "checked": 5}, meta={},
             scale_choices=[(0.0625, '3/4" = 1\'-0"')], length_cols={}, ftin=lambda v: None,
             scale_denom=lambda v: 16, label_tokens=["Name"], label_escapes=["c"],
@@ -86,10 +94,30 @@ def test_page_is_split_into_menu_panes():
 
 def test_old_anchors_still_exist_for_redirects():
     html = _render()
-    # rule actions redirect to #rules-<map>; old saves to #req-<view>; both land inside a pane
-    assert 'id="rules-900"' in html
+    # Rule blocks are scoped to their view (one map can serve several views);
+    # old saves still land on #req-<view>, and both sit inside a pane.
+    assert 'id="rules-22001-900"' in html
     assert 'id="req-22001"' in html
     assert 'id="lib"' in html
+
+
+def test_a_shared_representation_map_renders_once_per_view():
+    html = _render(_tree(view_keys=(22001, 22002)))
+    assert 'id="repr-22001-900"' in html and 'id="repr-22002-900"' in html
+    assert 'id="rules-22001-900"' in html and 'id="rules-22002-900"' in html
+    # htmx must not address a shared map by id: it swaps the block it sits in.
+    assert 'hx-target="#repr-' not in html
+    assert 'hx-target="closest .repr-block"' in html
+    # Each block carries its own uid back to the server.
+    assert 'name="uid" value="22001-900"' in html
+    assert 'name="uid" value="22002-900"' in html
+
+
+def test_two_views_sharing_sub_styles_emit_no_duplicate_ids():
+    html = _render(_tree(view_keys=(22001, 22002)))
+    ids = re.findall(r'id="([^"]+)"', html)
+    duplicated = sorted({i for i in ids if ids.count(i) > 1})
+    assert duplicated == []
 
 
 def test_every_chain_gets_a_plain_language_card():
