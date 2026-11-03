@@ -122,3 +122,54 @@ report instead of applying.
 - Verdict: **pass** for the environment (2019 server, attach/detach, file
   version preserved). A6 stays open: the Advance Steel import itself has not
   been re-run.
+### A6.3 — A 904 export is refused too, so the SQL file version is not the whole story
+
+- Date / operator: 2026-11-03 / same railing style, after the scratch container
+  was rebuilt on SQL Server 2019 (A6.2).
+- What was imported: `marks_rail.mdf` + `marks_rail_log.ldf`, exported by
+  Catalog Studio from the 2019 container at 2026-11-03 09:59.
+- Observed: Advance Steel reports the same *"Source database is older than
+  Release 5.1!"* it gave for the 2022 (957) export in A6.1. The file itself is
+  **904**: `DBCC CHECKPRIMARYFILE` reads version 904, it attaches and detaches
+  cleanly on the scratch 2019 server, `compatibility_level` is 120 (identical
+  to the working `samples/A325TC.mdf`), and its `DbVersion` table lists schema
+  versions per detail table (`DetObjAnnotationStrategy` = 2, the rest = 1).
+- Reading: A6.1's conclusion covered only one cause. A file that is 904 can be
+  refused as well, so the message is not a reliable statement about SQL Server
+  file version — Advance Steel compares something else (most likely the
+  per-table schema release in `DbVersion`) and words every mismatch as
+  "older". Do not treat 904 as proof that an export will import.
+- Next experiment: export the same style (and one stock style) **directly from
+  Advance Steel 2026's Drawing Style Manager**, then compare that file's
+  `DbVersion` and table list with ours. That isolates "our export is wrong"
+  from "this style library predates AS 2026".
+- Verdict: **open**. A6.1's fix (2019 container) removes one real hazard but
+  does not close A6.
+- Follow-up (same day): a second style export attached for comparison
+  (`Beam`) has the same 45 tables and identical `DbVersion` rows as both the
+  railing style and our re-export of it, and `compatibility_level`, state and
+  page-verify options match. Catalog Studio's export is therefore a faithful
+  round trip of what Advance Steel produced — the refusal is not caused by
+  anything this tool writes. The remaining split is "this style library predates
+  what AS 2026 accepts" versus "AS refuses re-imports of its own export here";
+  importing an AS-produced file straight into AS still decides it.
+
+### A6.4 — Two databases were attached on one physical file
+
+- Date / operator: 2026-11-03 / found while exporting a copy of `mark_rail`.
+- Observed: `sys.master_files` showed `Beam` and `mark_rail` both pointing at
+  `/var/opt/mssql/attach/Marks_6_-_Railing_Mp_is_Handrail.mdf` (with different
+  log files). Taking one online failed with `FCB::Open ... OS error 5 (Access is
+  denied)` and left it `RECOVERY_PENDING`, undetachable (`5173`: files do not
+  match the primary file).
+- Cause: attach copied the staged upload into the container under its uploaded
+  filename, so attaching the same file twice under two database names gave both
+  databases the same `mdf`. SQL Server can only open a database file for one
+  database at a time; the second one gets the access error.
+- Fixed: attach copies in as `<db>.mdf` / `<db>_log.ldf`, so every database owns
+  its files (`tests/test_attach_files.py`).
+- Repair: the wedged duplicate was dropped, and one copy was re-attached from
+  its own export pair (its own files, 45 tables, ONLINE). No user data was lost;
+  the style database had been exported minutes earlier.
+- Verdict: **fixed** (code + tests). This also explains the 16:16 export
+  failure that A6.3 was investigating.
