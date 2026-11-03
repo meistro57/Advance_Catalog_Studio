@@ -225,7 +225,9 @@ The home page is the ingest/edit/export control centre. It shows:
 - databases currently attached to the scratch SQL Server;
 - Advance Steel version and type tags (bolt, anchor, shear stud, drawing style);
 - new bolt and anchor catalog creation;
-- completed exports ready for download.
+- completed exports ready for download, with a **Clear exports** action that
+  moves them into `exports/.trash` (same recoverable-then-purge pattern) so the
+  download list does not grow forever.
 
 ### Light and dark mode
 

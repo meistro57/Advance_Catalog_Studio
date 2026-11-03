@@ -69,6 +69,13 @@ ICONS = {
     ),
     # Download / export.
     "download": '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/>',
+    # Clear into the trash.
+    "trash": (
+        '<path d="M4 6.75h16"/>'
+        '<path d="M9.5 4h5"/>'
+        '<path d="M6.5 6.75 7.6 20.5h8.8l1.1-13.75"/>'
+        '<path d="M10.5 10.5v6M13.5 10.5v6"/>'
+    ),
     # Duplicate a row.
     "duplicate": (
         '<rect x="8.25" y="2.75" width="12" height="12" rx="2"/>'

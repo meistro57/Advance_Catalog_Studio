@@ -128,7 +128,8 @@ def index():
                 flash(problem, "danger")
         except Exception as e:
             flash(f"Could not reach the scratch SQL Server container: {e}", "danger")
-    exports = staging.list_exports()
+    exports_status = staging_cleanup.scan_upload_dir(config.EXPORT_DIR)
+    exports = staging_cleanup.list_catalog_files(config.EXPORT_DIR)
     meta = metadata.all_meta()
     return render_template(
         "index.html",
@@ -137,6 +138,7 @@ def index():
         uploads_status=staged_status,
         attached=attached,
         exports=exports,
+        exports_status=exports_status,
         container_up=container_up,
         meta=meta,
         catalog_types=CATALOG_TEMPLATES,
@@ -225,6 +227,49 @@ def uploads_purge():
     flash(
         f"Purged {result['purged']} item(s) from the staging trash "
         f"({result['bytes'] / 1024:.2f} KiB reclaimed).", "success"
+    )
+    return redirect(url_for("index"))
+
+
+@app.route("/exports/clear", methods=["POST"])
+def exports_clear():
+    """Move every finished export into exports/.trash (recoverable).
+
+    The targets are re-derived from the export directory on the server, never
+    taken from the browser. Attached databases and the staging area are
+    untouched: the files here are finished copies for Advance Steel's import.
+    """
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    files = staging_cleanup.list_catalog_files(config.EXPORT_DIR)
+    if not files:
+        flash("There are no exports to clear.", "info")
+        return redirect(url_for("index"))
+    result = staging_cleanup.move_to_trash(config.EXPORT_DIR, files)
+    _report_cleanup(result)
+    status = staging_cleanup.scan_upload_dir(config.EXPORT_DIR)
+    flash(
+        f"Cleared {len(result['moved'])} export file(s) into exports/.trash "
+        f"({status['trash']['bytes'] / 1048576:.2f} MiB held). Nothing attached "
+        f"was touched; purge the trash to reclaim the space.",
+        "success",
+    )
+    return redirect(url_for("index"))
+
+
+@app.route("/exports/purge", methods=["POST"])
+def exports_purge():
+    """Permanently delete exports/.trash. The point of no return for exports."""
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    try:
+        result = staging_cleanup.purge_trash(config.EXPORT_DIR)
+    except staging_cleanup.StagingCleanupError as e:
+        flash(f"Purge failed: {e}", "danger")
+        return redirect(url_for("index"))
+    flash(
+        f"Purged {result['purged']} item(s) from the export trash "
+        f"({result['bytes'] / 1048576:.2f} MiB reclaimed).", "success"
     )
     return redirect(url_for("index"))
 

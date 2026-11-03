@@ -236,3 +236,75 @@ def test_purge_flow(app_client):
     client.post("/uploads/flush", data={"csrf_token": _csrf(client)})
     assert client.post("/uploads/purge", data={"csrf_token": _csrf(client)}).status_code == 302
     assert client.get("/uploads/status").get_json()["trash"]["count"] == 0
+
+
+# --- exports: "Clear exports" on the dashboard ------------------------------
+
+@pytest.fixture()
+def export_client(monkeypatch, tmp_path):
+    import config
+    from app import app
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    monkeypatch.setattr(config, "EXPORT_DIR", str(exports))
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        client.get("/")  # establishes the session + CSRF token
+        yield client, exports, tmp_path
+
+
+def _seed_exports(exports):
+    make_pair(exports, "Grade5")
+    (exports / "notes.txt").write_bytes(b"not a catalog")
+
+
+def test_index_offers_clearing_the_exports(export_client):
+    client, exports, _tmp = export_client
+    _seed_exports(exports)
+    html = client.get("/").get_data(as_text=True)
+    assert "Clear exports" in html
+    assert "clearExportsModal" in html and 'action="/exports/clear"' in html
+    assert "Grade5.mdf" in html
+
+
+def test_clear_exports_flow_only_moves_catalog_files(export_client):
+    client, exports, tmp_path = export_client
+    _seed_exports(exports)
+    sentinel = tmp_path / "attached.db"
+    sentinel.write_bytes(b"still attached")
+
+    resp = client.post("/exports/clear", data={"csrf_token": _csrf(client)})
+
+    assert resp.status_code == 302
+    # The non-catalog file is not a cleanup target and stays put.
+    assert names_of(exports) == set()
+    assert (exports / "notes.txt").exists()
+    assert sentinel.exists()
+    assert sc.scan_upload_dir(str(exports))["trash"]["count"] == 2
+
+
+def test_clear_exports_with_nothing_to_do(export_client):
+    client, exports, _tmp = export_client
+    resp = client.post("/exports/clear", data={"csrf_token": _csrf(client)}, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"There are no exports to clear" in resp.data
+
+
+def test_purge_exports_trash_flow(export_client):
+    client, exports, _tmp = export_client
+    _seed_exports(exports)
+    client.post("/exports/clear", data={"csrf_token": _csrf(client)})
+
+    resp = client.post("/exports/purge", data={"csrf_token": _csrf(client)})
+
+    assert resp.status_code == 302
+    assert sc.scan_upload_dir(str(exports))["trash"]["count"] == 0
+    assert (exports / "notes.txt").exists()
+
+
+@pytest.mark.parametrize("route", ["/exports/clear", "/exports/purge"])
+def test_exports_cleanup_requires_csrf(export_client, route):
+    client, exports, _tmp = export_client
+    _seed_exports(exports)
+    assert client.post(route).status_code == 400
+    assert names_of(exports) == {"Grade5.mdf", "Grade5_log.ldf"}

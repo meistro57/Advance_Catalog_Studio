@@ -113,12 +113,15 @@ and display-name token replacement.
   read-only). Detach/export and all reads stay allowed.
 - `catalog_studio/utils/staging.py` — pairs `.mdf` with `_log.ldf` in uploads/,
   suggests DB names from filenames, lists exports/.
-- `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the runtime
-  upload staging area (issue #3): strict path containment (plain basenames
+- `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the two runtime
+  catalog folders (issue #3): the upload staging area (`UPLOAD_DIR`) and the
+  finished-export folder (`EXPORT_DIR`). Strict path containment (plain basenames
   with `.mdf`/`.ldf` only, no traversal/absolute paths/symlinks escaping the
-  canonical upload dir), scan stats for the confirmation dialogs, and
-  recoverable removal — files move into `uploads/.trash` and only an explicit
-  purge deletes them. Fully unit-tested.
+  canonical directory), scan stats for the confirmation dialogs, and recoverable
+  removal — files move into `<dir>/.trash` and only an explicit purge deletes
+  them. Routes are `/uploads/remove|flush|purge` and `/exports/clear|purge`;
+  targets are always re-derived from the directory on the server, never trusted
+  from the browser. Fully unit-tested.
 - `catalog_studio/utils/drawing_styles.py` — Drawing Style Manager exports
   (`catalog_type == "drawing style"`). Reads the export's own
   `InfoTableRelations` map (+ `SUPPLEMENTARY_RELATIONS` fixes), builds the
