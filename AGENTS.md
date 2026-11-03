@@ -330,13 +330,23 @@ without path hacks and currently don't try.
 
 ## Web/data flow
 
-Upload → attach: file copied into the container's `/var/opt/mssql/attach`,
-then `CREATE DATABASE ... FOR ATTACH` (docker_ops + `db.attach_database`), then
-catalog type is guessed and recorded in the metadata sidecar. Edit flows call
+Upload → attach: the staged pair is copied into the container under the
+**database** name (`<db>.mdf` / `<db>_log.ldf`, never the uploaded file name —
+two databases pointing at one physical mdf leave the second in
+RECOVERY_PENDING), then `CREATE DATABASE ... FOR ATTACH` (docker_ops +
+`db.attach_database`), then catalog type is guessed and recorded in the metadata
+sidecar. Edit flows call
 `preview_*` functions to show samples/counts, then `apply_*` functions that
 repeat the same logic inside an explicit transaction
-(`autocommit=False` + `commit()`/`rollback()`). Export/detach runs
-`sp_detach_db`, then `docker cp`s the files back to `exports/` for download.
+(`autocommit=False` + `commit()`/`rollback()`).
+
+Two export paths: `/db/<db>/detach` runs `sp_detach_db` and ends the session;
+`/db/<db>/export-copy` uses `db.offline_database()` (ALTER DATABASE … SET
+OFFLINE inside a context manager whose `finally` sets it ONLINE) so the copied
+pair is as clean as a detach while the database stays attached for the next
+edit. Both `docker cp` the files out of `exports/` under `<db>.mdf` /
+`<db>_log.ldf`, overwriting the previous copy of the same name.
+
 Also available per table: browse/filter/add/edit/duplicate/delete rows, and a
 database-wide find & replace over all text columns. Every POST that can write
 passes the central CSRF guard first, and write routes additionally call
@@ -574,11 +584,11 @@ dimension logic of its own.
 
 ## Known inconsistencies (not yet bugs to "fix" blindly)
 
-- `docker_ops.copy_out_of_container` and `db.get_physical_files` document that
-  physical mdf/ldf filenames in the container need not match the database name,
-  but the detach route in `app.py` guesses `{database}.mdf` /
-  `{database}_log.ldf` anyway (`get_physical_files` is defined but unused by
-  the app).
+- A failed detach restores multi-user mode, but a database that is already
+  **RECOVERY_PENDING** can neither be brought online nor detached until the
+  SQL Server restarts; `DROP DATABASE` is then the only way out. Keep each
+  database on its own physical files (see the attach rule above) so this stays
+  an edge case.
 
 ## Gotchas for safe changes
 

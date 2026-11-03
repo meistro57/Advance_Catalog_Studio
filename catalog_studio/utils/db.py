@@ -4,6 +4,7 @@ databases, browse tables generically, and edit/duplicate/delete rows
 regardless of which catalog schema (anchors, bolts, whatever) is loaded."""
 
 import re
+from contextlib import contextmanager
 
 import pymssql
 
@@ -164,6 +165,29 @@ def detach_database(db_name: str):
         except Exception:
             pass
         raise
+    finally:
+        conn.close()
+
+
+@contextmanager
+def offline_database(db_name: str):
+    """Take a database offline for a moment, then bring it back.
+
+    Used for "export a copy": taking the database offline flushes and closes its
+    files exactly like a detach would, so the copied mdf/ldf pair is clean and
+    consistent, but the database stays attached and usable afterwards. The
+    normal path brings it back online; if the body raises (a failed copy) the
+    database is still brought back online rather than left unavailable.
+    """
+    if not valid_identifier(db_name):
+        raise ValueError("Invalid database name.")
+    conn, cur = connect()
+    try:
+        cur.execute(f"ALTER DATABASE [{db_name}] SET OFFLINE WITH ROLLBACK IMMEDIATE;")
+        try:
+            yield
+        finally:
+            cur.execute(f"ALTER DATABASE [{db_name}] SET ONLINE;")
     finally:
         conn.close()
 

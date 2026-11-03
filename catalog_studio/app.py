@@ -311,13 +311,25 @@ def attach():
     as_version = int(request.form.get("as_version") or config.ADVANCE_STEEL_VERSION)
 
     try:
+        if not db.valid_identifier(db_name):
+            raise RuntimeError(
+                f"'{db_name}' isn't a valid database name — letters, numbers, "
+                f"and underscores only (no spaces or hyphens)."
+            )
+        # Copy into the container under the DATABASE name, never the uploaded
+        # file name: attaching the same upload twice under two names used to
+        # point both databases at one physical mdf, which SQL Server then refuses
+        # to open ("Access is denied") because the files must belong to one
+        # database at a time.
+        container_mdf = f"{db_name}.mdf"
+        container_ldf = f"{db_name}_log.ldf"
         docker_ops.copy_into_container(
-            os.path.join(config.UPLOAD_DIR, mdf_filename), mdf_filename
+            os.path.join(config.UPLOAD_DIR, mdf_filename), container_mdf
         )
         docker_ops.copy_into_container(
-            os.path.join(config.UPLOAD_DIR, ldf_filename), ldf_filename
+            os.path.join(config.UPLOAD_DIR, ldf_filename), container_ldf
         )
-        db.attach_database(db_name, mdf_filename, ldf_filename)
+        db.attach_database(db_name, container_mdf, container_ldf)
         catalog_type = db.guess_catalog_type(db_name)
         library = metadata.library_kind(mdf_filename) or ""
         metadata.set_meta(db_name, catalog_type=catalog_type, as_version=as_version,
@@ -1004,6 +1016,40 @@ def find_replace(database):
         replace_text=replace_text,
         preview=preview,
     )
+
+
+@app.route("/db/<database>/export-copy", methods=["POST"])
+def export_copy(database):
+    """Write the mdf/ldf into exports/ and leave the database attached.
+
+    Detaching ends the editing session, which is wrong for the iterate loop
+    (export -> import into Advance Steel -> change something -> export again).
+    Taking the database offline for the copy flushes and closes its files the
+    same way a detach does, so the pair is just as clean, and the database comes
+    back online in a ``finally`` even when the copy fails.
+    """
+    try:
+        files = db.get_physical_files(database)
+        if not files.get("mdf") or not files.get("ldf"):
+            raise RuntimeError(f"Couldn't find the physical mdf/ldf for '{database}'.")
+        with db.offline_database(database):
+            docker_ops.copy_out_of_container(
+                files["mdf"], os.path.join(config.EXPORT_DIR, f"{database}.mdf")
+            )
+            docker_ops.copy_out_of_container(
+                files["ldf"], os.path.join(config.EXPORT_DIR, f"{database}_log.ldf")
+            )
+        flash(
+            f"Exported '{database}' to exports/ without detaching — download it, "
+            f"import it into Advance Steel, and keep editing: export again for the next attempt.",
+            "success",
+        )
+    except Exception as e:
+        flash(f"Export failed: {e}", "danger")
+    target = request.form.get("return_to", "")
+    if not target.startswith(f"/db/{database}"):
+        target = url_for("show_database", database=database)
+    return redirect(target)
 
 
 @app.route("/db/<database>/detach", methods=["POST"])

@@ -10,6 +10,14 @@
         {% if catalog_type %}<span class="badge bg-secondary">{{ catalog_type }}</span>{% endif %}
     </h4>
     <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="/db/{{ database }}/export-copy" class="m-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="return_to" value="/db/{{ database }}">
+            <button class="btn btn-sm btn-success"
+                    title="Write the mdf/ldf into exports/ and keep this database attached">
+                {{ icon('download') }} Export a copy
+            </button>
+        </form>
         {% if catalog_type == 'bolt' %}
         <a href="/db/{{ database }}/bolt-set-viewer" class="btn btn-sm btn-success">{{ icon('bolt') }} Bolt-Set Viewer</a>
         {% elif catalog_type == 'anchor' %}

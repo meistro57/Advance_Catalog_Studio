@@ -31,7 +31,9 @@ Catalog Studio gives those databases a safer workshop:
 - Find and replace text across database tables.
 - Edit a whole drawing style on one page: view titles, scale, view depth, representation rules, label formulas.
 - Check every in-file reference before export.
-- Detach and export the finished database pair for Advance Steel import.
+- Detach and export the finished database pair for Advance Steel import, or
+  write a copy to `exports/` and keep editing (export a fresh copy for each
+  import attempt).
 
 ## Project status
 
@@ -194,10 +196,10 @@ pyflakes catalog_studio tests *.py
 4. **Inspect** the database: diameters and relationship warnings for catalogs, or the Drawing Style Editor and its integrity check for styles.
 5. **Preview** a guided operation such as Add / Clone Diameter or Find & Replace, or make edits in the style editor.
 6. **Apply** the change. Database changes run as transactions.
-7. **Detach & Export** the modified `.mdf` / `.ldf` pair.
+7. **Export a copy** (or **Detach & Export** when you are finished with the pair). "Export a copy" writes the `.mdf` / `.ldf` into `exports/` and leaves the database attached, so the loop *export → import into Advance Steel → change something → export again* does not cost you a re-attach. It takes the database offline for the few milliseconds the copy takes and brings it back online; if the copy fails the database is still brought back.
 8. **Test** it in a controlled Advance Steel environment before adopting it.
 
-Before you detach, `/compare` shows what actually changed between the original export and the edited copy: tables that appeared or disappeared, row-count deltas and the diameter keys on each side.
+Before you export, `/compare` shows what actually changed between the original export and the edited copy: tables that appeared or disappeared, row-count deltas and the diameter keys on each side.
 
 ## Advance Steel round trip
 

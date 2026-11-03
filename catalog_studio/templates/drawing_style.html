@@ -234,11 +234,19 @@
   <h4 class="mb-0">{{ icon('drawing', 18) }} Drawing Style Editor <small class="text-muted">{{ database }}</small>
     {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
   </h4>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
     <a href="/db/{{ database }}/drawing-style/usage" class="btn btn-sm btn-outline-primary">Sub-style usage</a>
     <a href="/db/{{ database }}" class="btn btn-sm btn-outline-secondary">Raw tables</a>
+    <form method="post" action="/db/{{ database }}/export-copy" class="m-0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="return_to" value="/db/{{ database }}/drawing-style">
+      <button class="btn btn-sm btn-success"
+              title="Write the mdf/ldf into exports/ and keep this style attached">
+        {{ icon('download') }} Export a copy
+      </button>
+    </form>
     <form method="post" action="/db/{{ database }}/detach" onsubmit="return confirm('Detach and export the mdf/ldf? Unsaved edits on this page will be lost.');">
-      <button class="btn btn-sm btn-success">&#11015; Detach &amp; Export mdf/ldf</button>
+      <button class="btn btn-sm btn-outline-danger">&#11015; Detach &amp; Export mdf/ldf</button>
     </form>
   </div>
 </div>
