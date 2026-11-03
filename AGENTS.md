@@ -52,6 +52,12 @@ and display-name token replacement.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
   entry passes.
+- The scratch container must run **SQL Server 2019**
+  (`mcr.microsoft.com/mssql/server:2019-latest`). Advance Steel 2026 files are
+  internal version 904; attaching to 2022 (957) upgrades them permanently and
+  AS refuses the import ("Source database is older than Release 5.1!").
+  `db.require_as_compatible()` checks the server and the file before every
+  attach and new-database create; never bypass it.
 - A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
   and be running (`docker start hilti-scratch-sql`; it is configured with
   `--restart unless-stopped`). SQL Server `sa` password is hardcoded in

@@ -123,6 +123,9 @@ def index():
     else:
         try:
             attached = db.list_databases()
+            problem = db.compatibility_problem(db.server_file_version())
+            if problem:
+                flash(problem, "danger")
         except Exception as e:
             flash(f"Could not reach the scratch SQL Server container: {e}", "danger")
     exports = staging.list_exports()

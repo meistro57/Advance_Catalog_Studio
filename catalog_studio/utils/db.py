@@ -7,7 +7,9 @@ import re
 
 import pymssql
 
-from config import DB_CONFIG, DB_LOGIN_TIMEOUT, CONTAINER_ATTACH_PATH
+from config import (DB_CONFIG, DB_LOGIN_TIMEOUT, CONTAINER_ATTACH_PATH,
+                    AS_SQL_FILE_VERSION, AS_SQL_SERVER_LABEL, SCRATCH_SQL_IMAGE,
+                    SQL_FILE_VERSIONS)
 
 VALID_IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -44,11 +46,100 @@ def list_databases():
     return names
 
 
+# --------------------------------------------------------------------------
+# SQL Server file-version guard
+# --------------------------------------------------------------------------
+
+def decode_file_version(value):
+    """Turn the version SQL Server reports into an int.
+
+    ``DATABASEPROPERTYEX(..., 'Version')`` and ``DBCC CHECKPRIMARYFILE`` return
+    a sql_variant that pymssql hands back as an int, as 4 little-endian bytes,
+    or (for the DBCC call) as the UTF-8 of a single character whose code point
+    is the version (``b'\xce\x88'`` = U+0388 = 904).
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        raw = bytes(value)
+        if len(raw) == 4:
+            return int.from_bytes(raw, "little")
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return int.from_bytes(raw, "little")
+        return ord(text) if len(text) == 1 else int(text)
+    text = str(value).strip()
+    return ord(text) if len(text) == 1 and not text.isdigit() else int(text)
+
+
+def version_label(version):
+    return SQL_FILE_VERSIONS.get(version, f"file version {version}")
+
+
+def server_file_version():
+    """The file version this SQL Server writes (what an attach upgrades to)."""
+    conn, cur = connect()
+    try:
+        cur.execute("SELECT DATABASEPROPERTYEX('master', 'Version') AS v")
+        return decode_file_version(cur.fetchone()["v"])
+    finally:
+        conn.close()
+
+
+def primary_file_version(mdf_path: str):
+    """File version of an unattached .mdf, read without attaching it."""
+    if not mdf_path or "'" in mdf_path:
+        raise ValueError("Unsafe file path.")
+    conn, cur = connect()
+    try:
+        cur.execute("DBCC CHECKPRIMARYFILE (%s, 2)", (mdf_path,))
+        props = {r["property"]: r["value"] for r in cur.fetchall()}
+        return decode_file_version(props.get("Database version"))
+    finally:
+        conn.close()
+
+
+def compatibility_problem(server_version, file_version=None):
+    """Why attaching/creating here would produce a file Advance Steel can't
+    import, or None. Pure, so the rule is tested without a server."""
+    target = AS_SQL_FILE_VERSION
+    if server_version is not None and server_version > target:
+        if file_version is not None and file_version > target:
+            return (f"This file is already {version_label(file_version)} format "
+                    f"(version {file_version}). Advance Steel 2026 needs {AS_SQL_SERVER_LABEL} "
+                    f"(version {target}) files and will refuse to import it. Start again from the "
+                    f"original Advance Steel export.")
+        return (f"The scratch SQL Server is {version_label(server_version)} (version {server_version}). "
+                f"Attaching or creating a database there upgrades the file permanently, and Advance "
+                f"Steel 2026 ({AS_SQL_SERVER_LABEL}, version {target}) then refuses the import with "
+                f"'Source database is older than Release 5.1!'. Run the container on "
+                f"{SCRATCH_SQL_IMAGE} (see README).")
+    if file_version is not None and file_version > target:
+        return (f"This file is {version_label(file_version)} format (version {file_version}); "
+                f"Advance Steel 2026 can only import version {target}. Start again from the "
+                f"original Advance Steel export.")
+    return None
+
+
+def require_as_compatible(mdf_path: str = None):
+    """Raise ValueError instead of letting SQL Server upgrade a file."""
+    server = server_file_version()
+    file_version = primary_file_version(mdf_path) if mdf_path else None
+    problem = compatibility_problem(server, file_version)
+    if problem:
+        raise ValueError(problem)
+    return {"server": server, "file": file_version}
+
+
 def attach_database(db_name: str, mdf_filename: str, ldf_filename: str):
     if not valid_identifier(db_name):
         raise ValueError("Database name must be letters, numbers, underscores only.")
     mdf_path = f"{CONTAINER_ATTACH_PATH}/{mdf_filename}"
     ldf_path = f"{CONTAINER_ATTACH_PATH}/{ldf_filename}"
+    require_as_compatible(mdf_path)
     conn, cur = connect()
     cur.execute(f"""
         CREATE DATABASE [{db_name}] ON
@@ -423,6 +514,7 @@ def create_empty_database(db_name: str):
         raise ValueError("Database name must be letters, numbers, underscores only.")
     mdf_path = f"{CONTAINER_ATTACH_PATH}/{db_name}.mdf"
     ldf_path = f"{CONTAINER_ATTACH_PATH}/{db_name}_log.ldf"
+    require_as_compatible()  # a new database is born in the server's format
     conn, cur = connect()
     cur.execute(f"""
         CREATE DATABASE [{db_name}] ON
