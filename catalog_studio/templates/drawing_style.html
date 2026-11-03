@@ -242,7 +242,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="return_to" value="/db/{{ database }}/drawing-style">
       <button class="btn btn-sm btn-success"
-              title="Download the mdf/ldf as a .zip and keep this style attached">
+              title="Download the .mdf and keep this style attached — Advance Steel rebuilds the log">
         {{ icon('download') }} Export a copy
       </button>
     </form>
@@ -364,6 +364,46 @@
       <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'TitleFormat', s.row.TitleFormat, 'formula', rows=3, label='View title formula') }}</div>
       <div class="col-lg-6">{{ fld('DetailStyle', s.token, 'CutViewTitleFormat', s.row.CutViewTitleFormat, 'formula', rows=3, label='Cut-view title formula') }}</div>
     </div>
+
+    {# ---------------- placement ---------------- #}
+    <div class="ds-sub">Placement &mdash; where the views and titles go</div>
+    <div class="ds-hint mb-2">
+      The export stores the <em>rules</em> for placing views, not the positions themselves:
+      Advance Steel computes the layout when it builds the drawing, so there are no
+      coordinates to edit here. The arrangement strategy below sets the spacing; the
+      numbers under it are Advance Steel's own placement switches.
+    </div>
+    <div class="ds-grid">
+      {{ fld('DetailStyle', s.token, 'ViewArrangeStrategy', s.row.ViewArrangeStrategy, 'select',
+             options.DetailStyle.ViewArrangeStrategy, label='View arrangement strategy') }}
+      {{ fld('DetailStyle', s.token, 'DetailOrientation', s.row.DetailOrientation,
+             label='Detail orientation (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'ObjectSelectionStrategy', s.row.ObjectSelectionStrategy,
+             label='Object selection strategy (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'ObjectPosition', s.row.ObjectPosition,
+             label='Object position (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'TitlePosition', s.row.TitlePosition,
+             label='Title position (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'CutViewTitlePosition', s.row.CutViewTitlePosition,
+             label='Cut-view title position (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'FrameAppearance', s.row.FrameAppearance,
+             label='Frame appearance (AS enum)') }}
+      {{ fld('DetailStyle', s.token, 'AutomaticClipping', s.row.AutomaticClipping,
+             label='Automatic clipping (AS enum)') }}
+    </div>
+    {% if s.arrange %}
+    <div class="ds-hint mt-2">
+      Arrangement strategy #{{ s.arrange.row.Key }} is a shared sub-style: editing it
+      changes every style that uses it.
+    </div>
+    <div class="ds-grid mt-1">
+      {{ fld('DetViewArrangeStrategy', s.arrange.token, 'RunName', s.arrange.row.RunName, label='Arrangement name') }}
+      {{ fld('DetViewArrangeStrategy', s.arrange.token, 'ViewDistance', s.arrange.row.ViewDistance, 'length', label='Distance between views') }}
+      {{ fld('DetViewArrangeStrategy', s.arrange.token, 'ArrangeCutsInChains', s.arrange.row.ArrangeCutsInChains, 'bool', label='Arrange cuts in chains') }}
+    </div>
+    {% else %}
+    <div class="ds-hint">This style points at arrangement strategy #{{ s.row.ViewArrangeStrategy }}, which is not in this file.</div>
+    {% endif %}
     {% for r in s.requests %}{% if r.missing %}
       <div class="alert alert-danger mt-3">View request #{{ r.missing }} is referenced but not in this file.</div>
     {% endif %}{% endfor %}
@@ -389,6 +429,21 @@
     {{ fld('DetViewRequest', r.token, 'UsedForCutsAndCallouts', r.row.UsedForCutsAndCallouts, 'select', [(1,'Yes'),(0,'No')], label='Used for cuts & callouts') }}
     {{ fld('DetViewRequest', r.token, 'ObjReprMap', r.row.ObjReprMap, 'select', options.DetViewRequest.ObjReprMap, label='Representation map') }}
     {{ fld('DetViewRequest', r.token, 'DimStrategy', r.row.DimStrategy, 'select', options.DetViewRequest.DimStrategy, label='Dimension strategy') }}
+  </div>
+
+  <div class="ds-sub">Placement in this view</div>
+  <div class="ds-grid">
+    {{ fld('DetViewRequest', r.token, 'ArrangeDir', r.row.ArrangeDir,
+           label='Arrangement direction (AS enum)') }}
+    {{ fld('DetViewRequest', r.token, 'CompassLocation', r.row.CompassLocation,
+           label='Compass location (AS enum)') }}
+    {{ fld('DetViewRequest', r.token, 'CompassLocationInOverviews', r.row.CompassLocationInOverviews,
+           label='Compass in overviews (AS enum)') }}
+  </div>
+  <div class="ds-hint mb-2">
+    Direction and compass numbers are Advance Steel's own switches; the export
+    carries no labels for them. Spacing between views comes from the style's
+    arrangement strategy (<a href="#pane-style-{{ m.row.Key }}">Placement</a>).
   </div>
 
   <div class="row g-2 mt-2">

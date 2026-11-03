@@ -176,6 +176,41 @@ several times with different `GeometricRestrictions` (seen: 0, 5, 6) — specifi
 cases first, catch-all after. The editor can reorder (swap through a temp
 `Order`), copy-below (shifts the rest down), delete (then renumbers 0..n-1).
 
+## Placement (where views, titles and labels go)
+
+**No coordinates are stored.** A style export carries the *rules* Advance Steel
+uses to lay a drawing out; the positions themselves are computed at drawing
+time. Verified across the three checked-in exports: there is no x/y column on
+`DetViewRequest`, `DetailStyle` or `DetViewSystemAndBox`, and `DetArrangerControl`
+(which does hold angles) is empty in the sample.
+
+Placement is therefore four groups of stored inputs:
+
+| Where | Column | Meaning |
+| --- | --- | --- |
+| `DetailStyle.ViewArrangeStrategy` | -> `DetViewArrangeStrategy.Key` | shared arrangement sub-style |
+| `DetViewArrangeStrategy` | `ViewDistance` | spacing between views, **millimetres** (displayed as ft-in, accepts either) |
+| `DetViewArrangeStrategy` | `ArrangeCutsInChains` | boolean |
+| `DetailStyle` | `DetailOrientation`, `ObjectSelectionStrategy` | AS enums; the relation points at `AstorBase` tables that are not in the export, so only the number is available |
+| `DetailStyle` | `ObjectPosition`, `TitlePosition`, `CutViewTitlePosition`, `FrameAppearance`, `AutomaticClipping` | AS enums with **no relation at all** in `InfoTableRelations`; numbers only |
+| `DetViewRequest` | `ArrangeDir`, `CompassLocation`, `CompassLocationInOverviews` | per-view direction/compass enums; numbers only |
+| `DetArrangerStrategy` | `TerminateOnFirstFit`, `ArrangeGlobally`, `ArrangeInCenter` + `SearchArea1..10` / `AreaPercent` / `MinDistance` / `MaxDistance` | where an **object label** is placed (10 search areas, distances in mm) |
+| `DetArrangerControl` | `Angle1..16`, `PreferredDistance`, `MaxDistance`, `AllowOppositeAngles`, `ArrangeInCentre` | where a **dimension text** may sit (angle search); empty in every sample |
+
+The editor shows these in two places rather than inventing positions:
+
+- **Style pane -> Placement** — the arrangement strategy as a select, the three
+  arrangement fields editable inline (shared sub-style, so it says so), and the
+  seven style-level placement numbers;
+- **each view pane -> Placement in this view** — the three per-view numbers,
+  linking back to the style's arrangement strategy.
+
+Unverified: what each placement enum number means. They are shown as
+`(AS enum)` and never labelled, and the page states that positions are computed
+rather than stored. `DetArrangerStrategy` is already loaded into the editor tree
+and editable through the raw table view; giving it a dedicated pane is the next
+step, not a rewrite.
+
 ## Label formulas (`DetAnnotationType.Content`, `DetailStyle.TitleFormat`)
 
 | Token | Meaning |

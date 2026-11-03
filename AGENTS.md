@@ -171,6 +171,17 @@ and display-name token replacement.
   browser, never server-gated: every screen stays in the one form so one POST
   saves the whole style. The old library tab strip is gone; do not reintroduce
   `data-bs-toggle="tab"` or a second scroll container.
+- Placement in a style export is **rules, not coordinates**: there is no x/y on
+  `DetViewRequest`/`DetailStyle`, and `DetArrangerControl` is empty in every
+  sample. `DetailStyle.ViewArrangeStrategy` -> `DetViewArrangeStrategy`
+  (`ViewDistance` in mm, `ArrangeCutsInChains`) is the only placement value
+  with a verified meaning; the rest (`DetailOrientation`,
+  `ObjectSelectionStrategy`, `ObjectPosition`, `TitlePosition`,
+  `CutViewTitlePosition`, `FrameAppearance`, `AutomaticClipping`,
+  `ArrangeDir`, `CompassLocation`, `CompassLocationInOverviews`) are AS enums
+  whose labels are not in the export — show the number, never a guessed
+  label, and say that Advance Steel computes the layout. Details in
+  `docs/drawing-style-schema.md` "Placement".
 - `catalog_studio/utils/style_diagrams.py` — the drawing-style editor's
   schematic SVG figures (style overview, print-scale ruler, view box, length
   clipping, dimension-chain anatomy, per-view dimension plan, single chain,
@@ -350,9 +361,10 @@ OFFLINE inside a context manager whose `finally` sets it ONLINE) so the copied
 pair is as clean as a detach while the database stays attached for the next
 edit. Both `docker cp` the files into `exports/` under `<db>.mdf` /
 `<db>_log.ldf`, overwriting the previous copy of the same name; export-copy then
-returns them as one `<db>.zip` attachment (a browser cannot save two files from
-one response, and Advance Steel wants the pair side by side), while a failure
-flashes and redirects back to the sending page.
+returns the **mdf alone** as an attachment (Advance Steel rebuilds the log), and
+a failure flashes and redirects back to the sending page. Both paths call
+`db.ensure_windows_file_paths()` first: Advance Steel refuses a database whose
+recorded file paths are Linux paths.
 
 Also available per table: browse/filter/add/edit/duplicate/delete rows, and a
 database-wide find & replace over all text columns. Every POST that can write

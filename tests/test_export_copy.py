@@ -6,9 +6,7 @@ have to be as clean as a detach would leave them, and a failed copy must not
 leave it offline. No SQL Server: the connection and docker calls are stubbed.
 """
 
-import io
 import pathlib
-import zipfile
 
 import pytest
 
@@ -120,7 +118,8 @@ def _stub_pipeline(monkeypatch, tmp_path, payload=(b"mdf-bytes", b"ldf-bytes")):
     return copies, offline_calls
 
 
-def test_export_copy_downloads_the_pair_as_a_zip(monkeypatch, tmp_path):
+def test_export_copy_downloads_the_mdf_only(monkeypatch, tmp_path):
+    """Advance Steel rebuilds the log, so the download is the mdf alone."""
     copies, offline_calls = _stub_pipeline(monkeypatch, tmp_path)
     client = _client_with_csrf()
 
@@ -128,22 +127,18 @@ def test_export_copy_downloads_the_pair_as_a_zip(monkeypatch, tmp_path):
                        data={"csrf_token": "tok", "return_to": "/db/SomeDb"})
 
     assert resp.status_code == 200
-    assert resp.mimetype == "application/zip"
-    assert 'attachment; filename=SomeDb.zip' in resp.headers["Content-Disposition"]
+    assert resp.mimetype == "application/octet-stream"
+    assert 'attachment; filename=SomeDb.mdf' in resp.headers["Content-Disposition"]
+    assert resp.data == b"mdf-bytes"
     assert offline_calls == ["SomeDb"]
     assert copies == [
         ("/var/opt/mssql/attach/SomeDb.mdf", str(tmp_path / "SomeDb.mdf")),
         ("/var/opt/mssql/attach/SomeDb_log.ldf", str(tmp_path / "SomeDb_log.ldf")),
     ]
 
-    with zipfile.ZipFile(io.BytesIO(resp.data)) as archive:
-        assert sorted(archive.namelist()) == ["SomeDb.mdf", "SomeDb_log.ldf"]
-        assert archive.read("SomeDb.mdf") == b"mdf-bytes"
-        assert archive.read("SomeDb_log.ldf") == b"ldf-bytes"
-
 
 def test_export_copy_also_leaves_the_pair_in_exports(monkeypatch, tmp_path):
-    """The zip is a convenience; the dashboard links keep working from disk."""
+    """The download is the mdf; the complete pair still lands on disk."""
     _stub_pipeline(monkeypatch, tmp_path)
     client = _client_with_csrf()
     client.post("/db/SomeDb/export-copy", data={"csrf_token": "tok"})

@@ -487,6 +487,7 @@ def style_tree(database):
     ditems = _rows(database, "SELECT * FROM DetViewDimStrategyItems ORDER BY [Key], [Order]") if "DetViewDimStrategyItems" in tables else []
     dlins = _by_key(_rows(database, "SELECT * FROM DetViewDimRequestLinear")) if "DetViewDimRequestLinear" in tables else {}
     dpoints = _by_key(_rows(database, "SELECT * FROM DetViewDimPointSelection")) if "DetViewDimPointSelection" in tables else {}
+    varrange = _by_key(_rows(database, "SELECT * FROM DetViewArrangeStrategy")) if "DetViewArrangeStrategy" in tables else {}
 
     def build_request(rk):
         r = requests.get(rk)
@@ -560,6 +561,8 @@ def style_tree(database):
                 **tokrow("DetailStyle", s),
                 "title_preview": parse_label_format(s.get("TitleFormat")),
                 "cut_title_preview": parse_label_format(s.get("CutViewTitleFormat")),
+                "arrange": tokrow("DetViewArrangeStrategy", varrange[s["ViewArrangeStrategy"]])
+                if s.get("ViewArrangeStrategy") in varrange else None,
                 "requests": [build_request(k) for k in reqs],
             }
             set_short_view_names(style["requests"])

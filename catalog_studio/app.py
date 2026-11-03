@@ -5,7 +5,6 @@ import io
 import json
 import os
 import secrets
-import zipfile
 
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, send_from_directory,
@@ -1024,7 +1023,7 @@ def find_replace(database):
 
 @app.route("/db/<database>/export-copy", methods=["POST"])
 def export_copy(database):
-    """Write the mdf/ldf into exports/ and send the pair to the browser.
+    """Write the mdf/ldf into exports/ and send the mdf to the browser.
 
     Detaching ends the editing session, which is wrong for the iterate loop
     (export -> import into Advance Steel -> change something -> export again).
@@ -1032,9 +1031,9 @@ def export_copy(database):
     same way a detach does, so the pair is just as clean, and the database comes
     back online in a ``finally`` even when the copy fails.
 
-    Both files go back as one ``.zip``: a browser cannot save two downloads from
-    a single response, and Advance Steel needs the ``.mdf`` and its ``.ldf`` side
-    by side. The pair also stays in ``exports/`` for the dashboard links.
+    Advance Steel imports the ``.mdf`` and rebuilds the log itself, so the
+    download is the mdf alone. The matching ``.ldf`` is still written to
+    ``exports/`` so the dashboard can hand over the complete pair.
     """
     try:
         db.ensure_windows_file_paths(database)  # Advance Steel refuses Linux paths
@@ -1057,16 +1056,11 @@ def export_copy(database):
             target = url_for("show_database", database=database)
         return redirect(target)
 
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name in (mdf_name, ldf_name):
-            archive.write(os.path.join(config.EXPORT_DIR, name), arcname=name)
-    buffer.seek(0)
     return send_file(
-        buffer,
-        mimetype="application/zip",
+        os.path.join(config.EXPORT_DIR, mdf_name),
+        mimetype="application/octet-stream",
         as_attachment=True,
-        download_name=f"{database}.zip",
+        download_name=mdf_name,
     )
 
 

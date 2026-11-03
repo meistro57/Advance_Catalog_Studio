@@ -171,3 +171,53 @@ def test_chain_card_numbers_use_the_dimension_plan_colours():
         many["masters"][0]["style"]["requests"][0]["dims"].append(cloned)
     html_many = _render(many)
     assert 'class="dx-num" style="background:#0d6efd"' in html_many  # #7 wraps to blue
+
+
+def _tree_with_arrangement():
+    tree = _tree()
+    tree["masters"][0]["style"]["row"]["ViewArrangeStrategy"] = 9001
+    tree["masters"][0]["style"]["arrange"] = {
+        "row": {"Key": 9001, "RunName": "Top or bottom - 1/4 in", "ViewDistance": 6.35,
+                "ArrangeCutsInChains": True},
+        "token": "arr-tok",
+    }
+    return tree
+
+
+def test_placement_exposes_the_arrangement_strategy_and_its_fields():
+    html = _render(_tree_with_arrangement())
+    assert "Placement &mdash; where the views and titles go" in html or "Placement — where the views" in html
+    # The style points at a shared arrangement strategy; its own fields are editable.
+    assert 'name="f::DetailStyle::s-tok::ViewArrangeStrategy"' in html
+    assert 'name="f::DetViewArrangeStrategy::arr-tok::ViewDistance"' in html
+    assert 'name="f::DetViewArrangeStrategy::arr-tok::ArrangeCutsInChains"' in html
+    assert "shared sub-style" in html
+
+
+def test_placement_lists_every_style_placement_switch():
+    html = _render(_tree_with_arrangement())
+    for column in ("DetailOrientation", "ObjectSelectionStrategy", "ObjectPosition",
+                   "TitlePosition", "CutViewTitlePosition", "FrameAppearance",
+                   "AutomaticClipping"):
+        assert f"::s-tok::{column}" in html, column
+
+
+def test_placement_explains_that_positions_are_computed_not_stored():
+    html = _render(_tree_with_arrangement())
+    assert "not the positions themselves" in html
+    assert "computes the layout when it builds the drawing" in html
+
+
+def test_missing_arrangement_strategy_is_reported_not_invented():
+    tree = _tree()
+    tree["masters"][0]["style"]["row"]["ViewArrangeStrategy"] = 4242
+    tree["masters"][0]["style"]["arrange"] = None
+    html = _render(tree)
+    assert "arrangement strategy #4242, which is not in this file" in html
+
+
+def test_view_pane_shows_its_placement_numbers():
+    html = _render()
+    for column in ("ArrangeDir", "CompassLocation", "CompassLocationInOverviews"):
+        assert f"::req-tok::{column}" in html, column
+    assert "Placement in this view" in html
