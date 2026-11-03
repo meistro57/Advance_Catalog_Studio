@@ -116,8 +116,7 @@ def index():
     if not container_up:
         flash(
             f"SQL Server container '{config.CONTAINER_NAME}' is not running, so no "
-            "catalogs can be attached or browsed. Start it with: "
-            f"docker start {config.CONTAINER_NAME}",
+            "catalogs can be attached or browsed. Use 'Start SQL Server 2019' below.",
             "danger",
         )
     else:
@@ -142,6 +141,7 @@ def index():
         catalog_types=CATALOG_TEMPLATES,
         as_versions=sorted(config.SUPPORTED_AS_VERSIONS),
         default_as_version=config.ADVANCE_STEEL_VERSION,
+        sql_container=config.CONTAINER_NAME,
     )
 
 
@@ -1380,5 +1380,40 @@ def delete_row_route(database, table, pk_val):
     return redirect(request.form.get("return_to") or url_for("show_table", database=database, table=table))
 
 
+@app.route("/sql/start", methods=["POST"])
+def sql_start():
+    """Start (or create, the first time) the app's own SQL Server 2019 container."""
+    if not _csrf_valid():
+        abort(400)
+    try:
+        did = docker_ops.ensure_container()
+        flash({
+            "running": "The SQL Server 2019 scratch container is already running.",
+            "started": "Started the SQL Server 2019 scratch container. Give it ~20 seconds, then refresh.",
+            "created": "Created the SQL Server 2019 scratch container. The first start downloads the image "
+                       "and takes a few minutes; refresh when it shows as running.",
+        }[did], "success")
+    except Exception as e:
+        flash(f"Couldn't start the SQL Server container: {e}", "danger")
+    return redirect(url_for("index"))
+
+
+def _start_sql_in_background():
+    """On launch, bring up the app's own SQL Server 2019 container without
+    blocking the web server (the first run pulls the image)."""
+    import threading
+
+    def work():
+        try:
+            print(f"[catalog-studio] SQL Server container: {docker_ops.ensure_container()}")
+        except Exception as e:  # docker missing, name clash, ...
+            print(f"[catalog-studio] SQL Server container not started: {e}")
+
+    threading.Thread(target=work, daemon=True).start()
+
+
 if __name__ == "__main__":
+    import os as _os
+    if _os.environ.get("WERKZEUG_RUN_MAIN") != "true":  # once, not again in the reloader child
+        _start_sql_in_background()
     app.run(debug=True, host="0.0.0.0", port=5050)

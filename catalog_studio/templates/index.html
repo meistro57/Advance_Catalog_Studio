@@ -4,9 +4,13 @@
 {% block content %}
 
 {% if not container_up %}
-<div class="alert alert-warning">
-    Scratch SQL Server container isn't running. Start it, then refresh:
-    <code>docker start hilti-scratch-sql</code>
+<div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>The app's SQL Server 2019 scratch container (<code>{{ sql_container }}</code>) isn't running.
+      Catalog Studio creates it the first time; it never touches Advance Steel's own SQL Server.</span>
+    <form method="post" action="{{ url_for('sql_start') }}" class="m-0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-sm btn-primary">Start SQL Server 2019</button>
+    </form>
 </div>
 {% endif %}
 

@@ -86,61 +86,27 @@ python -m pip install --upgrade pip
 pip install -r catalog_studio/requirements.txt
 ```
 
-### 2. Start the scratch SQL Server
+### 2. The scratch SQL Server (automatic)
 
-Catalog Studio expects a Docker container named `hilti-scratch-sql` on `127.0.0.1:1433`. The SQL Server `sa` password must match `DB_CONFIG` in `catalog_studio/config.py`.
+Catalog Studio runs its own throwaway **SQL Server 2019** in Docker and never
+touches Advance Steel's SQL Server. You only need Docker running.
+
+- When you start the app it creates (first time) or starts the container
+  `catalog-studio-sql2019` from `mcr.microsoft.com/mssql/server:2019-latest`,
+  on `127.0.0.1:14330` only. The first run downloads the image (a few
+  minutes); after that it starts in seconds.
+- If it's ever stopped, the dashboard has a **Start SQL Server 2019** button.
+- It doesn't use or change any other container. An older `hilti-scratch-sql`
+  container from earlier versions is left alone; stop it if you no longer need it.
 
 > [!IMPORTANT]
-> **Use SQL Server 2019, not 2022 or `latest`.** Advance Steel 2026 writes and
-> reads SQL Server 2019 files (internal version 904). Attaching a file to a
-> newer SQL Server upgrades it permanently (2022 = 957), and Advance Steel then
-> refuses the import with *"Source database is older than Release 5.1!"*.
-> Catalog Studio checks the server and each file before attaching and refuses
-> when the file would be upgraded.
-
-Create the container once:
-
-```bash
-docker run -d --name hilti-scratch-sql --restart unless-stopped \
-  -e ACCEPT_EULA=Y -e 'MSSQL_SA_PASSWORD=Scratch2026!Pw' \
-  -p 1433:1433 mcr.microsoft.com/mssql/server:2019-latest
-docker exec -u root hilti-scratch-sql mkdir -p /var/opt/mssql/attach
-docker exec -u root hilti-scratch-sql chown mssql /var/opt/mssql/attach
-```
-
-Already have a 2022 container? Keep it (it holds your attached databases) and
-make a 2019 one beside it under the expected name:
-
-```bash
-docker stop hilti-scratch-sql
-docker rename hilti-scratch-sql hilti-scratch-sql-2022
-# then the docker run command above
-```
-
-Files that were attached to the 2022 container are already upgraded and can't
-go back to Advance Steel. Start again from the original Advance Steel export.
-
-If the container already exists:
-
-```bash
-docker start hilti-scratch-sql
-```
-
-Confirm it is running:
-
-```bash
-docker ps --filter name=hilti-scratch-sql
-```
-
-If it keeps stopping after a Docker or host restart, give it a restart policy
-so it comes back up on its own:
-
-```bash
-docker update --restart unless-stopped hilti-scratch-sql
-```
-
-While the container is stopped the dashboard still loads and says so; no
-catalog can be attached or browsed until it is running again.
+> **Why 2019.** Advance Steel 2026 writes and reads SQL Server 2019 files
+> (internal version 904). Attaching a file to a newer SQL Server upgrades it
+> permanently (2022 = 957), and Advance Steel then refuses the import with
+> *"Source database is older than Release 5.1!"*. Catalog Studio also checks
+> the server and each file before attaching and refuses if the file would be
+> upgraded. A file already attached to a 2022 server can't go back; start
+> again from the original Advance Steel export.
 
 ### 3. Run Catalog Studio
 
@@ -289,7 +255,7 @@ Restoring is a deliberate manual step, because the in-container `.bak` is remove
 
 ```bash
 docker cp catalog_studio/snapshots/<database>/<file>.bak \
-  hilti-scratch-sql:/var/opt/mssql/data/<file>.bak
+  catalog-studio-sql2019:/var/opt/mssql/data/<file>.bak
 ```
 
 then, from `sqlcmd` or SSMS inside the container:

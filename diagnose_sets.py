@@ -2,7 +2,7 @@ import pymssql
 
 conn = pymssql.connect(
     server="127.0.0.1",
-    port=1433,
+    port=14330,  # catalog-studio-sql2019 (see catalog_studio/config.py)
     user="sa",
     password="Scratch2026!Pw",
     database="BoltsA325",

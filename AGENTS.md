@@ -52,17 +52,19 @@ and display-name token replacement.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
   entry passes.
-- The scratch container must run **SQL Server 2019**
+- The scratch container runs **SQL Server 2019**
   (`mcr.microsoft.com/mssql/server:2019-latest`). Advance Steel 2026 files are
   internal version 904; attaching to 2022 (957) upgrades them permanently and
   AS refuses the import ("Source database is older than Release 5.1!").
   `db.require_as_compatible()` checks the server and the file before every
   attach and new-database create; never bypass it.
-- A Docker container named `hilti-scratch-sql` on `127.0.0.1:1433` must exist
-  and be running (`docker start hilti-scratch-sql`; it is configured with
-  `--restart unless-stopped`). SQL Server `sa` password is hardcoded in
-  `catalog_studio/config.py` (`Scratch2026!Pw`) and duplicated in every
-  root-level CLI script.
+- The app owns its SQL Server: `docker_ops.ensure_container()` creates or
+  starts `catalog-studio-sql2019` (`config.CONTAINER_NAME`) from
+  `config.SCRATCH_SQL_IMAGE` on `127.0.0.1:14330`, at launch and from the
+  dashboard button. It only ever touches that container, refuses one of the
+  same name built from another image, and never touches Advance Steel's own
+  SQL Server. SQL `sa` password is `config.DB_CONFIG` (`Scratch2026!Pw`),
+  duplicated (with port 14330) in every root-level CLI script.
 - Start the web app (port **5050**): `python catalog_studio/app.py`
 - Attach existing catalog pairs through the web UI (upload → attach). The
   checked-in example pairs live in `samples/`; copy one into the runtime

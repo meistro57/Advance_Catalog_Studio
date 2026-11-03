@@ -9,13 +9,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 EXPORT_DIR = os.path.join(BASE_DIR, "exports")
 
-# The scratch SQL Server container (same one from tonight's manual session).
-CONTAINER_NAME = "hilti-scratch-sql"
+# The scratch SQL Server container. Catalog Studio creates and owns it
+# (docker_ops.ensure_container): SQL Server 2019, its own name, its own port,
+# bound to localhost. It never touches Advance Steel's SQL Server or any other
+# container. The older "hilti-scratch-sql" (SQL Server 2022) is left alone.
+CONTAINER_NAME = "catalog-studio-sql2019"
 CONTAINER_ATTACH_PATH = "/var/opt/mssql/attach"
+SQL_HOST_PORT = 14330
 
 DB_CONFIG = {
     "server": "127.0.0.1",
-    "port": 1433,
+    "port": SQL_HOST_PORT,
     "user": "sa",
     "password": "Scratch2026!Pw",
 }
