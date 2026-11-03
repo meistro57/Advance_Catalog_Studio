@@ -90,6 +90,36 @@ pip install -r catalog_studio/requirements.txt
 
 Catalog Studio expects a Docker container named `hilti-scratch-sql` on `127.0.0.1:1433`. The SQL Server `sa` password must match `DB_CONFIG` in `catalog_studio/config.py`.
 
+> [!IMPORTANT]
+> **Use SQL Server 2019, not 2022 or `latest`.** Advance Steel 2026 writes and
+> reads SQL Server 2019 files (internal version 904). Attaching a file to a
+> newer SQL Server upgrades it permanently (2022 = 957), and Advance Steel then
+> refuses the import with *"Source database is older than Release 5.1!"*.
+> Catalog Studio checks the server and each file before attaching and refuses
+> when the file would be upgraded.
+
+Create the container once:
+
+```bash
+docker run -d --name hilti-scratch-sql --restart unless-stopped \
+  -e ACCEPT_EULA=Y -e 'MSSQL_SA_PASSWORD=Scratch2026!Pw' \
+  -p 1433:1433 mcr.microsoft.com/mssql/server:2019-latest
+docker exec -u root hilti-scratch-sql mkdir -p /var/opt/mssql/attach
+docker exec -u root hilti-scratch-sql chown mssql /var/opt/mssql/attach
+```
+
+Already have a 2022 container? Keep it (it holds your attached databases) and
+make a 2019 one beside it under the expected name:
+
+```bash
+docker stop hilti-scratch-sql
+docker rename hilti-scratch-sql hilti-scratch-sql-2022
+# then the docker run command above
+```
+
+Files that were attached to the 2022 container are already upgraded and can't
+go back to Advance Steel. Start again from the original Advance Steel export.
+
 If the container already exists:
 
 ```bash

@@ -39,6 +39,20 @@ MAX_CONTENT_LENGTH = 500 * 1024 * 1024
 ADVANCE_STEEL_VERSION = 2026
 SUPPORTED_AS_VERSIONS = {2026}
 
+# SQL Server on-disk file version Advance Steel 2026 writes and can read.
+# Every AS 2026 export seen so far is 904 (SQL Server 2019). Attaching a file to
+# a newer server upgrades it in place (2022 = 957) and there is no downgrade:
+# Advance Steel then refuses the import with "Source database is older than
+# Release 5.1!". Run the scratch container on SQL Server 2019 so attach,
+# edit and detach keep the file at 904. See README "Start the scratch SQL Server".
+AS_SQL_FILE_VERSION = 904
+AS_SQL_SERVER_LABEL = "SQL Server 2019"
+SCRATCH_SQL_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest"
+SQL_FILE_VERSIONS = {
+    852: "SQL Server 2016", 869: "SQL Server 2017", 904: "SQL Server 2019",
+    957: "SQL Server 2022", 998: "SQL Server 2025",
+}
+
 METADATA_FILE = os.path.join(BASE_DIR, "catalog_metadata.json")
 
 # Where bug reports and feature requests go; linked from the navigation bar.

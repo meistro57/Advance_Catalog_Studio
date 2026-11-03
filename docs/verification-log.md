@@ -38,7 +38,7 @@ Each entry records:
 | A3 | Shear-stud clone round trip and `ConnectorRelations.Key` | not started |
 | A4 | Drawing-style edit round trip (same-name import) | not started |
 | A5 | `AstorDetailsBase` enum labels in the AS UI | in progress — one drawing observation (A5.1), DSM list not read yet |
-| A6 | Exported `.mdf` / `.ldf` pair imports cleanly | not started |
+| A6 | Exported `.mdf` / `.ldf` pair imports cleanly | failed on SQL 2022 (A6.1); fix in place, re-test pending |
 
 ## Known results
 
@@ -78,3 +78,23 @@ report instead of applying.
   unexplained; why its chain printed nothing is open.
 - Unblocks: nothing yet. Next step for A5: open these requests in the DSM and
   record the direction and dimension-type names shown for 4, 5 and 2.
+
+### A6.1 — Export from a SQL Server 2022 scratch container fails to import
+
+- Date / operator: 2026-11-03 / Mark Hubrich (import), file versions read in
+  a scratch container.
+- AS build: Advance Steel 2026 (build not recorded).
+- File(s): `Marks 6 - Railing (Mp is Handrail)` style export.
+- Operation: Drawing Style Manager → Import Drawing Styles on a file exported
+  by Catalog Studio.
+- Expected: the style list fills.
+- Observed: "Import/Export error — Source database is older than Release
+  5.1!". `DBCC CHECKPRIMARYFILE`: the original AS export is file version
+  **904** (SQL Server 2019); after attaching to `mssql/server:2022` it is
+  **957**. The same file attached, edited and detached on
+  `mssql/server:2019-latest` stays **904**. All sample catalogs in
+  `samples/` and `raw_files/` are 904.
+- Verdict: **fail** on 2022, cause found. Attach and create now refuse when the
+  server or the file is newer than 904 (`db.require_as_compatible`).
+- Unblocks: re-run this import with a file exported from a 2019 container to
+  close A6.
