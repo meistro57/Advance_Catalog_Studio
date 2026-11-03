@@ -5,10 +5,11 @@ import io
 import json
 import os
 import secrets
+import zipfile
 
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, send_from_directory,
-    jsonify, session, abort, Response,
+    send_file, jsonify, session, abort, Response,
 )
 from werkzeug.utils import secure_filename
 
@@ -1023,36 +1024,49 @@ def find_replace(database):
 
 @app.route("/db/<database>/export-copy", methods=["POST"])
 def export_copy(database):
-    """Write the mdf/ldf into exports/ and leave the database attached.
+    """Write the mdf/ldf into exports/ and send the pair to the browser.
 
     Detaching ends the editing session, which is wrong for the iterate loop
     (export -> import into Advance Steel -> change something -> export again).
     Taking the database offline for the copy flushes and closes its files the
     same way a detach does, so the pair is just as clean, and the database comes
     back online in a ``finally`` even when the copy fails.
+
+    Both files go back as one ``.zip``: a browser cannot save two downloads from
+    a single response, and Advance Steel needs the ``.mdf`` and its ``.ldf`` side
+    by side. The pair also stays in ``exports/`` for the dashboard links.
     """
     try:
         files = db.get_physical_files(database)
         if not files.get("mdf") or not files.get("ldf"):
             raise RuntimeError(f"Couldn't find the physical mdf/ldf for '{database}'.")
+        mdf_name = f"{database}.mdf"
+        ldf_name = f"{database}_log.ldf"
         with db.offline_database(database):
             docker_ops.copy_out_of_container(
-                files["mdf"], os.path.join(config.EXPORT_DIR, f"{database}.mdf")
+                files["mdf"], os.path.join(config.EXPORT_DIR, mdf_name)
             )
             docker_ops.copy_out_of_container(
-                files["ldf"], os.path.join(config.EXPORT_DIR, f"{database}_log.ldf")
+                files["ldf"], os.path.join(config.EXPORT_DIR, ldf_name)
             )
-        flash(
-            f"Exported '{database}' to exports/ without detaching — download it, "
-            f"import it into Advance Steel, and keep editing: export again for the next attempt.",
-            "success",
-        )
     except Exception as e:
         flash(f"Export failed: {e}", "danger")
-    target = request.form.get("return_to", "")
-    if not target.startswith(f"/db/{database}"):
-        target = url_for("show_database", database=database)
-    return redirect(target)
+        target = request.form.get("return_to", "")
+        if not target.startswith(f"/db/{database}"):
+            target = url_for("show_database", database=database)
+        return redirect(target)
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name in (mdf_name, ldf_name):
+            archive.write(os.path.join(config.EXPORT_DIR, name), arcname=name)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{database}.zip",
+    )
 
 
 @app.route("/db/<database>/detach", methods=["POST"])

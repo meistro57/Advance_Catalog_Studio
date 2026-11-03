@@ -6,6 +6,10 @@ have to be as clean as a detach would leave them, and a failed copy must not
 leave it offline. No SQL Server: the connection and docker calls are stubbed.
 """
 
+import io
+import pathlib
+import zipfile
+
 import pytest
 
 
@@ -83,7 +87,8 @@ def _client_with_csrf():
     return client
 
 
-def test_export_copy_writes_the_pair_and_keeps_the_database_attached(monkeypatch, tmp_path):
+def _stub_pipeline(monkeypatch, tmp_path, payload=(b"mdf-bytes", b"ldf-bytes")):
+    """Pretend the copy happens: write the given bytes into the destination."""
     import contextlib
 
     import app as app_module
@@ -102,26 +107,51 @@ def test_export_copy_writes_the_pair_and_keeps_the_database_attached(monkeypatch
         offline_calls.append(database)
         yield
 
+    def fake_copy(src, dest):
+        data = payload[0] if dest.endswith(".mdf") else payload[1]
+        pathlib.Path(dest).write_bytes(data)
+        copies.append((src, dest))
+
     monkeypatch.setattr(db, "offline_database", fake_offline)
     monkeypatch.setattr(db, "detach_database", lambda database: pytest.fail("must not detach"))
-    monkeypatch.setattr(app_module.docker_ops, "copy_out_of_container",
-                        lambda src, dest: copies.append((src, dest)))
+    monkeypatch.setattr(app_module.docker_ops, "copy_out_of_container", fake_copy)
     monkeypatch.setattr(app_module.config, "EXPORT_DIR", str(tmp_path))
+    return copies, offline_calls
 
+
+def test_export_copy_downloads_the_pair_as_a_zip(monkeypatch, tmp_path):
+    copies, offline_calls = _stub_pipeline(monkeypatch, tmp_path)
     client = _client_with_csrf()
+
     resp = client.post("/db/SomeDb/export-copy",
                        data={"csrf_token": "tok", "return_to": "/db/SomeDb"})
 
-    assert resp.status_code == 302
-    assert resp.headers["Location"].endswith("/db/SomeDb")
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/zip"
+    assert 'attachment; filename=SomeDb.zip' in resp.headers["Content-Disposition"]
     assert offline_calls == ["SomeDb"]
     assert copies == [
         ("/var/opt/mssql/attach/SomeDb.mdf", str(tmp_path / "SomeDb.mdf")),
         ("/var/opt/mssql/attach/SomeDb_log.ldf", str(tmp_path / "SomeDb_log.ldf")),
     ]
 
+    with zipfile.ZipFile(io.BytesIO(resp.data)) as archive:
+        assert sorted(archive.namelist()) == ["SomeDb.mdf", "SomeDb_log.ldf"]
+        assert archive.read("SomeDb.mdf") == b"mdf-bytes"
+        assert archive.read("SomeDb_log.ldf") == b"ldf-bytes"
 
-def test_export_copy_returns_to_the_page_that_asked(monkeypatch):
+
+def test_export_copy_also_leaves_the_pair_in_exports(monkeypatch, tmp_path):
+    """The zip is a convenience; the dashboard links keep working from disk."""
+    _stub_pipeline(monkeypatch, tmp_path)
+    client = _client_with_csrf()
+    client.post("/db/SomeDb/export-copy", data={"csrf_token": "tok"})
+
+    assert (tmp_path / "SomeDb.mdf").is_file()
+    assert (tmp_path / "SomeDb_log.ldf").is_file()
+
+
+def test_export_copy_failure_returns_to_the_page_that_asked(monkeypatch):
     import contextlib
 
     import app as app_module
@@ -134,35 +164,34 @@ def test_export_copy_returns_to_the_page_that_asked(monkeypatch):
         yield
 
     monkeypatch.setattr(db, "offline_database", fake_offline)
-    monkeypatch.setattr(app_module.docker_ops, "copy_out_of_container", lambda src, dest: None)
+    monkeypatch.setattr(app_module.docker_ops, "copy_out_of_container",
+                        lambda src, dest: (_ for _ in ()).throw(RuntimeError("copy failed")))
 
     client = _client_with_csrf()
     resp = client.post("/db/SomeDb/export-copy",
                        data={"csrf_token": "tok", "return_to": "/db/SomeDb/drawing-style"})
+    assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/db/SomeDb/drawing-style")
 
 
-def test_export_copy_ignores_a_forged_return_to(monkeypatch):
-    import contextlib
-
-    import app as app_module
+def test_export_copy_failure_ignores_a_forged_return_to(monkeypatch):
     from utils import db
 
-    monkeypatch.setattr(db, "get_physical_files", lambda database: {"mdf": "a", "ldf": "b"})
-
-    @contextlib.contextmanager
-    def fake_offline(database):
-        yield
-
-    monkeypatch.setattr(db, "offline_database", fake_offline)
-    monkeypatch.setattr(app_module.docker_ops, "copy_out_of_container", lambda src, dest: None)
+    monkeypatch.setattr(db, "get_physical_files", lambda database: {})
 
     client = _client_with_csrf()
     resp = client.post("/db/SomeDb/export-copy",
                        data={"csrf_token": "tok", "return_to": "https://example.com/"})
+    assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/db/SomeDb")
 
 
 def test_export_copy_requires_csrf():
     client = _client_with_csrf()
     assert client.post("/db/SomeDb/export-copy").status_code == 400
+
+
+def test_export_copy_rejects_an_unsafe_database_name():
+    client = _client_with_csrf()
+    assert client.post("/db/bad%20name/export-copy",
+                       data={"csrf_token": "tok"}).status_code in (302, 400, 404)

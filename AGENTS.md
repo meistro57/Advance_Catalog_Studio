@@ -348,8 +348,11 @@ Two export paths: `/db/<db>/detach` runs `sp_detach_db` and ends the session;
 `/db/<db>/export-copy` uses `db.offline_database()` (ALTER DATABASE … SET
 OFFLINE inside a context manager whose `finally` sets it ONLINE) so the copied
 pair is as clean as a detach while the database stays attached for the next
-edit. Both `docker cp` the files out of `exports/` under `<db>.mdf` /
-`<db>_log.ldf`, overwriting the previous copy of the same name.
+edit. Both `docker cp` the files into `exports/` under `<db>.mdf` /
+`<db>_log.ldf`, overwriting the previous copy of the same name; export-copy then
+returns them as one `<db>.zip` attachment (a browser cannot save two files from
+one response, and Advance Steel wants the pair side by side), while a failure
+flashes and redirects back to the sending page.
 
 Also available per table: browse/filter/add/edit/duplicate/delete rows, and a
 database-wide find & replace over all text columns. Every POST that can write
