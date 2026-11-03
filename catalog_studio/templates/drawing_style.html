@@ -61,9 +61,9 @@
 
   /* menu + panes */
   .ds-nav { position:sticky; top:.75rem; max-height:calc(100vh - 1.5rem); overflow-y:auto; font-size:.84rem; }
-  .ds-nav .ds-nav-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:#6c757d; font-weight:700; margin:.8rem 0 .25rem .5rem; }
-  .ds-nav a { display:flex; justify-content:space-between; align-items:center; gap:.4rem; padding:.22rem .55rem; border-radius:.3rem; color:#212529; text-decoration:none; }
-  .ds-nav a:hover { background:#f1f3f5; }
+  .ds-nav .ds-nav-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--cs-muted, #6c757d); font-weight:700; margin:.8rem 0 .25rem .5rem; }
+  .ds-nav a { display:flex; justify-content:space-between; align-items:center; gap:.4rem; padding:.22rem .55rem; border-radius:.3rem; color:var(--cs-ink, #212529); text-decoration:none; }
+  .ds-nav a:hover { background:var(--cs-surface-alt, #f1f3f5); }
   .ds-nav a.active { background:#0d6efd; color:#fff; }
   .ds-nav a.active .badge { background:#fff !important; color:#0d6efd !important; }
   .ds-nav .ds-nav-view { font-weight:600; }
@@ -71,22 +71,22 @@
   .ds-nav .dirty-dot { width:.5rem; height:.5rem; border-radius:50%; background:#fd7e14; display:none; flex:none; }
   .ds-nav a.dirty .dirty-dot { display:inline-block; }
   .ds-pane[hidden] { display:none !important; }
-  .ds-crumb { font-size:.75rem; color:#6c757d; }
+  .ds-crumb { font-size:.75rem; color:var(--cs-muted, #6c757d); }
   .ds-pager { display:flex; justify-content:space-between; gap:.5rem; margin:1rem 0; }
 
   /* dimension explainer */
-  .dx-chain { border:1px solid #dee2e6; border-radius:.45rem; margin-bottom:.75rem; background:#fff; }
+  .dx-chain { border:1px solid var(--cs-border, #dee2e6); border-radius:.45rem; margin-bottom:.75rem; background:var(--cs-surface, #fff); }
   .dx-chain > summary { list-style:none; cursor:pointer; padding:.55rem .75rem; display:flex; gap:.6rem; align-items:flex-start; }
   .dx-chain > summary::-webkit-details-marker { display:none; }
-  .dx-chain[open] > summary { border-bottom:1px solid #e9ecef; background:#f8f9fa; border-radius:.45rem .45rem 0 0; }
+  .dx-chain[open] > summary { border-bottom:1px solid var(--cs-border, #e9ecef); background:var(--cs-surface-alt, #f8f9fa); border-radius:.45rem .45rem 0 0; }
   .dx-num { flex:none; width:1.7rem; height:1.7rem; border-radius:.3rem; background:#0d6efd; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.8rem; }
   .dx-name { font-weight:600; }
-  .dx-summary { font-size:.86rem; color:#343a40; }
+  .dx-summary { font-size:.86rem; color:var(--cs-ink, #343a40); }
   .dx-body { padding:.75rem; }
-  .dx-section { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:#6c757d; font-weight:700; margin-bottom:.35rem; }
-  .dx-point { display:flex; gap:.5rem; align-items:flex-start; padding:.35rem .45rem; border:1px solid #e9ecef; border-radius:.35rem; margin-bottom:.3rem; font-size:.84rem; }
-  .dx-point.ref { background:#fbfbfb; border-style:dashed; }
-  .dx-point .dx-pidx { flex:none; font-weight:700; color:#6c757d; width:1.2rem; }
+  .dx-section { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--cs-muted, #6c757d); font-weight:700; margin-bottom:.35rem; }
+  .dx-point { display:flex; gap:.5rem; align-items:flex-start; padding:.35rem .45rem; border:1px solid var(--cs-border, #e9ecef); border-radius:.35rem; margin-bottom:.3rem; font-size:.84rem; }
+  .dx-point.ref { background:var(--cs-surface-alt, #fbfbfb); border-style:dashed; }
+  .dx-point .dx-pidx { flex:none; font-weight:700; color:var(--cs-muted, #6c757d); width:1.2rem; }
   .dx-switch { display:flex; gap:.45rem; align-items:flex-start; font-size:.84rem; padding:.2rem 0; }
   .dx-switch .dx-icon { flex:none; width:1.1rem; text-align:center; }
   .dx-code { font-family:monospace; font-weight:700; letter-spacing:.08em; }
@@ -95,8 +95,9 @@
   .basis-name { background:#f1f3f5; color:#495057; }
   .basis-data { background:#d1e7dd; color:#0f5132; }
   .basis-raw { background:#fff3cd; color:#664d03; }
+  .basis-observed { background:#e2d9f3; color:#432874; }
   .dx-glossary dt { font-size:.84rem; }
-  .dx-glossary dd { font-size:.82rem; color:#495057; margin-bottom:.5rem; }
+  .dx-glossary dd { font-size:.82rem; color:var(--cs-muted, #495057); margin-bottom:.5rem; }
 </style>
 
 {% from "_drawing_macros.html" import fld with context %}
@@ -105,6 +106,7 @@
   {%- if b == 'guide' %}<span class="basis basis-guide" title="Meaning from the Advance Steel Drawing Style Manager guide">DSM guide</span>
   {%- elif b == 'name' %}<span class="basis basis-name" title="Read from the rule's name, which describes intent, not stored settings">from name</span>
   {%- elif b == 'data' %}<span class="basis basis-data" title="Read directly from the stored row">stored</span>
+  {%- elif b == 'observed' %}<span class="basis basis-observed" title="Seen in Advance Steel's own output for a real export; not yet confirmed in the DSM option list">observed</span>
   {%- elif b == 'raw' %}<span class="basis basis-raw" title="An Advance Steel number whose label isn't in the export">AS number</span>
   {%- endif %}
 {%- endmacro %}
@@ -115,7 +117,7 @@
     <summary>
       <span class="dx-num">{{ loop_index }}</span>
       <span class="flex-grow-1">
-        <span class="dx-name">{{ e.name if e else ('#' ~ d.row.RequestLinear) }}</span>
+        <span class="dx-name" {% if e and e.raw_name != e.name %}title="{{ e.raw_name }}"{% endif %}>{{ e.name if e else ('#' ~ d.row.RequestLinear) }}</span>
         {% if e and e.name_code %}<span class="badge bg-light text-dark border ms-1 dx-code" title="Drawing Style Manager name code">{{ e.name_code.code }}</span>{% endif %}
         {% if e and e.warnings %}<span class="badge bg-warning text-dark ms-1">&#9888; {{ e.warnings|length }}</span>{% endif %}
         <div class="dx-summary mt-1">{{ e.summary if e and not e.missing else (e.warnings[0] if e else '') }}</div>
@@ -132,10 +134,12 @@
           <div class="dx-point">
             <span class="dx-pidx">{{ p.index }}</span>
             <span class="flex-grow-1">
-              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence|capitalize }}</span> {{ basis('name') }}
-              <div class="ds-hint">Rule <strong>{{ p.name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
-                {% for x in p.extras %}<span class="badge bg-light text-dark border ms-1" title="Advance Steel number; label not in the export">{{ x.column }} {{ x.value }}</span>{% endfor %}
+              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
+              <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
               </div>
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              </details>{% endif %}
             </span>
           </div>
           {% else %}
@@ -147,17 +151,19 @@
           <div class="dx-point ref">
             <span class="dx-pidx">{{ p.index }}</span>
             <span class="flex-grow-1">
-              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence|capitalize }}</span> {{ basis('name') }}
-              <div class="ds-hint">Rule <strong>{{ p.name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
-                {% for x in p.extras %}<span class="badge bg-light text-dark border ms-1" title="Advance Steel number; label not in the export">{{ x.column }} {{ x.value }}</span>{% endfor %}
+              <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
+              <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
               </div>
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              </details>{% endif %}
             </span>
           </div>
           {% endfor %}
           {% endif %}
           {% if d.point_rows %}
           <div class="ds-hint mt-1">Edit a point rule:
-            {% for pr in d.point_rows %}<a href="/db/{{ database }}/DetViewDimPointSelection/{{ pr.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}" class="me-2">{{ pr.row.RunName }} &rarr;</a>{% endfor %}
+            {% for pr in d.point_rows %}<a href="/db/{{ database }}/DetViewDimPointSelection/{{ pr.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}" class="me-2" title="{{ pr.row.RunName }}">{{ loop.index }} &rarr;</a>{% endfor %}
           </div>
           {% endif %}
         </div>
@@ -168,11 +174,17 @@
             <span>The chain {{ e.direction.text }} {{ basis(e.direction.basis) }}
               {% if e.direction.note %}<div class="ds-hint">{{ e.direction.note }}</div>{% endif %}</span>
           </div>
+          {% if e.dim_type %}
+          <div class="dx-switch"><span class="dx-icon">&#8866;</span>
+            <span>Drawn as a {{ e.dim_type.text }} {{ basis(e.dim_type.basis) }}<div class="ds-hint">{{ e.dim_type.note }}</div></span>
+          </div>
+          {% endif %}
           <div class="dx-section mt-2">3 · Where it goes on the drawing</div>
+          <div class="ds-hint mb-1">Hover a line for the DSM option it comes from.</div>
           {% for s in e.placement %}
           <div class="dx-switch" title="{{ s.help }}">
             <span class="dx-icon">{{ '&#10003;'|safe if s.on else '&#8211;'|safe }}</span>
-            <span>{{ s.text }} {{ basis(s.basis) }}<div class="ds-hint">{{ s.help }}</div></span>
+            <span>{{ s.text }} {{ basis(s.basis) }}</span>
           </div>
           {% endfor %}
           {% if e.name_code %}
@@ -182,6 +194,7 @@
           </div>
           {% endif %}
           {% if e.label %}<div class="ds-hint mt-1">Dimension label text: <code>{{ e.label }}</code></div>{% endif %}
+          {% if e.group_name %}<div class="ds-hint mt-1">Filed in the DSM under <strong>{{ e.group_name }}</strong> {{ basis('data') }}</div>{% endif %}
         </div>
       </div>
 
@@ -196,7 +209,7 @@
           <div class="dx-section">Edit</div>
           <div class="ds-grid">
             {{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName, label='Request name') }}
-            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y')], label='Direction') }}
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y'),(4,'4 · along main part (observed)')], label='Direction') }}
             {{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool', label='Above (left if vertical)') }}
           </div>
           <div class="ds-hint mt-2">
@@ -205,7 +218,7 @@
           </div>
           {% if e.extras %}
           <details class="mt-2"><summary class="ds-hint">Other stored columns ({{ e.extras|length }})</summary>
-            <div class="mt-1">{% for x in e.extras %}<span class="badge bg-light text-dark border me-1 mb-1">{{ x.column }} = {{ x.value }}</span>{% endfor %}</div>
+            <div class="mt-1">{% for x in e.extras %}<span class="badge bg-light text-dark border me-1 mb-1" title="{{ x.column }}">{{ x.label }} = {{ x.value }}</span>{% endfor %}</div>
           </details>
           {% endif %}
         </div>
@@ -258,7 +271,7 @@
       <div class="ds-nav-head">Views ({{ m.style.requests|length }})</div>
       {% for r in m.style.requests %}{% if not r.missing %}
         <a class="ds-nav-view" href="#pane-view-{{ r.row.Key }}" data-pane="pane-view-{{ r.row.Key }}">
-          <span>&#128065; {{ r.row.RunName }}</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span><span class="badge bg-secondary">{{ r.scale_label }}</span></span></a>
+          <span title="{{ r.row.RunName }}">&#128065; {{ r.short_name or r.row.RunName }}</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span><span class="badge bg-secondary">{{ r.scale_label }}</span></span></a>
         <a class="ds-nav-sub" href="#pane-rules-{{ r.row.Key }}" data-pane="pane-rules-{{ r.row.Key }}">
           <span>Representation rules</span><span class="d-flex align-items-center gap-1"><span class="dirty-dot"></span><span class="badge bg-light text-dark border">{{ r.repr_items|length }}</span></span></a>
         <a class="ds-nav-sub" href="#pane-dims-{{ r.row.Key }}" data-pane="pane-dims-{{ r.row.Key }}">
@@ -353,8 +366,8 @@
 {% if m.style %}
 {% for r in m.style.requests %}{% if not r.missing %}
 {# ---------------- view setup ---------------- #}
-<section class="ds-pane" id="pane-view-{{ r.row.Key }}" data-title="{{ r.row.RunName }} · View">
-<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.row.RunName }}</div>
+<section class="ds-pane" id="pane-view-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · View">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }}</div>
 <div class="card ds-card"><div class="card-body" id="req-{{ r.row.Key }}">
   <div class="d-flex justify-content-between align-items-center">
     <h6 class="mb-0">&#128065; View: {{ r.row.RunName }} <span class="badge bg-secondary">{{ r.scale_label }}</span></h6>
@@ -424,8 +437,8 @@
 </section>
 
 {# ---------------- representation rules ---------------- #}
-<section class="ds-pane" id="pane-rules-{{ r.row.Key }}" data-title="{{ r.row.RunName }} · Representation rules">
-<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.row.RunName }} &rsaquo; Representation rules</div>
+<section class="ds-pane" id="pane-rules-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · Representation rules">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }} &rsaquo; Representation rules</div>
 <div class="card ds-card"><div class="card-body">
   {% with block = {'map_key': r.row.ObjReprMap, 'repr_map': r.repr_map, 'repr_items': r.repr_items},
           options = options.DetObjReprMapItems %}
@@ -435,8 +448,8 @@
 </section>
 
 {# ---------------- dimensions ---------------- #}
-<section class="ds-pane" id="pane-dims-{{ r.row.Key }}" data-title="{{ r.row.RunName }} · Dimensions">
-<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.row.RunName }} &rsaquo; Dimensions</div>
+<section class="ds-pane" id="pane-dims-{{ r.row.Key }}" data-title="{{ r.short_name or r.row.RunName }} · Dimensions">
+<div class="ds-crumb mb-1">{{ m.row.RunName }} &rsaquo; {{ r.short_name or r.row.RunName }} &rsaquo; Dimensions</div>
 <div class="card ds-card"><div class="card-body" id="dims-{{ r.row.Key }}">
   {% if r.dims %}
   <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
@@ -450,7 +463,7 @@
   <div class="ds-hint mt-1 mb-2">
     Each numbered card is one dimension chain in this view, in the order Advance Steel builds them. The first line
     says what it measures and where it lands; open a card for the point rules and the placement switches behind it.
-    Tags show where each statement comes from: {{ basis('guide') }} {{ basis('data') }} {{ basis('name') }} {{ basis('raw') }}.
+    Tags show where each statement comes from: {{ basis('guide') }} {{ basis('data') }} {{ basis('observed') }} {{ basis('name') }} {{ basis('raw') }}.
   </div>
 
   <div class="row g-2 mb-3">
@@ -652,6 +665,7 @@
     <ul class="list-unstyled">
       <li>{{ basis('guide') }} the meaning comes from Autodesk's Drawing Style Manager guide; for the switches, the column is matched to the DSM option by name and checked against the name code.</li>
       <li>{{ basis('data') }} read straight from the stored row.</li>
+      <li>{{ basis('observed') }} seen in Advance Steel's own output for a real export, not yet confirmed in the DSM list (evidence in <code>docs/verification-log.md</code>).</li>
       <li>{{ basis('name') }} read from a rule's name. Names say what the author intended; the point type itself is stored as a number this file can't label.</li>
       <li>{{ basis('raw') }} an Advance Steel number whose label lives in its built-in database, which an export doesn't include.</li>
     </ul>

@@ -107,7 +107,7 @@ def test_unrecognised_rule_name_falls_back_to_the_name():
 
 def test_unexplained_point_columns_are_kept_raw():
     p = dx.explain_point({"Key": 1, "RunName": "Holes - All", "Objects": 0, "PointType": 12, "Empty": None})
-    assert p["extras"] == [{"column": "PointType", "value": 12}]
+    assert p["extras"] == [{"column": "PointType", "label": "Point type", "value": 12}]
 
 
 # --- direction and placement --------------------------------------------------
@@ -184,7 +184,7 @@ def test_missing_point_rows_are_skipped():
 
 def test_unknown_request_columns_are_listed():
     e = dx.explain_request(linear(Mystery=4), [HOLES], QSETS)
-    assert {"column": "Mystery", "value": 4} in e["extras"]
+    assert {"column": "Mystery", "label": "Mystery", "value": 4} in e["extras"]
     assert all(x["column"] != "Point3" for x in e["extras"])
 
 
@@ -202,3 +202,82 @@ def test_explain_strategy_follows_strategy_order_and_flags_missing_requests():
     out = dx.explain_strategy(dims, {22100: HOLES, 22101: MP_REF}, QSETS)
     assert out[0]["order"] == 0 and out[0]["measured"][0]["sentence"] == "the hole centers"
     assert out[1]["missing"] is True and "not in the file" in out[1]["warnings"][0]
+
+
+# --- real AS 2026 export: "Marks 6 - Railing (Mp is Handrail)" ----------------
+# Rows copied from the export; the matching drawing is described in
+# docs/verification-log.md.
+
+RAIL_POSTS = {"Key": 22001, "RunName": "Copy of Railings - Posts Landing | System | Bottom-Any",
+              "Objects": 22029, "GeometricRestrictions": 0, "DepthPosition": 0, "VisibilityStatus": 0,
+              "PointType": 9, "ReferenceAxis": 0, "MPReferenceAxis": 0, "PointGeometricRestrictions": 4,
+              "MpGeomRestriction": 0, "ParentRelativePositonRestriction": 0, "OwnerText": "MH"}
+RAIL_OVERALL = {"Key": 22003, "RunName": "Copy of Assembly overall", "Objects": 22030,
+                "PointType": 14, "OwnerText": "MH"}
+RAIL_MP_EXTREME = {"Key": 22004, "RunName": "Copy of Mp | Extreme", "Objects": 22030,
+                   "PointType": 1, "OwnerText": "MH"}
+RAIL_QSETS = {22029: "Copy of Railing - Post Landing", 22030: "Copy of Mp"}
+RAIL_GROUPS = {1: "Mp\r\n", 14: "Railings\r\n"}
+
+
+def test_copy_prefixes_are_dropped_for_display():
+    assert dx.clean_name("Copy of Copy of X view") == "X view"
+    assert dx.clean_name("Copy (2) of Mp") == "Mp"
+    assert dx.clean_name("Copyright plate") == "Copyright plate"
+
+
+def test_pipe_style_rule_names_are_read():
+    p = dx.explain_point(RAIL_POSTS, RAIL_QSETS)
+    assert p["sentence"] == "the system line of Railing - Post Landing (bottom points only)"
+    assert p["display_name"] == "Railings - Posts Landing | System | Bottom-Any"
+
+
+def test_position_words_follow_the_dsm_list():
+    assert dx.read_position("Bottom-Any") == ("Bottom", "Any")
+    assert dx.read_position("Left & Right Extremes") == ("Left & Right Extremes", None)
+    assert dx.read_position("TopLeft-Bottommost") == ("TopLeft", "Bottommost")
+    assert dx.read_position("Sideways") is None
+    assert dx.position_phrase("Any", "Left") == "on the left of the main part"
+
+
+def test_assembly_overall_and_main_part_extremes():
+    assert dx.explain_point(RAIL_OVERALL, RAIL_QSETS)["sentence"] == "the overall extents of the assembly"
+    assert dx.explain_point(RAIL_MP_EXTREME, RAIL_QSETS)["sentence"] == "the overall size of the main part"
+
+
+def test_point_settings_get_dsm_field_names_but_keep_numbers():
+    labels = {x["label"]: x["value"] for x in dx.explain_point(RAIL_POSTS, RAIL_QSETS)["extras"]}
+    assert labels["Point type"] == 9 and labels["Position on object"] == 4
+    assert labels["Position on main part"] == 0 and "OwnerText" not in labels
+
+
+def test_direction_four_is_marked_observed_not_verified():
+    d = dx.direction_text({"Direction": 4})
+    assert d["basis"] == "observed" and "main part" in d["text"] and "#4" in d["text"]
+    assert dx.direction_text({"Direction": 5})["basis"] == "raw"
+
+
+def test_railing_front_chains_read_like_the_drawing():
+    lin = {"Key": 22001, "RunName": "Copy of X view - Railing Posts", "OwnerText": "MH", "Direction": 0,
+           "ArrangeGlobally": True, "ArrangeAbove": False, "GroupRelatedDimensions": False,
+           "OneChainPerObjectInPoints1": False, "AllowCombine": True, "AutomaticallySeparate": False,
+           "Group": 14, "LabelPosition": 0, "LabelContents": "-", "Number of Points": 2,
+           "Point1": 22001, "Point2": 22003}
+    for i in range(3, 16):
+        lin[f"Point{i}"] = 0
+    e = dx.explain_request(lin, [RAIL_POSTS, RAIL_OVERALL], RAIL_QSETS,
+                           item={"Type": 2}, group_names=RAIL_GROUPS)
+    assert e["name"] == "X view - Railing Posts" and e["raw_name"].startswith("Copy of")
+    assert e["summary"] == ("Measures the system line of Railing - Post Landing (bottom points only); "
+                            "the overall extents of the assembly. The chain runs along X, placed below the view.")
+    assert e["group_name"] == "Railings"
+    assert e["dim_type"]["basis"] == "observed" and "relative" in e["dim_type"]["text"]
+    assert e["label"] is None  # "-" means no label text
+    assert {"column": "LabelPosition", "label": "Label position", "value": 0} in e["extras"]
+    assert e["warnings"] == []
+
+
+def test_unknown_request_type_stays_a_number():
+    t = dx.request_type_text(7)
+    assert t["basis"] == "raw" and "#7" in t["text"]
+    assert dx.request_type_text(None) is None

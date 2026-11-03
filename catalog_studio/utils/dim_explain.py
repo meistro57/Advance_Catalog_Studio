@@ -21,6 +21,10 @@ Every statement carries a *basis* so the page never presents a guess as fact:
     the rule, so they describe intent, not stored settings.
 ``data``
     A value read directly from the row (object set name, point count, …).
+``observed``
+    Seen in Advance Steel's own output for a real export (recorded in
+    ``docs/verification-log.md``) but not yet confirmed in the DSM's option
+    list. One observation, so it says so.
 ``raw``
     A number whose label lives in Advance Steel's built-in database
     (``AstorDetailsBase``), which an export does not contain. Shown unchanged;
@@ -53,13 +57,57 @@ CODE_LETTERS = {
 
 # Columns this module explains; anything else on the row is listed raw.
 LINEAR_KNOWN = {
-    "Key", "RunName", "Direction", "ArrangeAbove", "ArrangeGlobally",
+    "Key", "RunName", "OwnerText", "Direction", "ArrangeAbove", "ArrangeGlobally",
     "GroupRelatedDimensions", "OneChainPerObjectInPoints1", "AllowCombine",
     "AutomaticallySeparate", "Group", "LabelContents", "Number of Points",
     "NumberOfPoints",
 } | {f"Point{i}" for i in range(1, 16)}
 
-POINT_KNOWN = {"Key", "RunName", "Objects"}
+POINT_KNOWN = {"Key", "RunName", "Objects", "OwnerText"}
+
+# DetViewDimPointSelection columns -> the DSM field they hold. The column names
+# say it, and the export's InfoTableRelations points each one at its own
+# AstorDetailsBase list (DetViewDimPointtype, DetVwDimGeomRestrictions, ...).
+# The values stay numbers: those lists are not in the export.
+POINT_FIELD_LABELS = {
+    "PointType": "Point type",
+    "PointGeometricRestrictions": "Position on object",
+    "MpGeomRestriction": "Position on main part",
+    "VisibilityStatus": "Visibility",
+    "DepthPosition": "Depth position",
+    "GeometricRestrictions": "Object geometric restriction",
+    "ReferenceAxis": "Reference axis",
+    "MPReferenceAxis": "Main-part reference axis",
+    "ParentRelativePositonRestriction": "Position relative to parent",
+}
+
+LINEAR_FIELD_LABELS = {"LabelPosition": "Label position"}
+
+# Direction numbers whose meaning has been SEEN in Advance Steel output but not
+# yet read from the DSM list. Each entry names its evidence.
+OBSERVED_DIRECTIONS = {
+    4: ("runs along the main part",
+        "Observed in an AS 2026 railing detail (Marks 6 - Railing, Mp is Handrail): "
+        "the Direction 4 chain was drawn parallel to the sloped handrail, which is the "
+        "main part. Not yet confirmed in the DSM direction list."),
+}
+
+# DetViewDimStrategyItems.Type -> DetRequestTypes (AstorDetailsBase).
+OBSERVED_REQUEST_TYPES = {
+    2: ("chained (relative) linear dimension",
+        "Observed in the same railing detail: Type 2 chains print each segment "
+        "(3'-11\" spacing) rather than running totals. Not yet confirmed in the DSM list."),
+}
+
+# DSM "Point position on object / on main part" options (guide 2016 p.80),
+# used to read the position part of a rule name such as "... | Bottom-Any".
+POSITION_WORDS = (
+    "Left & Right Extremes", "Top & Bottom Extremes", "Bottommost", "BottomLeft",
+    "BottomRight", "Leftmost", "Rightmost", "Topmost", "TopLeft", "TopRight",
+    "Bottom", "Left", "Right", "Top", "Any",
+)
+
+COPY_PREFIX = re.compile(r"^(?:copy(?:\s*\(\d+\))?\s+of\s+)+", re.I)
 
 NULL_REFS = {None, 0, -1, "", "0", "-1"}
 
@@ -79,6 +127,8 @@ DIRECTION_OPTIONS = (
 # DSM point types (2016 guide p.76-78), keyed by words that appear in point
 # selection rule names. Order matters: the first match wins.
 POINT_MEANINGS = (
+    (("overall", "assembly"), "the overall extents of the assembly",
+     "The outermost points of the whole assembly in the chain direction."),
     (("collision",), "the collision points", "Main-part collision dimensions."),
     (("development",), "the development (bend) lines", ""),
     (("stencil",), "the stencil points", "Stencil points grouped as sub-objects."),
@@ -97,6 +147,9 @@ POINT_MEANINGS = (
     (("hole", "bolt"), "the hole centers", ""),
     (("all",), "every dimensionable point", ""),
 )
+
+# meanings that already name what they measure: no "of <objects>" after them
+STANDALONE_MEANINGS = {"the overall extents of the assembly"}
 
 SUBJECT_WORDS = (
     (("mp", "main part", "mainpart"), "the main part"),
@@ -153,17 +206,57 @@ def name_code_check(name, linear):
     return {"code": decoded["code"], "agree": agree, "disagree": disagree}
 
 
+def clean_name(name):
+    """Drop deep-copy prefixes ("Copy of Copy of X" -> "X") for display."""
+    return COPY_PREFIX.sub("", str(name or "")).strip()
+
+
+def read_position(text):
+    """``"Bottom-Any"`` -> ``("Bottom", "Any")`` (on object, on main part)."""
+    raw = str(text or "").strip()
+    found = []
+    rest = raw
+    while rest:
+        for word in POSITION_WORDS:
+            if rest.lower().startswith(word.lower()):
+                found.append(word)
+                rest = rest[len(word):].lstrip(" -/")
+                break
+        else:
+            return None
+    if not found or len(found) > 2:
+        return None
+    return found[0], (found[1] if len(found) > 1 else None)
+
+
+def position_phrase(on_object, on_main_part):
+    parts = []
+    if on_object and on_object != "Any":
+        parts.append(f"{on_object.lower().replace('&', 'and')} points only")
+    if on_main_part and on_main_part != "Any":
+        parts.append(f"on the {on_main_part.lower().replace('&', 'and')} of the main part")
+    return ", ".join(parts)
+
+
 def _lower_words(text):
     return re.sub(r"[^a-z0-9 ]+", " ", str(text or "").lower())
 
 
 def read_point_name(name):
     """Split ``"Main Part - Extreme as reference"`` into what/where/reference."""
-    raw = str(name or "").strip()
+    raw = clean_name(name)
     reference = bool(re.search(r"\bas\s+reference\b|\breference\b", raw, re.I))
-    head, _, tail = raw.partition(" - ")
-    if not tail:
-        head, tail = "", raw
+    position = None
+    if "|" in raw:
+        # "Objects | Point kind | Position" (e.g. "Railings - Posts Landing | System | Bottom-Any")
+        pieces = [x.strip() for x in raw.split("|")]
+        head, tail = pieces[0], " ".join(pieces[1:2])
+        if len(pieces) > 2:
+            position = read_position(pieces[2])
+    else:
+        head, _, tail = raw.partition(" - ")
+        if not tail:
+            head, tail = "", raw
     words = _lower_words(f"{head} {tail}")
     tail_words = _lower_words(tail)
 
@@ -191,6 +284,7 @@ def read_point_name(name):
             subject = text
             break
     return {"subject": subject, "meaning": meaning, "hint": hint, "reference": reference,
+            "position": position,
             "subject_text": head.strip(), "detail_text": tail.strip()}
 
 
@@ -203,25 +297,35 @@ def explain_point(point_row, qset_names=None, index=1):
     objects_key = row.get("Objects")
     objects_name = None
     if objects_key not in NULL_REFS:
-        objects_name = qset_names.get(objects_key, f"object set #{objects_key}")
+        objects_name = clean_name(qset_names.get(objects_key, f"object set #{objects_key}"))
+        if objects_name.lower() in {"mp", "main part", "mainpart"}:
+            objects_name = "the main part"
 
     target = objects_name or parsed["subject"] or parsed["subject_text"]
     meaning = parsed["meaning"]
-    if meaning and target and not (meaning == "the hole centers" and target.lower() in {"holes", "hole"}):
+    if meaning in STANDALONE_MEANINGS:
+        sentence = meaning
+    elif meaning and target and not (meaning == "the hole centers" and target.lower() in {"holes", "hole"}):
         sentence = f"{meaning} of {target}"
     elif meaning:
         sentence = meaning
     else:
         sentence = f"points from {target or 'the selected objects'} ({parsed['detail_text'] or name})"
 
+    if parsed["position"]:
+        phrase = position_phrase(*parsed["position"])
+        if phrase:
+            sentence = f"{sentence} ({phrase})"
+
     extras = [
-        {"column": c, "value": v}
+        {"column": c, "label": POINT_FIELD_LABELS.get(c, c), "value": v}
         for c, v in row.items()
         if c not in POINT_KNOWN and v not in (None, "")
     ]
     return {
         "index": index,
         "name": name,
+        "display_name": clean_name(name),
         "key": row.get("Key"),
         "sentence": sentence,
         "hint": parsed["hint"],
@@ -244,6 +348,10 @@ def direction_text(linear):
                 "note": "This app draws Direction 1 as Y; the full DSM list has ~20 options."}
     if value is None:
         return {"text": "direction not set", "axis": None, "value": None, "basis": "raw", "note": ""}
+    if value in OBSERVED_DIRECTIONS:
+        text, note = OBSERVED_DIRECTIONS[value]
+        return {"text": f"{text} (direction #{value})", "axis": None, "value": value,
+                "basis": "observed", "note": note}
     return {"text": f"uses direction option #{value}", "axis": None, "value": value, "basis": "raw",
             "note": "The label for this number is in Advance Steel's built-in list, not the export."}
 
@@ -308,14 +416,29 @@ def placement_lines(linear):
     return lines
 
 
-def explain_request(linear, point_rows=(), qset_names=None, order=None):
+def request_type_text(value):
+    """DetViewDimStrategyItems.Type (the DSM 'dimension type' column)."""
+    num = _int(value)
+    if num is None:
+        return None
+    if num in OBSERVED_REQUEST_TYPES:
+        text, note = OBSERVED_REQUEST_TYPES[num]
+        return {"value": num, "text": f"{text} (type #{num})", "basis": "observed", "note": note}
+    return {"value": num, "text": f"dimension type #{num}", "basis": "raw",
+            "note": "The DSM's dimension types (linear relative/absolute, arc, angle, slope…) "
+                    "are a built-in list; this number's label isn't in the export."}
+
+
+def explain_request(linear, point_rows=(), qset_names=None, order=None,
+                    item=None, group_names=None):
     """Everything the page shows for one dimension request.
 
     ``point_rows`` are the ``DetViewDimPointSelection`` rows in Point1..N
     order (missing ones as None).
     """
     lin = linear or {}
-    name = lin.get("RunName") or f"dimension request #{lin.get('Key')}"
+    raw_name = lin.get("RunName") or f"dimension request #{lin.get('Key')}"
+    name = clean_name(raw_name) or raw_name
     points = [explain_point(p, qset_names, i + 1) for i, p in enumerate(point_rows) if p]
     measured = [p for p in points if not p["reference"]]
     reference = [p for p in points if p["reference"]]
@@ -356,14 +479,21 @@ def explain_request(linear, point_rows=(), qset_names=None, order=None):
                     + ") are added only when the chain already has something to measure.")
 
     extras = [
-        {"column": c, "value": v}
+        {"column": c, "label": LINEAR_FIELD_LABELS.get(c, c), "value": v}
         for c, v in lin.items()
         if c not in LINEAR_KNOWN and v not in (None, "")
     ]
     label = lin.get("LabelContents")
+    group_key = lin.get("Group")
+    group_name = None
+    if group_names and group_key in group_names:
+        group_name = str(group_names[group_key] or "").strip() or None
     return {
         "order": order,
         "name": name,
+        "raw_name": raw_name,
+        "dim_type": request_type_text((item or {}).get("Type")),
+        "group_name": group_name,
         "summary": summary,
         "direction": direction,
         "placement": placement,
@@ -372,13 +502,13 @@ def explain_request(linear, point_rows=(), qset_names=None, order=None):
         "reference": reference,
         "name_code": check,
         "warnings": warnings,
-        "label": label if label not in (None, "") else None,
+        "label": label if label not in (None, "", "-") else None,
         "group": lin.get("Group"),
         "extras": extras,
     }
 
 
-def explain_strategy(dims, point_lookup, qset_names=None):
+def explain_strategy(dims, point_lookup, qset_names=None, group_names=None):
     """``dims`` as built by ``drawing_styles.style_tree`` (each with ``linear``
     and ``point_keys``) -> one explanation per chain, in strategy order."""
     out = []
@@ -390,5 +520,6 @@ def explain_strategy(dims, point_lookup, qset_names=None):
                         "warnings": ["This chain points at a dimension request that is not in the file."]})
             continue
         rows = [point_lookup.get(k) for k in d.get("point_keys") or ()]
-        out.append(explain_request(lin, rows, qset_names, order=(d.get("row") or {}).get("Order")))
+        out.append(explain_request(lin, rows, qset_names, order=(d.get("row") or {}).get("Order"),
+                                   item=d.get("row"), group_names=group_names))
     return out

@@ -246,6 +246,7 @@ Every line carries a basis tag so a reading is never presented as fact:
 | stored | Read straight from the row (object set name, point count, Direction 0/1) |
 | from name | Parsed from a rule's `RunName` (`Holes - All`, `Main Part - Extreme as reference`) |
 | AS number | A built-in enum value whose label is not in the export; shown unchanged |
+| observed | Seen in Advance Steel output for a real export (verification log A5.1), not yet read from the DSM list |
 
 Column ↔ DSM option matches (by name, cross-checked by the name code):
 
@@ -265,6 +266,19 @@ above are right (feeds TODO A5). It also warns when `Number of Points`
 disagrees with the filled `Point1..15`, when a chain has no points, and when
 every point rule is "as reference" (the guide: reference points only appear
 when the chain already has something to measure).
+
+Real exports (the railing style, A5.1) also showed:
+
+- point rule names in the form `Objects | Point kind | Position`
+  (`Railings - Posts Landing | System | Bottom-Any`); the explainer reads the
+  position part against the DSM's position list ("Bottom-Any" = bottom points
+  of the object, any on the main part);
+- `DetViewDimStrategyItems.Type` (→ `AstorDetailsBase.DetRequestTypes`, the
+  DSM dimension type) and `DetViewDimRequestLinear.Group`
+  (→ `DetViewDimRequestLinearGroup`, the DSM folder: Mp / Railings / Others);
+- `DetViewDimStrategyNew.Items`, which names the strategy's item list (equal to
+  its own `Key` in every export seen; the tree follows `Items` when set);
+- `Direction` values 4 and 5 in addition to 0/1.
 
 Not decoded: the point type, position-on-object and visibility columns of
 `DetViewDimPointSelection`, and `Direction` values other than 0/1. The guide
