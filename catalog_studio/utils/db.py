@@ -63,9 +63,18 @@ def detach_database(db_name: str):
     if not valid_identifier(db_name):
         raise ValueError("Invalid database name.")
     conn, cur = connect()
-    cur.execute(f"ALTER DATABASE [{db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;")
-    cur.execute(f"EXEC sp_detach_db N'{db_name}';")
-    conn.close()
+    try:
+        cur.execute(f"ALTER DATABASE [{db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;")
+        cur.execute(f"EXEC sp_detach_db N'{db_name}';")
+    except Exception:
+        # A failed detach must not leave the database single-user.
+        try:
+            cur.execute(f"ALTER DATABASE [{db_name}] SET MULTI_USER;")
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
 
 
 def list_tables(database: str):
@@ -225,6 +234,21 @@ def is_identity_column(database: str, table: str, column: str) -> bool:
     result = cur.fetchone()["cnt"] > 0
     conn.close()
     return result
+
+
+def get_identity_columns(database: str, table: str) -> list:
+    """Names of the identity columns on a table (empty when it has none)."""
+    conn, cur = connect(database)
+    try:
+        cur.execute("""
+            SELECT ic.name AS COLUMN_NAME
+            FROM sys.identity_columns ic
+            JOIN sys.tables t ON ic.object_id = t.object_id
+            WHERE t.name = %s
+        """, (table,))
+        return [r["COLUMN_NAME"] for r in cur.fetchall()]
+    finally:
+        conn.close()
 
 
 def coerce_value(value, data_type: str):
@@ -442,12 +466,14 @@ def backup_database(database: str, container_path: str, label: str = "catalog-st
     if not container_path or "'" in container_path:
         raise ValueError("Unsafe backup path.")
     conn, cur = connect()
-    cur.execute(
-        f"BACKUP DATABASE [{database}] TO DISK = %s "
-        f"WITH COPY_ONLY, INIT, NAME = %s, DESCRIPTION = %s",
-        (container_path, label[:128], "Catalog Studio pre-change snapshot"),
-    )
-    conn.close()
+    try:
+        cur.execute(
+            f"BACKUP DATABASE [{database}] TO DISK = %s "
+            f"WITH COPY_ONLY, INIT, NAME = %s, DESCRIPTION = %s",
+            (container_path, label[:128], "Catalog Studio pre-change snapshot"),
+        )
+    finally:
+        conn.close()
 
 
 def run_script(database: str, statements: list):
@@ -484,49 +510,87 @@ def _like_pattern(value: str) -> str:
     return f"%{escaped}%"
 
 
-def find_text_columns(database: str):
-    """Return [(table, column)] for every string-type column in the database."""
-    conn, cur = connect(database)
+def _text_column_details(cur):
+    """[(table, column, data_type)] for every string-type column.
+
+    Includes the legacy ``text`` / ``ntext`` types; callers must cast those
+    because ``REPLACE()`` rejects them.
+    """
     cur.execute("""
-        SELECT TABLE_NAME, COLUMN_NAME
+        SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE DATA_TYPE IN ('nvarchar', 'varchar', 'nchar', 'char', 'text', 'ntext')
         ORDER BY TABLE_NAME, COLUMN_NAME
     """)
-    cols = [(r["TABLE_NAME"], r["COLUMN_NAME"]) for r in cur.fetchall()]
-    conn.close()
-    return cols
+    return [
+        (r["TABLE_NAME"], r["COLUMN_NAME"], (r["DATA_TYPE"] or "").lower())
+        for r in cur.fetchall()
+    ]
+
+
+def find_text_columns(database: str):
+    """Return [(table, column)] for every string-type column in the database."""
+    conn, cur = connect(database)
+    try:
+        return [(table, column) for table, column, _ in _text_column_details(cur)]
+    finally:
+        conn.close()
+
+
+def _text_expr(column: str, data_type: str) -> str:
+    """Column reference usable by REPLACE()/LIKE, casting legacy text types."""
+    if data_type in ("text", "ntext"):
+        return f"CAST([{column}] AS nvarchar(max))"
+    return f"[{column}]"
 
 
 def preview_find_replace(database: str, find_text: str) -> dict:
     """Return {'table.column': match_count} for every text column containing find_text."""
     results = {}
     pattern = _like_pattern(find_text)
-    for table, column in find_text_columns(database):
-        conn, cur = connect(database)
-        cur.execute(f"SELECT COUNT(*) AS cnt FROM [{table}] WHERE [{column}] LIKE %s", (pattern,))
-        count = cur.fetchone()["cnt"]
+    conn, cur = connect(database)
+    try:
+        for table, column, data_type in _text_column_details(cur):
+            cur.execute(
+                f"SELECT COUNT(*) AS cnt FROM [{table}] "
+                f"WHERE {_text_expr(column, data_type)} LIKE %s",
+                (pattern,),
+            )
+            count = cur.fetchone()["cnt"]
+            if count:
+                results[f"{table}.{column}"] = count
+    finally:
         conn.close()
-        if count:
-            results[f"{table}.{column}"] = count
     return results
 
 
 def apply_find_replace(database: str, find_text: str, replace_text: str) -> dict:
-    """Run REPLACE() across every text column of every table. Returns {'table.column': rows_updated}."""
+    """Run REPLACE() across every text column of every table. Returns {'table.column': rows_updated}.
+
+    Every update runs on one connection inside a single transaction, so a
+    failure part-way through rolls the whole replacement back.
+    """
     results = {}
     pattern = _like_pattern(find_text)
-    for table, column in find_text_columns(database):
-        conn, cur = connect(database)
-        cur.execute(
-            f"UPDATE [{table}] SET [{column}] = REPLACE([{column}], %s, %s) "
-            f"WHERE [{column}] LIKE %s",
-            (find_text, replace_text, pattern),
-        )
-        affected = cur.rowcount
+    conn = _open_connection(database=database, autocommit=False)
+    cur = conn.cursor(as_dict=True)
+    try:
+        for table, column, data_type in _text_column_details(cur):
+            col_expr = _text_expr(column, data_type)
+            cur.execute(
+                f"UPDATE [{table}] SET [{column}] = REPLACE({col_expr}, %s, %s) "
+                f"WHERE {col_expr} LIKE %s",
+                (find_text, replace_text, pattern),
+            )
+            affected = cur.rowcount
+            if affected:
+                results[f"{table}.{column}"] = affected
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        if affected:
-            results[f"{table}.{column}"] = affected
     return results
 
 
@@ -587,6 +651,27 @@ def smart_replace_name(name: str, replace_from: str, replace_to: str) -> str:
     if p2.search(name):
         return p2.sub(replace_to, name)
     return name.replace(replace_from, replace_to)
+
+
+def replace_diameter_in_text(text: str, source_dia: float, target_dia: float) -> str:
+    """Replace a diameter number in free text without touching longer numbers.
+
+    `BoltsDistances.Description` is prose, so a plain substring replace of
+    `20.0` would also rewrite `120.0`. Both the dotted and comma-decimal
+    spellings used by Advance Steel are handled.
+    """
+    if not text:
+        return text
+    pairs = [
+        (str(source_dia).replace(".", ","), str(target_dia).replace(".", ",")),
+        (str(source_dia), str(target_dia)),
+    ]
+    for old, new in pairs:
+        if not old:
+            continue
+        pattern = re.compile(r"(?<![\w.,])" + re.escape(old) + r"(?![\d.,])")
+        text = pattern.sub(new, text)
+    return text
 
 
 def _get_connector_diameters(tables: set, cur, conn) -> list:
@@ -720,6 +805,8 @@ def preview_clone_diameter(
     scale_along_across: bool = True,
     include_tables: list = None,
 ) -> dict:
+    if abs(target_dia - source_dia) < 0.001:
+        raise ValueError("Target diameter must differ from the source diameter.")
     conn, cur = connect(database)
     tables = set(list_tables(database))
     catalog_type = guess_catalog_type(database)
@@ -890,9 +977,31 @@ def preview_clone_diameter(
                     if f"Diameter{i}" in r_dict and r_dict[f"Diameter{i}"] is not None and abs(r_dict[f"Diameter{i}"] - source_dia) < 0.001:
                         r_dict[f"Diameter{i}"] = target_dia
                 samples.append(r_dict)
+
+            # Applying twice replaces the target diameter, so report what goes away.
+            cur.execute("SELECT COUNT(*) as cnt FROM AnchorsName WHERE Diameter = %s", (target_dia,))
+            replace_counts = {"AnchorsName": cur.fetchone()["cnt"]}
+            if "AnchorsDefinition" in tables:
+                cur.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM AnchorsDefinition ad
+                    JOIN AnchorsName an ON ad.AnchorID = an.ID
+                    WHERE an.Diameter = %s
+                """, (target_dia,))
+                replace_counts["AnchorsDefinition"] = cur.fetchone()["cnt"]
+            if "AnchorsHoleDefinition" in tables:
+                cur.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM AnchorsHoleDefinition ah
+                    JOIN AnchorsName an ON ah.AnchorNameID = an.ID
+                    WHERE an.Diameter = %s
+                """, (target_dia,))
+                replace_counts["AnchorsHoleDefinition"] = cur.fetchone()["cnt"]
+
             preview["tables"]["AnchorsName"] = {
                 "count": len(samples),
                 "samples": samples[:3],
+                "replace_count": replace_counts["AnchorsName"],
             }
 
             if "AnchorsDefinition" in tables:
@@ -903,7 +1012,11 @@ def preview_clone_diameter(
                     WHERE an.Diameter = %s
                 """, (source_dia,))
                 def_cnt = cur.fetchone()["cnt"]
-                preview["tables"]["AnchorsDefinition"] = {"count": def_cnt, "samples": []}
+                preview["tables"]["AnchorsDefinition"] = {
+                    "count": def_cnt,
+                    "samples": [],
+                    "replace_count": replace_counts["AnchorsDefinition"],
+                }
 
             if "AnchorsHoleDefinition" in tables:
                 cur.execute("""
@@ -913,7 +1026,11 @@ def preview_clone_diameter(
                     WHERE an.Diameter = %s
                 """, (source_dia,))
                 hole_cnt = cur.fetchone()["cnt"]
-                preview["tables"]["AnchorsHoleDefinition"] = {"count": hole_cnt, "samples": []}
+                preview["tables"]["AnchorsHoleDefinition"] = {
+                    "count": hole_cnt,
+                    "samples": [],
+                    "replace_count": replace_counts["AnchorsHoleDefinition"],
+                }
 
     conn.close()
     preview["total_rows"] = sum(t["count"] for t in preview["tables"].values())
@@ -932,6 +1049,8 @@ def apply_clone_diameter(
     include_tables: list = None,
     cleanup_keys: list = None,
 ) -> dict:
+    if abs(target_dia - source_dia) < 0.001:
+        raise ValueError("Target diameter must differ from the source diameter.")
     conn = _open_connection(database=database, autocommit=False)
     cur = conn.cursor(as_dict=True)
     tables = set(list_tables(database))
@@ -940,7 +1059,21 @@ def apply_clone_diameter(
     inserted_counts = {}
 
     try:
-        # 0. Clean up any orphan keys if requested
+        # 0a. The bolt branch copies every column verbatim, which is only safe on
+        # tables without identity columns. Fail closed on anything else.
+        if catalog_type == "bolt":
+            identity_tables = [
+                t for t in ("ScrewNew", "SetOfBolts", "SetNutsBolts", "SetBolts")
+                if t in tables and get_identity_columns(database, t)
+            ]
+            if identity_tables:
+                raise RuntimeError(
+                    "Clone aborted: identity column found on "
+                    + ", ".join(identity_tables)
+                    + ". Cloning into identity-keyed bolt tables is unverified; nothing was changed."
+                )
+
+        # 0b. Clean up any orphan keys if requested
         if cleanup_keys and "BoltsDiameters" in tables:
             for k in cleanup_keys:
                 cur.execute("DELETE FROM BoltsDiameters WHERE [Key] = %s", (float(k),))
@@ -962,9 +1095,7 @@ def apply_clone_diameter(
             for r in src_rows:
                 along_val = round(r["along"] * scale, 4) if scale_along_across and r.get("along") is not None else r.get("along")
                 across_val = round(r["across"] * scale, 4) if scale_along_across and r.get("across") is not None else r.get("across")
-                desc = r.get("Description") or ""
-                desc = desc.replace(str(source_dia).replace(".", ","), str(target_dia).replace(".", ","))\
-                           .replace(str(source_dia), str(target_dia))
+                desc = replace_diameter_in_text(r.get("Description") or "", source_dia, target_dia)
                 cur.execute("""
                     INSERT INTO BoltsDistances (Diameter, HoleTolerance, along, across, Description)
                     VALUES (%s, %s, %s, %s, %s)
@@ -1090,6 +1221,22 @@ def apply_clone_diameter(
                 is_an_identity = is_identity_column(database, "AnchorsName", "ID")
                 is_ad_identity = is_identity_column(database, "AnchorsDefinition", "ID") if "AnchorsDefinition" in tables else False
                 is_ah_identity = is_identity_column(database, "AnchorsHoleDefinition", "ID") if "AnchorsHoleDefinition" in tables else False
+
+                # Applying twice must not duplicate the target diameter: drop the
+                # existing target anchors first, children before parents.
+                if "AnchorsHoleDefinition" in tables:
+                    cur.execute(
+                        "DELETE FROM AnchorsHoleDefinition WHERE AnchorNameID IN "
+                        "(SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                        (target_dia,),
+                    )
+                if "AnchorsDefinition" in tables:
+                    cur.execute(
+                        "DELETE FROM AnchorsDefinition WHERE AnchorID IN "
+                        "(SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                        (target_dia,),
+                    )
+                cur.execute("DELETE FROM AnchorsName WHERE Diameter = %s", (target_dia,))
 
                 for ar in src_anchors:
                     old_id = ar["ID"]

@@ -28,7 +28,7 @@ for table in tables:
     print(f"TABLE: dbo.{table}")
     print("=" * 70)
 
-    cur.execute(f"""
+    cur.execute("""
         SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = %s
@@ -46,7 +46,7 @@ for table in tables:
     if count > 0:
         cur.execute(f"SELECT TOP 3 * FROM dbo.[{table}]")
         rows = cur.fetchall()
-        print(f"  Sample rows:")
+        print("  Sample rows:")
         for r in rows:
             print(f"    {r}")
 

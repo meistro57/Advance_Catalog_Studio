@@ -36,10 +36,18 @@ and display-name token replacement.
   (bolt-set view model and profile drawing, drawing-style label parsing,
   figures and htmx rule partials, drawing-style sub-style usage walk and orphan
   scan, catalog health report, fabrication sheet model, shear-stud browser
-  model and clone plan, staging cleanup, connection timeouts) — no database
-  needed.
-- **No linter, no CI, no Makefile, no packaging config exist.** Verification
-  is manual against the Docker SQL Server (plus the pytest suite).
+  model and clone plan, staging cleanup, connection timeouts, the diameter
+  clone's replace-before-insert order, find & replace's single transaction and
+  legacy-type casts, detach/backup connection recovery, and the light/dark
+  theme hooks) — no database needed. The clone and find/replace tests stub the
+  cursor, so they assert statement order and commit/rollback rather than SQL
+  Server behaviour.
+- **No configured linter, no Makefile, no packaging config exist.** CI exists:
+  `.github/workflows/ci.yml` runs `compileall`, `pytest tests/` and
+  `pyflakes catalog_studio tests *.py` on every push/PR. Verification of real
+  catalogs is still manual against the Docker SQL Server; the suite itself needs
+  no database. The tree is kept pyflakes-clean, but pyflakes is not a pinned
+  dependency and no formatting policy is applied.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
   entry passes.
@@ -78,10 +86,14 @@ and display-name token replacement.
   skips the database query when it is down.
 - `catalog_studio/utils/docker_ops.py` — shells out to `docker cp`/`exec`/
   `inspect` to move files in/out of the container.
-- `catalog_studio/utils/metadata.py` — per-database `catalog_type` and
+- `catalog_studio/utils/metadata.py` — per-database `catalog_type`, `library` and
   `as_version`, stored in a local JSON sidecar
   (`catalog_studio/catalog_metadata.json`), deliberately **not** written into
-  the mdf (extra tables would break Advance Steel import).
+  the mdf (extra tables would break Advance Steel import). `library_kind()`
+  recognises an attachment made from `AstorDetails` / `AstorAddIn` /
+  `AstorBase` / `AstorSettings` and the attach route stores it; `app._blocked_write()`
+  then refuses every write route for that database (delivered libraries are
+  read-only). Detach/export and all reads stay allowed.
 - `catalog_studio/utils/staging.py` — pairs `.mdf` with `_log.ldf` in uploads/,
   suggests DB names from filenames, lists exports/.
 - `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the runtime
@@ -158,9 +170,23 @@ and display-name token replacement.
   (fail closed, never "warn and continue"). Snapshots are runtime files
   (git-ignored); the exported mdf/ldf pair remains the deliverable. Tests patch
   `db.backup_database` / `docker_ops.copy_out_of_container`, so no DB is needed.
+  Retention is explicit: `snapshot_files()` lists the `.bak` files (newest
+  first, manifest optional), `prune_snapshots(keep=5)` deletes the surplus and
+  backs the database page's **Prune older** button
+  (`POST /db/<db>/snapshots/prune`, CSRF-checked), and `restore_plan()` returns
+  the `docker cp` + `RESTORE DATABASE ... WITH REPLACE` commands for a manual
+  restore. Nothing here executes a restore.
+- `catalog_studio/utils/compare.py` — read-only side-by-side comparison of two
+  attached databases (`/compare`, template `compare.html`, **Compare** button in
+  the nav bar): table presence, per-table row counts with deltas, and diameter
+  keys/names/related-row counts/orphan flags for bolt, anchor and shear-stud
+  catalogs. Pure helpers (`table_diff`, `count_diff`, `diameter_diff`,
+  `summary`) are unit-tested; `build_comparison()` is the only SQL. It never
+  writes and refuses a database with itself.
 - `catalog_studio/utils/health.py` — read-only catalog health report
   (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
-  the database page). It adds no new catalog semantics: `build_report()`
+  the database page; the same findings download as `/db/<db>/health.json` and
+  `/db/<db>/health.csv`). It adds no new catalog semantics: `build_report()`
   dispatches on `db.guess_catalog_type` and reuses `db.get_catalog_diameters`
   (bolt diameter coverage against the documented six-table relationship),
   `bolt_sets.parse_component_slots`/`annotate_components` (anchor hardware
@@ -192,6 +218,18 @@ and display-name token replacement.
   `≈` marker for inexact conversions), validation, safe sheet filenames, the
   hardware schedule, and the dimensioned SVG elevation renderer. All of it is
   unit-tested; the template never invents numbers.
+- `templates/base.html` + `static/css/theme.css` + `static/js/theme.js` — the
+  light/dark switch and the **Issues** button. The button URL comes from
+  `config.ISSUES_URL` via the context processor (`issues_url`), not from the
+  template. `base.html` sets `data-bs-theme` on `<html>` from
+  `localStorage` (`catalogStudioTheme`) before first paint, falling back to
+  `prefers-color-scheme`, and renders the navbar toggle; `theme.js` only wires
+  the switch, icons and cross-tab sync. `theme.css` owns the tokens **and** the
+  dark remaps for the light-only utilities the templates use (`bg-white`,
+  `bg-light`, `text-dark` scoped to `bg-light`). Keep pages extending
+  `base.html` so they inherit the theme, and keep SVG/drawing surfaces on light
+  "paper" (`.cs-paper`, `.bp-host`, `.label-preview`, the Three.js canvas, the
+  printable fabrication sheet) — their strokes and dimension text assume it.
 - `catalog_studio/static/vendor/three/` — **pinned local** Three.js r160
   (`three.module.js`, `OrbitControls.js`) so the workshop works offline. The
   viewer template loads it via an import map (`three` and `three/addons/`
@@ -248,7 +286,11 @@ repeat the same logic inside an explicit transaction
 (`autocommit=False` + `commit()`/`rollback()`). Export/detach runs
 `sp_detach_db`, then `docker cp`s the files back to `exports/` for download.
 Also available per table: browse/filter/add/edit/duplicate/delete rows, and a
-database-wide find & replace over all text columns.
+database-wide find & replace over all text columns. Every POST that can write
+passes the central CSRF guard first, and write routes additionally call
+`_blocked_write()` so an attachment recorded as a delivered library cannot be
+modified. Two read-only views sit on top: `/db/<db>/health(.json|.csv)` and
+`/compare?a=&b=`.
 
 Bolt-set viewer flow (issue #1): `/db/<db>/bolt-set-viewer` (page, bolt
 catalogs only) → the page's JS calls
@@ -429,14 +471,26 @@ dimension logic of its own.
   - Names in cloned rows are rewritten via `db.smart_replace_name`, which only
     substitutes a token when it is preceded by whitespace and followed by
     ` x ` (bolt names) or at end-of-string/boundary — so `1/4` in `1 1/4`
-    is not corrupted.
-- `preview_find_replace` / `apply_find_replace` open a fresh connection per
-  table/column; fine for small catalogs, slow on large ones.
-- Destructive browser actions (the staging cleanup POSTs) require a CSRF
-  token from the session; `_csrf_token()` is injected into templates and
-  `_csrf_valid()` guards each cleanup route. Target filenames are always
-  re-derived server-side from the scanned staged list, never trusted from the
-  browser.
+    is not corrupted. Free text (`BoltsDistances.Description`) goes through
+    `db.replace_diameter_in_text`, which matches whole numbers only.
+  - Re-applying a clone replaces the target diameter instead of duplicating it:
+    the bolt tables are deleted first and the anchor branch deletes
+    `AnchorsHoleDefinition`/`AnchorsDefinition`/`AnchorsName` children before
+    parents in the same transaction. Applying with target == source raises.
+  - The bolt branch copies every column, so it refuses to run (fail closed) when
+    one of the copied tables has an identity column — that shape is unverified.
+- `preview_find_replace` / `apply_find_replace` each use one connection for the
+  whole scan. `apply_find_replace` runs every column update in one transaction
+  and rolls back on the first failure; legacy `text`/`ntext` columns are cast to
+  `nvarchar(max)` because SQL Server's `REPLACE()` rejects them.
+- Every POST is CSRF-checked by the central `_csrf_guard()` (`before_request`)
+  before the route body runs; only `READ_ONLY_POST_ENDPOINTS` (clone preview,
+  label preview) and `action=preview` on add-diameter/find-replace are exempt.
+  The bolt-set sketch route checks the JSON `csrf_token` itself. Any new POST
+  route must either rely on that guard or be added to the exemption set **and**
+  to `docs/csrf-audit.md`; `test_every_writing_post_route_requires_csrf` walks
+  the URL map and fails otherwise. Staging targets are always re-derived
+  server-side from the scanned staged list, never trusted from the browser.
 - `.gitignore` excludes `venv/`, `__pycache__/`, `.pytest_cache/`, `.crush/`,
   everything in `catalog_studio/uploads/` (kept via `.gitkeep`) and generated
   files in `catalog_studio/exports/`. Example `.mdf`/`.ldf` pairs are tracked
@@ -462,9 +516,9 @@ dimension logic of its own.
   recursive `Copy (1) of ...` names. Deep-copy naming is a project decision to
   make when that write path is verified.
 - **Performance:** catalog tables can hold tens of thousands of rows. Prefer one
-  connection per operation, parameterised batch statements and indexed lookups;
-  `preview_find_replace` / `apply_find_replace` still open a connection per
-  table/column and are the known slow path.
+  connection per operation, parameterised batch statements and indexed lookups.
+  `preview_find_replace` / `apply_find_replace` still run one `COUNT`/`UPDATE`
+  per text column and are the known slow path on very large catalogs.
 
 ## Known inconsistencies (not yet bugs to "fix" blindly)
 
@@ -475,6 +529,11 @@ dimension logic of its own.
   the app).
 
 ## Gotchas for safe changes
+
+- Adding a POST route: the central `_csrf_guard()` already requires a token, so
+  the form needs `csrf_token`. If the route only renders a preview, add it to
+  `READ_ONLY_POST_ENDPOINTS` **and** `docs/csrf-audit.md`
+  (`test_every_writing_post_route_requires_csrf` enforces the split).
 
 - Never point the tool at live Advance Steel databases; keep untouched source
   copies. The Flask dev server (port 5050, debug on) has no auth.

@@ -15,7 +15,13 @@
             catalog shape. Nothing here changes the database.
         </div>
     </div>
-    <span class="badge bg-light text-dark border">read-only</span>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/health.json"
+           title="Download every finding as JSON">JSON</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/health.csv"
+           title="Download the findings as CSV">CSV</a>
+        <span class="badge bg-light text-dark border">read-only</span>
+    </div>
 </div>
 
 <div class="row g-2 mb-3">

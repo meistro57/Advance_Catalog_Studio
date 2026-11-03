@@ -1,5 +1,8 @@
 # app.py
+import csv
 import datetime
+import io
+import json
 import os
 import secrets
 
@@ -12,7 +15,7 @@ from werkzeug.utils import secure_filename
 import config
 from utils import db, docker_ops, staging, metadata, bolt_sets, anchor_sets, fabrication
 from utils import staging_cleanup, drawing_styles, style_diagrams, bolt_profile
-from utils import shear_studs, health, style_usage, snapshots
+from utils import shear_studs, health, style_usage, snapshots, compare
 from utils.schema_templates import CATALOG_TEMPLATES
 
 app = Flask(__name__)
@@ -38,9 +41,61 @@ def _csrf_valid() -> bool:
     return bool(session.get("_csrf")) and request.form.get("csrf_token", "") == session["_csrf"]
 
 
+def _library_block(database):
+    """Reason when this attachment came from a delivered Advance Steel library."""
+    library = metadata.get(database).get("library")
+    if not library:
+        return None
+    label = metadata.library_label(library) or f"{library}.mdf"
+    return (
+        f"'{database}' was attached from a delivered Advance Steel library ({label}). "
+        f"Catalog Studio keeps that copy read-only; attach a copy under a new name "
+        f"to edit it."
+    )
+
+
+def _blocked_write(database):
+    """Redirect response when a delivered-library database must stay read-only."""
+    blocked = _library_block(database)
+    if not blocked:
+        return None
+    flash(blocked, "warning")
+    return redirect(url_for("show_database", database=database))
+
+
 @app.context_processor
 def _inject_csrf():
-    return {"csrf_token": _csrf_token()}
+    return {"csrf_token": _csrf_token(), "issues_url": config.ISSUES_URL}
+
+
+# POST endpoints that only render a preview and never touch the database. They
+# are listed here (and in docs/csrf-audit.md) instead of carrying a token.
+READ_ONLY_POST_ENDPOINTS = {
+    "shear_stud_clone_preview",
+    "drawing_style_label_preview",
+}
+
+
+@app.before_request
+def _csrf_guard():
+    """Require a CSRF token for every POST that can write.
+
+    A central guard runs before the route body, so a stale or missing token is
+    rejected before any database work starts.
+    """
+    if request.method != "POST":
+        return None
+    endpoint = request.endpoint or ""
+    if endpoint in READ_ONLY_POST_ENDPOINTS:
+        return None
+    if endpoint == "bolt_set_viewer_sketch":
+        return None  # JSON payload: the route checks csrf_token from the body
+    if endpoint in {"find_replace", "add_diameter"}:
+        if request.form.get("action") != "apply":
+            return None
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    return None
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(config.EXPORT_DIR, exist_ok=True)
@@ -213,8 +268,15 @@ def attach():
         )
         db.attach_database(db_name, mdf_filename, ldf_filename)
         catalog_type = db.guess_catalog_type(db_name)
-        metadata.set_meta(db_name, catalog_type=catalog_type, as_version=as_version)
-        flash(f"Attached as database '{db_name}' (AS {as_version}, {catalog_type} catalog).", "success")
+        library = metadata.library_kind(mdf_filename) or ""
+        metadata.set_meta(db_name, catalog_type=catalog_type, as_version=as_version,
+                          library=library)
+        message = f"Attached as database '{db_name}' (AS {as_version}, {catalog_type} catalog)."
+        if library:
+            message += (f" It came from a delivered Advance Steel library"
+                        f" ({metadata.library_label(library)}), so this copy is"
+                        f" read-only in Catalog Studio.")
+        flash(message, "success")
     except Exception as e:
         flash(f"Attach failed: {e}", "danger")
 
@@ -271,7 +333,37 @@ def show_database(database):
     return render_template(
         "database.html", database=database, tables=tables, counts=counts, meta=meta,
         diameters=diameters, catalog_type=catalog_type,
+        snapshot_list=snapshots.snapshot_files(database),
+        snapshot_keep=snapshots.DEFAULT_KEEP,
+        library_label=metadata.library_label(meta.get("library")),
+        write_blocked=_library_block(database),
     )
+
+
+@app.route("/db/<database>/snapshots/prune", methods=["POST"])
+def prune_snapshots(database):
+    """Keep the newest N pre-change snapshots and delete the rest."""
+    if not _csrf_valid():
+        abort(400, description="Invalid CSRF token.")
+    try:
+        keep = int(request.form.get("keep") or snapshots.DEFAULT_KEEP)
+    except ValueError:
+        keep = snapshots.DEFAULT_KEEP
+    keep = max(1, min(keep, 50))
+    try:
+        result = snapshots.prune_snapshots(database, keep)
+    except Exception as e:
+        flash(f"Snapshot cleanup failed: {e}", "danger")
+    else:
+        if result["removed"]:
+            flash(
+                f"Kept the newest {result['kept']} snapshot(s) for '{database}' and "
+                f"removed {len(result['removed'])} ({result['bytes_freed']} bytes).",
+                "success",
+            )
+        else:
+            flash(f"Nothing to prune: {result['kept']} snapshot(s) kept.", "info")
+    return redirect(url_for("show_database", database=database))
 
 
 @app.route("/db/<database>/health")
@@ -288,6 +380,83 @@ def catalog_health(database):
         flash(f"Could not build the health report: {e}", "danger")
         return redirect(url_for("show_database", database=database))
     return render_template("catalog_health.html", database=database, report=report)
+
+
+def _health_report_or_400(database):
+    if not db.valid_identifier(database):
+        abort(400, description="Invalid database name.")
+    try:
+        return health.build_report(database)
+    except Exception as e:
+        abort(503, description=f"Could not build the health report: {e}")
+
+
+@app.route("/db/<database>/health.json")
+def catalog_health_json(database):
+    """Download the health report as JSON (read-only, same checks as the page)."""
+    report = _health_report_or_400(database)
+    payload = json.dumps(report, indent=2, sort_keys=False)
+    return Response(
+        payload,
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{database}-health.json"',
+        },
+    )
+
+
+@app.route("/db/<database>/health.csv")
+def catalog_health_csv(database):
+    """Download the findings as CSV (one row per finding)."""
+    report = _health_report_or_400(database)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["severity", "area", "code", "table", "message"])
+    for item in report["findings"]:
+        writer.writerow([
+            item["severity"], item["area"], item["code"],
+            item.get("table") or "", item["message"],
+        ])
+    return Response(
+        buffer.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{database}-health.csv"',
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# Catalog comparison (read-only)
+# --------------------------------------------------------------------------
+
+@app.route("/compare")
+def compare_catalogs():
+    """Side-by-side table/diameter comparison of two attached databases."""
+    name_a = request.args.get("a", "").strip()
+    name_b = request.args.get("b", "").strip()
+    try:
+        attached = sorted(db.list_databases())
+    except Exception as e:
+        flash(f"Could not list the attached databases: {e}", "danger")
+        attached = []
+
+    result = None
+    if name_a and name_b:
+        if name_a not in attached or name_b not in attached:
+            flash("Pick two attached databases to compare.", "warning")
+        elif name_a == name_b:
+            flash("Pick two different databases.", "warning")
+        else:
+            try:
+                result = compare.build_comparison(name_a, name_b)
+            except Exception as e:
+                flash(f"Comparison failed: {e}", "danger")
+
+    return render_template(
+        "compare.html", attached=attached, name_a=name_a, name_b=name_b,
+        result=result, meta=metadata.all_meta(),
+    )
 
 
 # --------------------------------------------------------------------------
@@ -671,8 +840,27 @@ def add_diameter(database):
                     include_tables=include_tables,
                 )
             elif action == "apply":
-                snapshot = snapshots.create_snapshot(
-                    database, f"add diameter {target_dia:g} mm")
+                blocked = _blocked_write(database)
+                if blocked:
+                    return blocked
+                try:
+                    snapshot = snapshots.create_snapshot(
+                        database, f"add diameter {target_dia:g} mm")
+                except Exception as e:
+                    flash(
+                        f"Pre-change snapshot failed, so nothing was added: {e}",
+                        "danger",
+                    )
+                    return render_template(
+                        "add_diameter.html",
+                        database=database,
+                        catalog_type=catalog_type,
+                        existing_diameters=existing_diameters,
+                        presets=presets,
+                        form_data=form_data,
+                        preview=None,
+                        meta=meta,
+                    )
                 counts = db.apply_clone_diameter(
                     database=database,
                     source_dia=source_dia,
@@ -728,6 +916,9 @@ def find_replace(database):
             if return_to:
                 return redirect(return_to)
         elif find_text and action == "apply":
+            blocked = _blocked_write(database)
+            if blocked:
+                return blocked
             try:
                 snapshot = snapshots.create_snapshot(
                     database, f"find-replace {find_text[:20]}")
@@ -813,6 +1004,11 @@ def show_table(database, table):
     filter_val = request.args.get("filter_val", "")
     virtual_val = request.args.get("virtual_val", "")
 
+    if filter_col and filter_col not in columns:
+        abort(400)
+    if filter_op not in ("=", "contains"):
+        abort(400)
+
     virtual = db.VIRTUAL_FILTERS.get(table)
     virtual_values = None
 
@@ -862,6 +1058,9 @@ def add_row(database, table):
     columns = db.get_columns(database, table)
 
     if request.method == "POST":
+        blocked = _blocked_write(database)
+        if blocked:
+            return blocked
         values = {}
         for c in columns:
             name = c["COLUMN_NAME"]
@@ -960,8 +1159,9 @@ def drawing_style(database):
 
 @app.route("/db/<database>/drawing-style/save", methods=["POST"])
 def drawing_style_save(database):
-    if not _csrf_valid():
-        abort(400)
+    blocked = _blocked_write(database)
+    if blocked:
+        return blocked
     edits = []
     for name, value in request.form.items():
         if not name.startswith("f::"):
@@ -996,8 +1196,9 @@ def drawing_style_rule(database):
     copying a rule keeps the page (and scroll position) intact; a plain form
     post still redirects to the rebuilt page.
     """
-    if not _csrf_valid():
-        abort(400)
+    blocked = _blocked_write(database)
+    if blocked:
+        return blocked
     raw_op = request.form.get("op", "")
     parts = raw_op.split(":")
     map_key = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
@@ -1086,6 +1287,9 @@ def edit_row(database, table, pk_val):
     columns = db.get_columns(database, table)
 
     if request.method == "POST":
+        blocked = _blocked_write(database)
+        if blocked:
+            return blocked
         updates = {}
         for c in columns:
             name = c["COLUMN_NAME"]
@@ -1119,6 +1323,9 @@ def edit_row(database, table, pk_val):
 
 @app.route("/db/<database>/<table>/<pk_val>/duplicate", methods=["POST"])
 def duplicate_row_route(database, table, pk_val):
+    blocked = _blocked_write(database)
+    if blocked:
+        return blocked
     pk_cols, pk = _resolve_row(database, table, pk_val)
     if pk_cols is None:
         flash(pk, "warning")
@@ -1140,6 +1347,9 @@ def duplicate_row_route(database, table, pk_val):
 
 @app.route("/db/<database>/<table>/<pk_val>/delete", methods=["POST"])
 def delete_row_route(database, table, pk_val):
+    blocked = _blocked_write(database)
+    if blocked:
+        return blocked
     pk_cols, pk = _resolve_row(database, table, pk_val)
     if pk_cols is None:
         flash(pk, "warning")

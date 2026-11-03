@@ -11,6 +11,26 @@ from config import METADATA_FILE
 
 _lock = threading.Lock()
 
+# Advance Steel ships these libraries; they are delivered templates, so the
+# tool must treat anything attached from them as read-only (see AGENTS.md,
+# "Database roles").
+LIBRARY_FILES = {
+    "astordetails": "delivered templates/styles library",
+    "astoraddin": "user overrides library",
+    "astorbase": "delivered fasteners library",
+    "astorsettings": "delivered global defaults library",
+}
+
+
+def library_kind(mdf_filename: str):
+    """Library name when the attachment came from a delivered Astor*.mdf file."""
+    base = os.path.splitext(os.path.basename(str(mdf_filename or "")))[0]
+    return base.strip().lower() if base.strip().lower() in LIBRARY_FILES else None
+
+
+def library_label(kind: str):
+    return LIBRARY_FILES.get(str(kind or "").lower())
+
 
 def _load() -> dict:
     if not os.path.exists(METADATA_FILE):
@@ -28,7 +48,8 @@ def get(database: str) -> dict:
     return _load().get(database, {})
 
 
-def set_meta(database: str, catalog_type: str = None, as_version: int = None):
+def set_meta(database: str, catalog_type: str = None, as_version: int = None,
+             library: str = None):
     with _lock:
         data = _load()
         entry = data.get(database, {})
@@ -36,6 +57,8 @@ def set_meta(database: str, catalog_type: str = None, as_version: int = None):
             entry["catalog_type"] = catalog_type
         if as_version is not None:
             entry["as_version"] = as_version
+        if library is not None:
+            entry["library"] = library
         data[database] = entry
         _save(data)
 

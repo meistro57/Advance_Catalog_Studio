@@ -7,6 +7,7 @@
 <p class="text-muted">Searches every text column in every table &mdash; not just the one you were looking at. Preview first, then apply.</p>
 
 <form method="post" class="bg-white p-3 rounded shadow-sm mb-4" style="max-width:600px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="row g-2">
         <div class="col">
             <label class="form-label small mb-0">Find</label>

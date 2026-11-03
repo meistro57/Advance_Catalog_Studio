@@ -2,7 +2,6 @@
 or delete swaps one rules block instead of reloading the page. These tests
 pin the fragment contract (and the plain-form fallback)."""
 
-import pytest
 from flask import render_template
 
 

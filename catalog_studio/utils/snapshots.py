@@ -100,3 +100,114 @@ def list_snapshots(database: str):
         except (OSError, ValueError):
             continue
     return found
+
+
+# --------------------------------------------------------------------------
+# Retention (issue: keep the newest N, prune the rest with an explicit action)
+# --------------------------------------------------------------------------
+
+DEFAULT_KEEP = 5
+RESTORE_DIR = "/var/opt/mssql/data"
+
+
+def _host_paths(database: str, filename: str):
+    """Absolute .bak and manifest paths for one snapshot, never leaving the dir."""
+    name = os.path.basename(str(filename or ""))
+    if not name.endswith(".bak"):
+        raise ValueError("Not a snapshot filename.")
+    directory = os.path.realpath(snapshot_dir(database))
+    backup = os.path.realpath(os.path.join(directory, name))
+    manifest = os.path.realpath(os.path.join(directory, name + ".json"))
+    if os.path.dirname(backup) != directory or os.path.dirname(manifest) != directory:
+        raise ValueError("Snapshot path escapes the snapshot directory.")
+    return backup, manifest
+
+
+def snapshot_files(database: str):
+    """Every snapshot on disk, newest first, including ones without a manifest."""
+    directory = snapshot_dir(database)
+    if not os.path.isdir(directory):
+        return []
+    found = []
+    for name in sorted(os.listdir(directory), reverse=True):
+        if not name.endswith(".bak"):
+            continue
+        path = os.path.join(directory, name)
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            continue
+        manifest_path = path + ".json"
+        manifest = None
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+            except (OSError, ValueError):
+                manifest = None
+        found.append({
+            "filename": name,
+            "size_bytes": size,
+            "reason": (manifest or {}).get("reason"),
+            "created_utc": (manifest or {}).get("created_utc"),
+            "has_manifest": manifest is not None,
+        })
+    return found
+
+
+def delete_snapshot(database: str, filename: str):
+    """Remove one snapshot pair. Only names that exist on disk are accepted."""
+    known = {item["filename"] for item in snapshot_files(database)}
+    name = os.path.basename(str(filename or ""))
+    if name not in known:
+        raise ValueError("Unknown snapshot.")
+    backup, manifest = _host_paths(database, name)
+    size = os.path.getsize(backup)
+    os.remove(backup)
+    if os.path.exists(manifest):
+        os.remove(manifest)
+    return {"filename": name, "bytes_freed": size}
+
+
+def prune_snapshots(database: str, keep: int = DEFAULT_KEEP):
+    """Keep the newest `keep` snapshots, delete the rest. Explicit action only."""
+    if keep < 1:
+        raise ValueError("Keep at least one snapshot.")
+    snapshots_on_disk = snapshot_files(database)
+    stale = snapshots_on_disk[keep:]
+    removed = []
+    for item in stale:
+        removed.append(delete_snapshot(database, item["filename"]))
+    return {
+        "kept": min(len(snapshots_on_disk), keep),
+        "removed": removed,
+        "bytes_freed": sum(item["bytes_freed"] for item in removed),
+    }
+
+
+def restore_plan(database: str, filename: str, container_dir: str = RESTORE_DIR):
+    """What an operator needs to restore a snapshot by hand.
+
+    Snapshots are copied out of the container and the in-container .bak is
+    removed, so a restore starts by copying the file back in. The statements
+    are documentation for a manual run -- this module never executes them.
+    """
+    if not db.valid_identifier(database):
+        raise ValueError("Invalid database name.")
+    known = {item["filename"] for item in snapshot_files(database)}
+    name = os.path.basename(str(filename or ""))
+    if name not in known:
+        raise ValueError("Unknown snapshot.")
+    backup, _ = _host_paths(database, name)
+    container_path = f"{container_dir.rstrip('/')}/{name}"
+    return {
+        "filename": name,
+        "host_path": backup,
+        "container_path": container_path,
+        "docker_command": f"docker cp {backup} {config.CONTAINER_NAME}:{container_path}",
+        "statements": [
+            f"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;",
+            f"RESTORE DATABASE [{database}] FROM DISK = N'{container_path}' WITH REPLACE;",
+            f"ALTER DATABASE [{database}] SET MULTI_USER;",
+        ],
+    }

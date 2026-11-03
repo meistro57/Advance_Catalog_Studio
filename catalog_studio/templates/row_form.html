@@ -8,6 +8,7 @@
 <div class="row g-4">
     <div class="col-lg-{{ '6' if table == 'AnchorsDefinition' else '12' }}">
         <form method="post" id="rowForm" class="bg-white p-4 rounded shadow-sm" style="max-width: 700px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
             {% set rel_opts = relation_options or {} %}
             {% for c in columns %}
@@ -46,7 +47,7 @@
 
     {% if table == "AnchorsDefinition" %}
     <div class="col-lg-6">
-        <div class="bg-white p-3 rounded shadow-sm" style="position: sticky; top: 1rem;">
+        <div class="cs-paper p-3 rounded shadow-sm" style="position: sticky; top: 1rem;">
             <p class="text-muted small mb-2">
                 Click into a field to highlight it here. Layout is a schematic reference,
                 not to scale &mdash; positions of Distance A/C/E/F/O are best-guess sequential

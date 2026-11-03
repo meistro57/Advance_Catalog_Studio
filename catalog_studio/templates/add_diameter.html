@@ -24,6 +24,7 @@
             </div>
             <div class="card-body">
                 <form method="post" id="diameterForm" action="/db/{{ database }}/add-diameter">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Preset Selection -->
                     <div class="mb-3">
@@ -194,6 +195,11 @@
                         </div>
                         <span class="badge bg-primary rounded-pill fs-6">{{ data.count }}</span>
                     </div>
+                    {% if data.replace_count %}
+                    <div class="list-group-item small text-warning bg-warning-subtle">
+                        {{ data.replace_count }} existing {{ table_name }} row(s) for this target diameter will be replaced.
+                    </div>
+                    {% endif %}
                     {% endfor %}
                 </div>
 

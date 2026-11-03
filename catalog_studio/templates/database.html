@@ -27,6 +27,18 @@
     </div>
 </div>
 
+{% if library_label %}
+<div class="alert alert-warning d-flex justify-content-between align-items-start gap-3">
+    <div>
+        <strong>Read-only copy.</strong>
+        This database was attached from a delivered Advance Steel library
+        ({{ library_label }}). Catalog Studio blocks every write here &mdash;
+        attach a copy under a new name to edit it.
+    </div>
+    <span class="badge bg-warning text-dark text-nowrap">read-only</span>
+</div>
+{% endif %}
+
 {% if diameters %}
 <div class="card shadow-sm border-0 mb-4 bg-white">
     <div class="card-body py-3">
@@ -48,6 +60,41 @@
                 {% endif %}
             {% endfor %}
         </div>
+    </div>
+</div>
+{% endif %}
+
+{% if snapshot_list %}
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-bold">Pre-change snapshots ({{ snapshot_list|length }})</span>
+        <form method="post" action="/db/{{ database }}/snapshots/prune"
+              class="d-flex align-items-center gap-2 m-0"
+              onsubmit="return confirm('Delete every snapshot except the newest ones?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="small text-muted m-0" for="keepSnapshots">keep</label>
+            <input id="keepSnapshots" name="keep" type="number" min="1" max="50"
+                   value="{{ snapshot_keep }}" class="form-control form-control-sm" style="width:5rem">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Prune older</button>
+        </form>
+    </div>
+    <ul class="list-group list-group-flush small">
+        {% for s in snapshot_list %}
+        <li class="list-group-item d-flex justify-content-between align-items-center gap-3">
+            <span class="text-truncate">
+                <code>{{ s.filename }}</code>
+                {% if s.reason %}<span class="text-muted">&mdash; {{ s.reason }}</span>{% endif %}
+                {% if not s.has_manifest %}<span class="badge bg-secondary">no manifest</span>{% endif %}
+            </span>
+            <span class="text-muted text-nowrap">{{ s.size_bytes|filesizeformat }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    <div class="card-footer bg-white small text-muted">
+        Snapshots are renamed copies of the scratch database taken before a batch
+        write. Restoring is a documented manual step: copy a <code>.bak</code> back
+        into the container and run <code>RESTORE DATABASE &hellip; WITH REPLACE</code>
+        (see the README).
     </div>
 </div>
 {% endif %}

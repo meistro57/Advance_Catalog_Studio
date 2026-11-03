@@ -48,12 +48,17 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Anchor configurator (graphical viewer) | Implemented (read-only) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
-| Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) |
+| Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) with JSON/CSV downloads |
+| Catalog comparison (`/compare`) | Implemented (read-only: table presence, row counts, diameter coverage) |
+| Pre-change snapshots | Implemented for the batch writes: `COPY_ONLY` backup + manifest, explicit prune (newest N), documented manual restore |
+| Delivered-library protection | Implemented (databases attached from `Astor*.mdf` are read-only) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
+| CSRF protection | Every POST is checked centrally; read-only previews are the documented exceptions (`docs/csrf-audit.md`) |
 | Existing catalog ingest/export | Implemented |
 | New catalog scaffolding | Implemented |
 | Raw table editing and filtering | Implemented (composite-key safe) |
 | Drawing-style editor (Drawing Style Manager exports) | Menu-driven screens per view; style tree, representation rules (edited in place), label formulas, integrity check, schematic figures (scale, view box, clipping, dimension plan and chains), plain-language dimension request cards, read-only sub-style usage and orphan scan |
+| Interface theme | Light and dark, remembered per browser; drawings stay on light paper |
 | Multi-user or internet deployment | Not supported |
 
 > [!CAUTION]
@@ -120,11 +125,24 @@ The suite needs no SQL Server. It covers the bolt-set view model and the dimensi
 assembly profile, the shear-stud browser model and its preview-only clone proposal,
 drawing-style label parsing, schematic figures and the htmx rule partials, the
 fabrication sheet model, staging cleanup, connection timeouts, and route
-smoke tests:
+smoke tests. It also pins the write-safety behaviour of the guided tools: the
+diameter clone replaces the target before inserting, find & replace commits once
+or rolls back, detach and backup always close (and detach restores multi-user
+mode), and the theme hooks stay in place. Those database tests stub the cursor,
+so they check the statements and commit/rollback calls rather than a live SQL
+Server:
 
 ```bash
 pip install -r requirements-dev.txt   # adds pytest
 python -m pytest tests/
+```
+
+The tree is also kept free of pyflakes findings; the same two commands run in
+GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request, so a
+change that needs a database cannot silently break the suite:
+
+```bash
+pyflakes catalog_studio tests *.py
 ```
 
 ## Typical workflow
@@ -137,6 +155,8 @@ python -m pytest tests/
 6. **Apply** the change. Database changes run as transactions.
 7. **Detach & Export** the modified `.mdf` / `.ldf` pair.
 8. **Test** it in a controlled Advance Steel environment before adopting it.
+
+Before you detach, `/compare` shows what actually changed between the original export and the edited copy: tables that appeared or disappeared, row-count deltas and the diameter keys on each side.
 
 ## Advance Steel round trip
 
@@ -166,6 +186,14 @@ The home page is the ingest/edit/export control centre. It shows:
 - new bolt and anchor catalog creation;
 - completed exports ready for download.
 
+### Light and dark mode
+
+A **Dark / Light** button in the navigation bar switches the interface theme. The choice is remembered in the browser (`localStorage`) and, on a first visit, follows the operating system's `prefers-color-scheme`; while no explicit choice has been made, a system change is followed live. Nothing is stored server-side.
+
+The chrome re-themes: navigation, cards, tables, forms, alerts, badges and the drawing-style editor, including its helper panels and "changed cell" highlight. Engineering drawings deliberately stay on light "paper" in both themes - the Three.js schematic, the dimensioned bolt profile, the drawing-style schematic figures and label previews - because their strokes, dimension text and part colours are drawn for a light background. The printable fabrication sheet is always light.
+
+Bootstrap 5.3.3's own `data-bs-theme` attribute drives the standard components; `static/css/theme.css` holds the colour tokens and the remaps for the light-only utility classes the templates use (`bg-white`, `bg-light`, `text-dark` inside `bg-light`).
+
 ### Database overview
 
 Opening an attached database shows every table and its live row count. Bolt and shear-stud catalogs also receive a diameter summary bar showing:
@@ -190,6 +218,18 @@ Every attached database has a **Health Report** page (`/db/<db>/health`). It agg
 
 The report is read-only: it never repairs anything, and every finding names the table it came from so it can be inspected in the raw table editor. A clean report is not a guarantee — it only means the checks this tool knows about did not fail. Existing samples show real findings (for example `Grade5` has a 10 mm diameter with no bolts and a 3/8" diameter with no nuts/washers).
 
+The same findings download as `health.json` (the full report, including tables and sections) or `health.csv` (one row per finding: severity, area, code, table, message) from the **JSON** and **CSV** buttons on the page, for archiving a review or attaching to an issue.
+
+### Comparing two catalogs
+
+`/compare` (also a **Compare** button in the navigation bar) puts two attached databases side by side without changing either one:
+
+- table presence — shared tables, tables only on one side;
+- row counts per table with the delta between the two;
+- diameter coverage for bolt, anchor and shear-stud catalogs: which keys exist on each side, their display names, related-row totals and orphan flags.
+
+It answers "what changed between my original export and this repaired copy?" without detaching or re-importing anything. Only attached databases can be compared, and nothing is written.
+
 ### Add / Clone Diameter wizard
 
 This is the relationship-aware part of Catalog Studio. The wizard lets you:
@@ -204,13 +244,38 @@ This is the relationship-aware part of Catalog Studio. The wizard lets you:
 
 If any insert fails, the transaction rolls back rather than leaving half a diameter scattered through the catalog.
 
+Re-applying the same target diameter is safe: the wizard replaces the existing target rows instead of duplicating them (bolt tables are cleared first, and on anchor catalogs the hole and length rows are removed before their parent anchor records). The preview shows how many existing rows will be replaced. Cloning a diameter onto itself is refused.
+
+### Pre-change snapshots
+
+Before a batch write (diameter clone, find & replace) Catalog Studio takes a `COPY_ONLY` backup of the scratch database inside the container and copies it to `catalog_studio/snapshots/<database>/` next to a JSON manifest. If the snapshot cannot be taken, the write does not run.
+
+The database page lists the snapshots for that database and offers **Prune older**, which keeps the newest N (default 5) and deletes the rest — an explicit action, never automatic, because a snapshot can be hundreds of megabytes.
+
+Restoring is a deliberate manual step, because the in-container `.bak` is removed after the copy:
+
+```bash
+docker cp catalog_studio/snapshots/<database>/<file>.bak \
+  hilti-scratch-sql:/var/opt/mssql/data/<file>.bak
+```
+
+then, from `sqlcmd` or SSMS inside the container:
+
+```sql
+ALTER DATABASE [<database>] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+RESTORE DATABASE [<database>] FROM DISK = N'/var/opt/mssql/data/<file>.bak' WITH REPLACE;
+ALTER DATABASE [<database>] SET MULTI_USER;
+```
+
+`snapshots.restore_plan()` produces exactly that command set for a chosen snapshot, and it is unit-tested, but the tool never runs it for you.
+
 ### Find & Replace
 
-Searches textual columns across the database and reports matches by table and column before changing anything. This is useful when correcting catalog names, manufacturer designations, or legacy product labels.
+Searches textual columns across the database and reports matches by table and column before changing anything. This is useful when correcting catalog names, manufacturer designations, or legacy product labels. The whole replacement runs as one transaction, so a failure part-way through rolls back every column instead of leaving the catalog half changed; legacy `text`/`ntext` columns are converted on the fly because SQL Server's `REPLACE()` refuses them directly.
 
 ### Raw table editor
 
-For work that does not fit a guided tool, each table can be browsed and filtered directly. Supported tables allow adding, editing, duplicating, and deleting rows.
+For work that does not fit a guided tool, each table can be browsed and filtered directly. Filters are limited to the table's own columns and to the equals / contains operators; anything else is rejected. Supported tables allow adding, editing, duplicating, and deleting rows.
 
 Many Advance Steel tables use **composite primary keys** (`SetBolts`, `ScrewNew`, `SetNutsBolts`, `BoltsDistances`, and in style exports `DetObjReprMapItems (Key, Order)`). Rows are addressed by every key column together, and each edit/delete runs in a transaction that rolls back unless exactly one row is affected. Duplicating a composite-key row bumps the last integer key column (e.g. the next `Order` within the same `Key`).
 
@@ -400,6 +465,8 @@ Advance_Catalog_Studio/
 │   │   ├── js/bolt-set-viewer.js   # Three.js bolt-set visualizer + editor
 │   │   ├── js/bolt-set-layout.js   # Client mirror of the bolt layout math
 │   │   ├── js/anchor-configurator.js # Three.js anchor viewer
+│   │   ├── js/theme.js            # Light/dark toggle (persistence, icons)
+│   │   ├── css/theme.css          # Light/dark tokens + Bootstrap remaps
 │   │   ├── css/                   # bolt-set-viewer.css, fabrication-sheet.css
 │   │   └── vendor/
 │   │       ├── three/              # Pinned local Three.js r160 (offline)
@@ -413,7 +480,8 @@ Advance_Catalog_Studio/
 │       ├── style_diagrams.py   # Schematic SVG figures for drawing styles
 │       ├── style_usage.py      # Reverse references (used-by) and orphan scan
 │       ├── shear_studs.py      # Shear-stud (connector) browser model
-│       ├── snapshots.py        # COPY_ONLY pre-change .bak snapshots
+│       ├── snapshots.py        # COPY_ONLY .bak snapshots, retention, restore plan
+│       ├── compare.py          # Read-only comparison of two attached catalogs
 
 │       ├── health.py          # Cross-type read-only health report
 │       ├── db.py               # SQL inspection, composite-key-safe row ops, catalog operations
@@ -424,8 +492,10 @@ Advance_Catalog_Studio/
 │       └── staging_cleanup.py  # Safe removal of staged uploads
 ├── tests/                     # Pytest: models, SVG figures, routes (no DB needed)
 ├── samples/                   # Example mdf/ldf catalog pairs (tracked)
+├── .github/workflows/ci.yml   # Tests + lint on push/PR (no database needed)
 ├── docs/
 │   ├── images/
+│   ├── csrf-audit.md          # Every route: writes, CSRF handling, exemptions
 │   ├── drawing-style-schema.md # Drawing Style Manager export investigation
 │   └── shear-stud-schema.md   # Nelson H4L connector catalog investigation
 ├── db_inspect.py
@@ -509,11 +579,15 @@ These are planned features, not claims about the current release. Development wi
 - The Flask development server has no authentication or multi-user protections. Destructive cleanup actions require a CSRF token and are limited to files inside the runtime `catalog_studio/uploads/` staging area (removal moves files to `uploads/.trash`; attached databases, container files, exports, and the `samples/` examples are never touched).
 - Catalog schemas can differ between Advance Steel versions and component families.
 - The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
+- If detaching a database fails, Catalog Studio restores it to multi-user mode so it can still be reconnected.
+- Databases attached from a delivered Advance Steel library file (`AstorDetails.mdf`, `AstorBase.mdf`, `AstorAddIn.mdf`, `AstorSettings.mdf`) are recorded as such and kept **read-only**: every write route refuses them with an explanation. Attach a copy under a new database name to edit it.
+- Every request that can change something (uploads, attach, create, detach, clone, find & replace, row CRUD, style edits, snapshot pruning) requires a session CSRF token; the central guard and the full route list are in `docs/csrf-audit.md`.
+- Snapshot pruning is manual and keeps the newest five by default; restoring a snapshot is a documented `docker cp` + `RESTORE DATABASE ... WITH REPLACE` step, never automatic.
 - Batch writes take a **pre-change snapshot** first: the bolt-diameter clone and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
 
 ## Contributing
 
-Catalog knowledge is the valuable bit. Bug reports, confirmed schema differences, reproducible catalog cases, and tested improvements are welcome through [GitHub Issues](https://github.com/meistro57/Advance_Catalog_Studio/issues).
+Catalog knowledge is the valuable bit. Bug reports, confirmed schema differences, reproducible catalog cases, and tested improvements are welcome through [GitHub Issues](https://github.com/meistro57/Advance_Catalog_Studio/issues); the navigation bar carries an **Issues** link to the same page so a problem can be filed straight from the tool.
 
 When reporting a problem, include the Advance Steel version, catalog type, operation performed, expected result, and the relevant schema or error output. Do not attach customer data or live production databases.
 

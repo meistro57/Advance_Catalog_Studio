@@ -68,6 +68,7 @@
     <div class="modal-content">
       <form method="post" action="/db/{{ database }}/find-replace">
         <input type="hidden" name="return_to" value="{{ request.path }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="modal-header">
           <h5 class="modal-title">Find &amp; Replace across {{ database }}</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -110,10 +111,12 @@
             <td class="text-nowrap">
                 <a class="btn btn-sm btn-outline-secondary" href="/db/{{ database }}/{{ table }}/{{ tok }}/edit">Edit</a>
                 <form action="/db/{{ database }}/{{ table }}/{{ tok }}/duplicate" method="post" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button class="btn btn-sm btn-outline-success" type="submit">Duplicate</button>
                 </form>
                 <form action="/db/{{ database }}/{{ table }}/{{ tok }}/delete" method="post" class="d-inline"
                       onsubmit="return confirm('Delete this row?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                 </form>
             </td>

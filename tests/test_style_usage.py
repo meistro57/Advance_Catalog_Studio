@@ -5,8 +5,6 @@ styles), so the walk, the orphan scan and the truncation guards are testable
 without a database.
 """
 
-import pytest
-
 from utils import style_usage as su
 
 

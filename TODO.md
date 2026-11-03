@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 317 tests; read-only bolt/anchor/stud/style views and
+Baseline: `main` green at 387 tests; read-only bolt/anchor/stud/style views and
 the health report exist; writes are the bolt diameter clone, raw row CRUD, find
 & replace, and drawing-style field/rule edits.
 
@@ -140,37 +140,45 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [ ] **F0a — Snapshot the remaining batch paths.** Wire `create_snapshot()`
   into selective deep copy, batch presentation replace and any future purge, and
   decide whether single-row style edits need one (probably not, but state it).
-- [ ] **F0b — Snapshot retention.** Keep the newest N per database and prune the
-  rest with an explicit action (snapshots can be hundreds of MB).
-- [ ] **F0c — Restore helper.** Document (and optionally automate) restoring a
-  snapshot with `RESTORE DATABASE` inside the container, then detaching.
-- [ ] **F0d — Read-only library guard.** Track which attached databases came from
-  a delivered library (`AstorDetails`) and refuse batch writes there, even
-  though everything is a copy in this tool.
+- [x] **F0b — Snapshot retention.** `snapshot_files()` / `prune_snapshots()` and
+  the database page's **Prune older** button keep the newest N (default 5);
+  deletion is only ever an explicit, CSRF-checked action.
+- [x] **F0c — Restore helper.** `snapshots.restore_plan()` returns the
+  `docker cp` + `RESTORE DATABASE ... WITH REPLACE` command set (unit-tested);
+  the README documents the manual procedure. Nothing executes a restore.
+- [x] **F0d — Read-only library guard.** The attach route records an `Astor*`
+  library origin in the metadata sidecar and `app._blocked_write()` refuses
+  every write route for that database; reads, detach and export still work.
 
 ## G. Cross-cutting features
 
-- [ ] **G1 — Catalog comparison.** `GET /compare?a=&b=` showing table presence,
-  row counts and per-type summaries (diameters/families/stud lengths); pure diff
-  helpers plus tests; no writes.
-- [ ] **G2 — Health report exports.** Download the findings as JSON/CSV, and add
-  checks that are cheap and verified (e.g. `ScrewNew` grip gaps, duplicate stud
-  names, anchor hardware material mismatches).
-- [ ] **G3 — CI.** GitHub Actions running `pytest`, `python -m compileall`, and
-  a docs link check on push/PR (repo currently has no CI).
-- [ ] **G4 — Lint/format.** Decide on `ruff` (and a formatting policy) or
-  explicitly stay unformatted; do not reformat unrelated code in one commit.
+- [x] **G1 — Catalog comparison.** `GET /compare?a=&b=` shows table presence,
+  row-count deltas and diameter keys/names/related rows/orphans; pure helpers in
+  `utils/compare.py`; no writes.
+- [~] **G2 — Health report exports.** JSON and CSV downloads exist
+  (`/db/<db>/health.json`, `/db/<db>/health.csv`). Still open: extra cheap checks
+  (`ScrewNew` grip gaps, duplicate stud names, anchor hardware material
+  mismatches).
+- [~] **G3 — CI.** `.github/workflows/ci.yml` runs `compileall`, `pytest tests/`
+  and `pyflakes` on push/PR. A docs/markdown link check is still open.
+- [~] **G4 — Lint/format.** `pyflakes catalog_studio tests *.py` is clean and
+  is now the documented convenience check; still decide whether to pin `ruff`
+  (and a formatting policy) or explicitly stay unformatted. Do not reformat
+  unrelated code in one commit.
 - [ ] **G5 — Docs refresh.** Screenshot for the usage page, refresh
   `catalog-studio-dashboard.png`, and re-check the README status table after
   every milestone.
-- [ ] **G6 — CSRF review.** Audit every POST route; destructive ones must use
-  `_csrf_valid()`, read-only previews may stay token-free but must say so.
+- [x] **G6 — CSRF review.** Every POST now goes through the central
+  `_csrf_guard()`; read-only previews are listed in `READ_ONLY_POST_ENDPOINTS`
+  and `docs/csrf-audit.md`, and a URL-map test enforces the rule.
 
 ## H. Housekeeping
 
 - [ ] **G1 — Metadata sidecar.** `catalog_studio/catalog_metadata.json` is dirty
   from live attaches (`Mark_Column`, `HILTI_HY_200`); decide whether the file is
-  runtime state (git-ignore it) or committed examples.
+  runtime state (git-ignore it) or committed examples. It now also carries the
+  `library` flag that makes delivered Astor* attachments read-only, so a stale
+  entry can silently block (or unblock) writes — worth settling.
 - [ ] **G2 — Reference PDFs.** `docs/references/` holds the Autodesk guides and
   is git-ignored; keep a one-line note in the docs on what each is used for.
 - [ ] **G3 — Test gaps.** No automated coverage for: `add-diameter` apply,
@@ -199,3 +207,26 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] Branch cleanup and README/docs alignment.
 - [x] Pre-change `COPY_ONLY` snapshots for the bolt diameter clone and find &
   replace, with fail-closed routes and manifests (329 tests).
+- [x] Find & replace runs in one transaction, cascading legacy `text`/`ntext`
+  to `nvarchar(max)` and rolling back on the first failure (issue #7).
+- [x] Anchor diameter clone replaces an existing target diameter instead of
+  duplicating it; the preview reports the rows that will be replaced (issue #8).
+- [x] Table browser validates `filter_col` against the table's columns and
+  limits `filter_op` to equals / contains (issue #9).
+- [x] Detach restores `MULTI_USER` when `sp_detach_db` fails, snapshots close
+  their connection on error, add-diameter names the snapshot failure, the bolt
+  clone refuses identity-keyed tables, `BoltsDistances.Description` uses a
+  token-boundary replace, and the tree is pyflakes-clean (issue #10).
+- [x] Light/dark theme: navbar toggle, `localStorage` + `prefers-color-scheme`,
+  Bootstrap `data-bs-theme` tokens in `static/css/theme.css`, drawing surfaces
+  kept on light paper (348 tests).
+- [x] Snapshot retention (`prune` keeps newest N) and a documented restore plan
+  (F0b/F0c).
+- [x] Delivered-library attachments (Astor*) are read-only for every write route
+  (F0d).
+- [x] Catalog comparison page `/compare` (G1); health report JSON/CSV downloads
+  (G2 part 1).
+- [x] Central CSRF guard for all POST routes plus `docs/csrf-audit.md` and a
+  URL-map test (G6).
+- [x] GitHub Actions CI: `compileall`, pytest and pyflakes (G3 part 1, 387
+  tests).
