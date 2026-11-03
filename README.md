@@ -132,6 +132,14 @@ Confirm it is running:
 docker ps --filter name=hilti-scratch-sql
 ```
 
+Confirm it writes SQL Server 2019 files (anything but 15.x means the wrong
+image, and attaches will be refused):
+
+```bash
+docker exec hilti-scratch-sql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
+  -P 'Scratch2026!Pw' -C -Q "SELECT SERVERPROPERTY('ProductVersion') AS version"
+```
+
 If it keeps stopping after a Docker or host restart, give it a restart policy
 so it comes back up on its own:
 

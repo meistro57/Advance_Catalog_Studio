@@ -38,8 +38,9 @@ and display-name token replacement.
   scan, catalog health report, fabrication sheet model, shear-stud browser
   model and clone plan, staging cleanup, connection timeouts, the diameter
   clone's replace-before-insert order, find & replace's single transaction and
-  legacy-type casts, detach/backup connection recovery, the light/dark theme
-  hooks and shared design layer, and the inline SVG icon set / offline asset
+  legacy-type casts, detach/backup connection recovery, the SQL file-version
+  guard, the docker commands that stage files into the container, the light/dark
+  theme hooks and shared design layer, and the inline SVG icon set / offline asset
   rule) — no database needed. The clone and find/replace tests stub the
   cursor, so they assert statement order and commit/rollback rather than SQL
   Server behaviour.
@@ -63,6 +64,12 @@ and display-name token replacement.
   `--restart unless-stopped`). SQL Server `sa` password is hardcoded in
   `catalog_studio/config.py` (`Scratch2026!Pw`) and duplicated in every
   root-level CLI script.
+- The container image is part of the setup, not an implementation detail: a
+  container created from `2022-latest` cannot attach anything any more (the
+  guard refuses) and cannot be repaired, because its files are already 957.
+  Rebuild it from `SCRATCH_SQL_IMAGE` (README step 2); the old container's
+  files are lost with it. Verified on 2026-11-03 — `docs/verification-log.md`
+  A6.2.
 - Start the web app (port **5050**): `python catalog_studio/app.py`
 - Attach existing catalog pairs through the web UI (upload → attach). The
   checked-in example pairs live in `samples/`; copy one into the runtime

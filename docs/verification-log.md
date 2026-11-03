@@ -98,3 +98,27 @@ report instead of applying.
   server or the file is newer than 904 (`db.require_as_compatible`).
 - Unblocks: re-run this import with a file exported from a 2019 container to
   close A6.
+### A6.2 — Scratch container rebuilt on 2019; attach path re-verified
+
+- Date / operator: 2026-11-03 / repair of the local scratch environment.
+- Why: the `hilti-scratch-sql` container had been created from
+  `mssql/server:2022-latest` (file version 957). After A6.1's guard landed,
+  every attach was refused, so detached databases could not be brought back.
+- Done: the 2022 container and its files were removed, and the container was
+  recreated from `mcr.microsoft.com/mssql/server:2019-latest` on
+  `127.0.0.1:1433` (same name, `--restart unless-stopped`, configured SA
+  password). Only 904 files were kept behind.
+- Second defect found during the rebuild: copying a file into
+  `/var/opt/mssql/attach` chowned it to `mssql:mssql`, but the 2019 image has
+  no `mssql` group (user `mssql` runs with gid 0), so the copy step failed with
+  "invalid group" before SQL Server saw the file. `docker_ops` now sets the
+  owner only (`chown mssql`), which works on both images.
+- Verified end to end on the rebuilt server: `server_file_version()` reports
+  **904** and `compatibility_problem()` returns `None`; `samples/A325TC.mdf`
+  (904) attaches, `guess_catalog_type` reports **bolt**, 10 tables are listed,
+  the database detaches cleanly, and `DBCC CHECKPRIMARYFILE` on the same file
+  afterwards still reads **904**. The temporary copy was removed, leaving the
+  container with no attached databases.
+- Verdict: **pass** for the environment (2019 server, attach/detach, file
+  version preserved). A6 stays open: the Advance Steel import itself has not
+  been re-run.
