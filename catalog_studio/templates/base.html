@@ -20,7 +20,7 @@
     <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/theme.css') }}" rel="stylesheet">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 <a class="cs-skip-link" href="#mainHost">Skip to content</a>
 <nav class="navbar navbar-dark bg-dark mb-4 rounded px-3" aria-label="Main">
     <a class="navbar-brand d-flex align-items-center gap-2" href="/">

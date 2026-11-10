@@ -17,11 +17,13 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 541 tests; read-only bolt/anchor/stud/style views,
-the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; writes
-are the bolt/anchor diameter clone and removal (issue #17), raw row CRUD, find
-& replace, drawing-style field/rule edits, and deep-copy `RunName` prefix
-renaming (issue #16).
+Baseline: `main` green at 543 tests; read-only bolt/anchor/stud/style views,
+the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; the
+home dashboard is split into Fastener Management and Drawing Style Management
+realms with distinct colour palettes (issue #20); writes are the bolt/anchor
+diameter clone and removal (issue #17), raw row CRUD, find & replace,
+drawing-style field/rule edits, and deep-copy `RunName` prefix renaming
+(issue #16).
 
 ---
 
@@ -270,3 +272,6 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] Remove diameter (`/db/<db>/remove-diameter`, issue #17): previews and
   cascades deletion of a bolt or anchor diameter in child-before-parent order
   inside one transaction after taking a pre-change snapshot (541 tests).
+- [x] Split home interface into Fastener Management and Drawing Style Management
+  realms with distinct cobalt-steel vs drafting-teal themes across the home page
+  and drawing-style workspace pages (issue #20, 543 tests).

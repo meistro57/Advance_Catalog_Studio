@@ -218,19 +218,19 @@ Drawing styles follow the same pattern: export a style from the **Drawing Style 
 
 ## What the web interface does
 
-### Catalog dashboard
+### Catalog dashboard (Fastener Management & Drawing Style Management)
 
-The home page is the ingest/edit/export control centre. It shows:
+The home page is split into two distinct workspaces (issue #20) above a shared ingest/export dock:
 
-- uploaded catalog pairs waiting to be attached;
-- per-pair **Remove** and **Clear staged uploads** actions with a staging
-  trash (recoverable until an explicit purge) and confirmation counts/sizes;
-- databases currently attached to the scratch SQL Server;
-- Advance Steel version and type tags (bolt, anchor, shear stud, drawing style);
-- new bolt and anchor catalog creation;
-- completed exports ready for download, with a **Clear exports** action that
-  moves them into `exports/.trash` (same recoverable-then-purge pattern) so the
-  download list does not grow forever.
+- **Fastener Management (`#fastenerManagementZone`)** — styled in an industrial cobalt/steel palette for `AstorBase` component catalogs (bolts, anchors, shear studs), listing attached fastener databases with direct launch buttons (`Bolt-Set Viewer`, `Anchor Configurator`, `Shear Stud Browser`, `Clone Diameter`, `Remove Diameter`, `Health`), a `Compare` shortcut, and new bolt/anchor catalog creation from scratch.
+- **Drawing Style Management (`#drawingStyleManagementZone`)** — styled in a drafting-studio teal palette for Drawing Style Manager exports (`AstorDetails` / `AstorAddIn`), listing attached style databases with direct launch buttons (`Style Editor`, `Rename Deep Copies`, `Sub-style Usage`, `Health`) plus a dedicated card for **Detail Diff** (`/detail-diff`) and deep-copy prefix cleanup. Opening any drawing-style page (`drawing_style.html`, `drawing_style_rename.html`, `drawing_style_usage.html`, `detail_diff.html`, or `database.html` for a style export) shifts the workspace chrome (`body.cs-style-workspace`) to the same drafting-studio teal theme.
+- **Shared Ingest, Staging & Export Dock**:
+  - uploaded catalog pairs waiting to be attached;
+  - per-pair **Remove** and **Clear staged uploads** actions with a staging
+    trash (recoverable until an explicit purge) and confirmation counts/sizes;
+  - completed exports ready for download, with a **Clear exports** action that
+    moves them into `exports/.trash` (same recoverable-then-purge pattern) so the
+    download list does not grow forever.
 
 ### Light and dark mode
 

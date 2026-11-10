@@ -311,10 +311,14 @@ transaction after taking a pre-change snapshot.
   `prefers-color-scheme`, and renders the navbar toggle; `theme.js` only wires
   the switch, icons and cross-tab sync. `theme.css` owns the tokens **and** the
   dark remaps for the light-only utilities the templates use (`bg-white`,
-  `bg-light`, `text-dark` scoped to `bg-light`). Keep pages extending
-  `base.html` so they inherit the theme, and keep SVG/drawing surfaces on light
-  "paper" (`.cs-paper`, `.bp-host`, `.label-preview`, the Three.js canvas, the
-  printable fabrication sheet) — their strokes and dimension text assume it.
+  `bg-light`, `text-dark` scoped to `bg-light`), plus the two workspace palettes
+  (issue #20): **Fastener Management** (`--cs-fastener-*`, `.cs-zone-fasteners`)
+  in industrial cobalt/steel and **Drawing Style Management** (`--cs-style-*`,
+  `.cs-zone-styles`, `body.cs-style-workspace`) in drafting-studio teal. Keep
+  pages extending `base.html` so they inherit the theme, and keep SVG/drawing
+  surfaces on light "paper" (`.cs-paper`, `.bp-host`, `.label-preview`, the
+  Three.js canvas, the printable fabrication sheet) — their strokes and
+  dimension text assume it.
 - `catalog_studio/utils/icons.py` — the chrome's inline SVG icon set, exposed
   to templates as the `icon('name')` Jinja global (registered in `app.py`).
   Icons are 24x24 stroke paths that inherit `currentColor`, so no icon font and

@@ -1,6 +1,7 @@
 <!-- templates/database.html -->
 {% extends "base.html" %}
 {% block title %}{{ database }}{% endblock %}
+{% block body_class %}{% if catalog_type == 'drawing style' %}cs-style-workspace{% endif %}{% endblock %}
 {% block content %}
 <p><a href="/">&laquo; Home</a></p>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">

@@ -41,6 +41,27 @@
     --cs-focus: #0d6efd;
     --cs-nav-bg: #212529;
     --cs-radius: .5rem;
+
+    /* Fastener Management realm (Industrial Steel & Cobalt) */
+    --cs-fastener-bg: #edf2f9;
+    --cs-fastener-card-head: #dfe8f5;
+    --cs-fastener-border: #b8cce4;
+    --cs-fastener-banner: linear-gradient(135deg, #162a45 0%, #1e3f6f 100%);
+    --cs-fastener-accent: #1d4ed8;
+    --cs-fastener-badge-bg: #dbeafe;
+    --cs-fastener-badge-ink: #1e3a8a;
+
+    /* Drawing Style Management realm (Drafting Studio Teal & Warm Amber) */
+    --cs-style-bg: #eaf4f2;
+    --cs-style-card-head: #d5ebe6;
+    --cs-style-border: #9fd0c7;
+    --cs-style-banner: linear-gradient(135deg, #103836 0%, #0f544f 100%);
+    --cs-style-accent: #0f766e;
+    --cs-style-accent-hover: #0d5f59;
+    --cs-style-badge-bg: #ccfbf1;
+    --cs-style-badge-ink: #115e59;
+    --cs-style-help-bg: #e6f7f4;
+    --cs-style-help-border: #0f766e;
 }
 
 [data-bs-theme="dark"] {
@@ -71,6 +92,27 @@
     --cs-row-zebra: #1d242c;
     --cs-focus: #6ea8fe;
     --cs-nav-bg: #0f141a;
+
+    /* Fastener Management realm (dark) */
+    --cs-fastener-bg: #141d29;
+    --cs-fastener-card-head: #1c2838;
+    --cs-fastener-border: #2b4263;
+    --cs-fastener-banner: linear-gradient(135deg, #102038 0%, #1b355c 100%);
+    --cs-fastener-accent: #60a5fa;
+    --cs-fastener-badge-bg: #1e3a5f;
+    --cs-fastener-badge-ink: #bfdbfe;
+
+    /* Drawing Style Management realm (dark) */
+    --cs-style-bg: #11201f;
+    --cs-style-card-head: #172d2b;
+    --cs-style-border: #254f4b;
+    --cs-style-banner: linear-gradient(135deg, #0c2625 0%, #134440 100%);
+    --cs-style-accent: #2dd4bf;
+    --cs-style-accent-hover: #14b8a6;
+    --cs-style-badge-bg: #134e4a;
+    --cs-style-badge-ink: #99f6e4;
+    --cs-style-help-bg: #132b29;
+    --cs-style-help-border: #2dd4bf;
 }
 
 /* ---- 2. Base elements ---------------------------------------------------- */
@@ -285,6 +327,133 @@ table.data-table tbody tr:hover { background: var(--cs-row-hover); }
 [data-bs-theme="dark"] .sd-step {
     background: var(--cs-surface-alt);
     border-color: var(--cs-border);
+}
+
+/* ---- 6b. Split Workspaces: Fastener Management vs Drawing Style Management */
+
+.cs-zone {
+    border-radius: .65rem;
+    padding: 1rem;
+    height: 100%;
+    box-shadow: var(--cs-shadow);
+}
+
+.cs-zone-fasteners {
+    background: var(--cs-fastener-bg);
+    border: 1.5px solid var(--cs-fastener-border);
+}
+
+.cs-zone-styles {
+    background: var(--cs-style-bg);
+    border: 1.5px solid var(--cs-style-border);
+}
+
+.cs-zone-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .75rem 1rem;
+    border-radius: .5rem;
+    color: #ffffff;
+    margin-bottom: 1rem;
+}
+
+.cs-zone-fasteners .cs-zone-banner {
+    background: var(--cs-fastener-banner);
+}
+
+.cs-zone-styles .cs-zone-banner {
+    background: var(--cs-style-banner);
+}
+
+.cs-zone-banner-sub {
+    display: block;
+    font-size: .78rem;
+    opacity: .85;
+    font-weight: 400;
+}
+
+.cs-zone-fasteners .card > .card-header {
+    background: var(--cs-fastener-card-head);
+    border-bottom-color: var(--cs-fastener-border);
+    font-weight: 600;
+}
+
+.cs-zone-styles .card > .card-header {
+    background: var(--cs-style-card-head);
+    border-bottom-color: var(--cs-style-border);
+    font-weight: 600;
+}
+
+.badge-cs-fastener {
+    background-color: var(--cs-fastener-badge-bg);
+    color: var(--cs-fastener-badge-ink);
+    border: 1px solid var(--cs-fastener-border);
+}
+
+.badge-cs-style {
+    background-color: var(--cs-style-badge-bg);
+    color: var(--cs-style-badge-ink);
+    border: 1px solid var(--cs-style-border);
+}
+
+.btn-cs-style {
+    background-color: #0f766e;
+    border-color: #0f766e;
+    color: #ffffff;
+}
+
+.btn-cs-style:hover,
+.btn-cs-style:focus {
+    background-color: #0d5f59;
+    border-color: #0d5f59;
+    color: #ffffff;
+}
+
+.btn-outline-cs-style {
+    color: var(--cs-style-accent);
+    border-color: var(--cs-style-accent);
+    background: transparent;
+}
+
+.btn-outline-cs-style:hover,
+.btn-outline-cs-style:focus {
+    background-color: #0f766e;
+    border-color: #0f766e;
+    color: #ffffff;
+}
+
+/* Full-page Drawing Style workspace shift (editor, rename, usage, detail diff) */
+body.cs-style-workspace {
+    background: var(--cs-style-bg);
+}
+
+body.cs-style-workspace > nav.navbar {
+    background: var(--cs-style-banner) !important;
+    border-bottom: 2px solid var(--cs-style-accent);
+}
+
+body.cs-style-workspace .ds-card > .card-header,
+body.cs-style-workspace table.data-table th {
+    background: var(--cs-style-banner) !important;
+    color: #ffffff;
+}
+
+body.cs-style-workspace .ds-nav a.active {
+    background: #0f766e !important;
+    color: #ffffff !important;
+}
+
+body.cs-style-workspace .ds-nav a.active .badge {
+    background: #ffffff !important;
+    color: #0f766e !important;
+}
+
+body.cs-style-workspace .ds-help {
+    background: var(--cs-style-help-bg) !important;
+    border-left-color: var(--cs-style-help-border) !important;
 }
 
 /* ---- 7. Motion and responsive -------------------------------------------- */

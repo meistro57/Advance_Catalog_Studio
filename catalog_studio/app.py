@@ -135,12 +135,32 @@ def index():
     exports_status = staging_cleanup.scan_upload_dir(config.EXPORT_DIR)
     exports = staging_cleanup.list_catalog_files(config.EXPORT_DIR)
     meta = metadata.all_meta()
+    fastener_dbs = []
+    style_dbs = []
+    for name in attached:
+        m = dict(meta.get(name) or {})
+        ctype = m.get("catalog_type")
+        if not ctype and container_up:
+            try:
+                ctype = db.guess_catalog_type(name)
+            except Exception:
+                ctype = None
+            if ctype:
+                m["catalog_type"] = ctype
+                meta[name] = m
+        if ctype == "drawing style":
+            style_dbs.append(name)
+        else:
+            fastener_dbs.append(name)
+
     return render_template(
         "index.html",
         staged=staged_status["pairs"],
         orphan_files=staged_status["orphans"],
         uploads_status=staged_status,
         attached=attached,
+        fastener_dbs=fastener_dbs,
+        style_dbs=style_dbs,
         exports=exports,
         exports_status=exports_status,
         container_up=container_up,
