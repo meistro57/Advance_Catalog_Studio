@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+<title id="title">Advance Catalog Studio engineering workbench</title>
+<desc id="desc">An industrial-blue technical illustration with a dimensioned steel fastener assembly, drawing grid and catalog interface motifs.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#081625"/><stop offset="62%" stop-color="#112C42"/><stop offset="100%" stop-color="#0E434B"/></linearGradient>
+  <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#5EA4FF"/><stop offset="100%" stop-color="#4FE0CC"/></linearGradient>
+  <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#92BED3" stroke-width=".6" opacity=".15"/></pattern>
+  <clipPath id="clip"><rect x="2" y="2" width="1196" height="316" rx="20"/></clipPath>
+</defs>
+<rect x="2" y="2" width="1196" height="316" rx="20" fill="url(#bg)" stroke="#3B7893" stroke-width="2"/>
+<g clip-path="url(#clip)">
+  <rect width="1200" height="320" fill="url(#grid)"/>
+  <path d="M730-40 1040 340" stroke="#53C8D6" opacity=".13" stroke-width="100"/>
+  <path d="M807-20 1100 337" stroke="#7EDCF2" opacity=".06" stroke-width="50"/>
+  <path d="M56 72H530" stroke="url(#accent)" stroke-width="2" opacity=".6"/>
+  <text x="57" y="56" fill="#8FC8DF" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="13" letter-spacing="3">ENGINEERING DATA  /  UNDER CONTROL</text>
+  <text x="52" y="135" fill="#F3F8FF" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="50" letter-spacing="1">ADVANCE CATALOG</text>
+  <text x="55" y="195" fill="#6EDCE0" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="58" letter-spacing="5">STUDIO</text>
+  <text x="58" y="229" fill="#B6CFDD" font-family="Arial, Helvetica, sans-serif" font-size="16">Local workbench for the data behind the steel</text>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing=".6">
+    <rect x="56" y="258" width="139" height="29" rx="5" fill="#173B54" stroke="#347C9C"/>
+    <text x="70" y="277" fill="#C5E8FA">FASTENERS</text>
+    <rect x="205" y="258" width="157" height="29" rx="5" fill="#173B54" stroke="#347C9C"/>
+    <text x="219" y="277" fill="#C5E8FA">DRAWING STYLES</text>
+    <rect x="372" y="258" width="129" height="29" rx="5" fill="#15534F" stroke="#41AFA5"/>
+    <text x="387" y="277" fill="#B0F5E9">SAFE EXPORT</text>
+  </g>
+  <g transform="translate(825 43)" fill="none" stroke="#66C7E1" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="-10" y="-2" width="315" height="244" rx="12" fill="#091B2C" fill-opacity=".54" stroke="#3C6A86" stroke-width="1.5"/>
+    <path d="M5 28H289M5 196H289" stroke="#5196AC" stroke-dasharray="5 6" opacity=".6"/>
+    <path d="M40 4V232M251 4V232" stroke="#5196AC" stroke-dasharray="5 6" opacity=".5"/>
+    <g stroke="#A2DEF0" stroke-width="2.5">
+      <path d="M42 103H93V76H110V124H93V112H42Z" fill="#133A51"/>
+      <path d="M110 91H211V109H110" fill="#163C56"/>
+      <path d="M211 82H224V117H211Z" fill="#3A8091"/>
+      <path d="M224 86H251V113H224Z" fill="#1E566B"/>
+      <path d="M251 82 272 90V110L251 118 239 109V91Z" fill="#1E566B"/>
+      <path d="M68 77V127M79 77V127" stroke="#7BC7DF" stroke-width="1.2"/>
+      <path d="M228 89 244 113M228 112 244 88" stroke-width="1"/>
+    </g>
+    <g stroke="#5ADBC8" stroke-width="1.35">
+      <path d="M42 51V67M272 51V76M42 60H272"/>
+      <path d="M42 60 49 56M42 60 49 64M272 60 265 56M272 60 265 64"/>
+      <path d="M95 140V168M211 127V168M95 159H211"/>
+      <path d="M95 159 102 155M95 159 102 163M211 159 204 155M211 159 204 163"/>
+    </g>
+    <g font-family="Arial, Helvetica, sans-serif" fill="#73E4D4" stroke="none" text-anchor="middle">
+      <text x="157" y="50" font-size="13" letter-spacing="1">ASSEMBLY LENGTH</text>
+      <text x="154" y="179" font-size="12" letter-spacing=".5">GRIP / HARDWARE</text>
+    </g>
+    <g stroke="#5BADC8" opacity=".7" stroke-width="1">
+      <circle cx="161" cy="101" r="31" stroke-dasharray="4 6"/>
+      <path d="M161 67V135M127 101H195" stroke-dasharray="4 6"/>
+      <path d="M17 217H278" stroke-dasharray="6 6"/>
+    </g>
+    <text x="17" y="234" font-family="monospace" font-size="10" fill="#8BAEC3" stroke="none">AS-2026 / CATALOG VIEW</text>
+  </g>
+</g>
+</svg>

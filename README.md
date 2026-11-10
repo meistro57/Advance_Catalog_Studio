@@ -1,29 +1,56 @@
+<p align="center">
+  <img src="docs/images/catalog-studio-console.svg" alt="Advance Catalog Studio: industrial engineering workbench banner with a dimensioned steel fastener" width="100%" />
+</p>
+
 # Advance Steel Catalog Studio
 
 > Because handling your Advance Steel bolt, anchor, and drawing-style data should be easy.
 
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-web%20app-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Advance Steel](https://img.shields.io/badge/Advance%20Steel-2026-0696D7)](https://www.autodesk.com/products/advance-steel/overview)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/meistro57/Advance_Catalog_Studio/actions/workflows/ci.yml"><img alt="CI workflow status" src="https://img.shields.io/github/actions/workflow/status/meistro57/Advance_Catalog_Studio/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white" /></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-2B82A7?style=flat-square&logo=git&logoColor=white" /></a>
+  <a href="https://github.com/meistro57/Advance_Catalog_Studio/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=457D9F" /></a>
+  <a href="https://github.com/meistro57/Advance_Catalog_Studio/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=278D89" /></a>
+  <a href="LICENSE"><img alt="MIT licensed" src="https://img.shields.io/badge/license-MIT-B59A4B?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="https://www.python.org/"><img alt="Python 3.12 or newer" src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
+  <a href="https://flask.palletsprojects.com/"><img alt="Flask web application" src="https://img.shields.io/badge/Flask-web%20app-39516D?style=flat-square&logo=flask&logoColor=white" /></a>
+  <a href="https://www.autodesk.com/products/advance-steel/overview"><img alt="Advance Steel 2026" src="https://img.shields.io/badge/Advance%20Steel-2026-287DA1?style=flat-square" /></a>
+  <a href="#2-start-the-scratch-sql-server"><img alt="SQL Server 2019" src="https://img.shields.io/badge/SQL%20Server-2019-276D85?style=flat-square&logo=microsoftsqlserver&logoColor=white" /></a>
+  <a href="#2-start-the-scratch-sql-server"><img alt="Docker scratch environment" src="https://img.shields.io/badge/Docker-scratch%20DB-2077AB?style=flat-square&logo=docker&logoColor=white" /></a>
+  <a href="#safety-and-limitations"><img alt="Local deployment only" src="https://img.shields.io/badge/deployment-local%20only-278C83?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="#why-this-exists">Why it exists</a> ·
+  <a href="#project-status">Project status</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-the-web-interface-does">Workbench tour</a> ·
+  <a href="#safety-and-limitations">Safety</a>
+</p>
 
 **Advance Steel Catalog Studio** is a local, browser-based workbench for inspecting, editing, repairing, creating, and exporting Autodesk Advance Steel databases stored as SQL Server `.mdf` / `.ldf` pairs: bolt and anchor component catalogs, shear-stud connector catalogs, and drawing styles exported from the Drawing Style Manager.
 
 It replaces fragile, repetitive table-by-table editing with guided workflows that understand the relationships behind bolt diameters, bolt lengths, nuts, washers, assembly sets, grip rules, and edge distances, and behind drawing styles: view requests, representation rules, label formulas, and dimension strategies.
 
-<img width="2526" height="1657" alt="image" src="https://github.com/user-attachments/assets/17a5efea-1d41-43a9-bca5-90b9ff0c20df" />
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/17a5efea-1d41-43a9-bca5-90b9ff0c20df"><img src="https://github.com/user-attachments/assets/17a5efea-1d41-43a9-bca5-90b9ff0c20df" alt="Advance Steel Catalog Studio application interface (full-size screenshot)" width="900" /></a>
+</p>
 
-<img width="2539" height="1794" alt="image" src="https://github.com/user-attachments/assets/c0dd1280-9999-4d55-b9a3-fcde8f53617d" />
+<details>
+  <summary><strong>Explore five more workbench screenshots</strong> (click to expand, then select an image for full size)</summary>
 
-<img width="2531" height="1796" alt="image" src="https://github.com/user-attachments/assets/c765e100-4cd8-4397-b377-74a5af8ed425" />
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/c0dd1280-9999-4d55-b9a3-fcde8f53617d"><img src="https://github.com/user-attachments/assets/c0dd1280-9999-4d55-b9a3-fcde8f53617d" alt="Additional Catalog Studio interface screenshot 2; select to inspect full size" width="45%" /></a>
+  <a href="https://github.com/user-attachments/assets/c765e100-4cd8-4397-b377-74a5af8ed425"><img src="https://github.com/user-attachments/assets/c765e100-4cd8-4397-b377-74a5af8ed425" alt="Additional Catalog Studio interface screenshot 3; select to inspect full size" width="45%" /></a>
+  <a href="https://github.com/user-attachments/assets/5439f833-fbac-486d-9845-122da9a9dabe"><img src="https://github.com/user-attachments/assets/5439f833-fbac-486d-9845-122da9a9dabe" alt="Additional Catalog Studio interface screenshot 4; select to inspect full size" width="45%" /></a>
+  <a href="https://github.com/user-attachments/assets/d851e7e1-dfb6-49c3-9519-71d9f72d4d7c"><img src="https://github.com/user-attachments/assets/d851e7e1-dfb6-49c3-9519-71d9f72d4d7c" alt="Additional Catalog Studio interface screenshot 5; select to inspect full size" width="45%" /></a>
+  <a href="https://github.com/user-attachments/assets/114a33a7-bd24-4e5b-a283-ea1ae90256fe"><img src="https://github.com/user-attachments/assets/114a33a7-bd24-4e5b-a283-ea1ae90256fe" alt="Additional Catalog Studio interface screenshot 6; select to inspect full size" width="45%" /></a>
+</p>
 
-<img width="2533" height="1073" alt="image" src="https://github.com/user-attachments/assets/5439f833-fbac-486d-9845-122da9a9dabe" />
-
-<img width="2539" height="1789" alt="image" src="https://github.com/user-attachments/assets/d851e7e1-dfb6-49c3-9519-71d9f72d4d7c" />
-
-<img width="2538" height="1809" alt="image" src="https://github.com/user-attachments/assets/114a33a7-bd24-4e5b-a283-ea1ae90256fe" />
-
-
+</details>
 
 ## Why this exists
 
