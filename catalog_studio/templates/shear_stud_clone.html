@@ -12,11 +12,39 @@
 </p>
 
 <div class="alert alert-{% if plan.ok %}info{% else %}danger{% endif %} py-2 small">
-    <strong>Preview only — no SQL is written and there is no apply action.</strong>
-    The connector schema is not yet round-trip verified against Advance Steel 2026,
-    so every row below must be reviewed (and the plan confirmed) before any write
-    path is built. Scaled geometry is a starting estimate, not certified data.
+    <strong>Preview only — no SQL has been written yet.</strong>
+    Review the proposed rows across all four connector tables below before applying.
+    Scaled geometry is a starting estimate, not certified manufacturer data.
 </div>
+
+{% if plan.ok %}
+<div class="card border-0 shadow-sm mb-3" id="applyCloneCard">
+    <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="small">
+            <strong>Ready to apply:</strong>
+            inserts {{ plan.summary.rows }} row(s) across {{ plan.summary.tables }} tables in one transaction after taking a pre-change backup snapshot.
+        </div>
+        <form method="post" action="/db/{{ database }}/shear-stud-browser/clone-apply" class="mb-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="units" value="{{ units }}">
+            <input type="hidden" name="standard" value="{{ form.standard }}">
+            <input type="hidden" name="material" value="{{ form.material }}">
+            <input type="hidden" name="source_diameter" value="{{ form.source_diameter }}">
+            <input type="hidden" name="target_diameter" value="{{ form.target_diameter }}">
+            <input type="hidden" name="lengths" value="{{ form.lengths }}">
+            <input type="hidden" name="along" value="{{ form.along }}">
+            <input type="hidden" name="across" value="{{ form.across }}">
+            <input type="hidden" name="hole_tolerance" value="{{ form.hole_tolerance }}">
+            {% if plan.scale_geometry %}
+            <input type="hidden" name="scale_geometry" value="on">
+            {% endif %}
+            <button type="submit" class="btn btn-sm btn-success">
+                {{ icon('add', 16) }} Apply clone ({{ plan.summary.rows }} rows)
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
 
 <div class="row g-2 mb-3">
     <div class="col-6 col-md-2">

@@ -878,6 +878,127 @@ def shear_stud_clone_preview(database):
     )
 
 
+@app.route("/db/<database>/shear-stud-browser/clone-apply", methods=["POST"])
+def shear_stud_clone_apply(database):
+    """Apply a verified shear-stud diameter clone in one SQL transaction (D1)."""
+    blocked = _blocked_write(database)
+    if blocked is not None:
+        return blocked
+
+    if db.guess_catalog_type(database) != "shear stud":
+        flash("The shear-stud browser only supports shear-stud (connector) catalogs.", "warning")
+        return redirect(url_for("show_database", database=database))
+
+    try:
+        model = shear_studs.get_browser_model(database)
+    except Exception as e:
+        flash(f"Could not read the connector tables: {e}", "danger")
+        return redirect(url_for("show_database", database=database))
+
+    form = {
+        "standard": request.form.get("standard", "").strip(),
+        "material": request.form.get("material", "").strip(),
+        "source_diameter": request.form.get("source_diameter", "").strip(),
+        "target_diameter": request.form.get("target_diameter", "").strip(),
+        "lengths": request.form.get("lengths", "").strip(),
+        "along": request.form.get("along", "").strip(),
+        "across": request.form.get("across", "").strip(),
+        "hole_tolerance": request.form.get("hole_tolerance", "").strip(),
+    }
+    scale_geometry = "scale_geometry" in request.form
+    units = shear_studs.normalize_units(request.form.get("units"))
+
+    plan = shear_studs.plan_clone(
+        model["groups"],
+        model["relation_keys"],
+        model["diameter_keys"],
+        standard=form["standard"],
+        material=form["material"],
+        source_diameter=form["source_diameter"],
+        target_diameter=form["target_diameter"],
+        lengths=form["lengths"],
+        scale_geometry=scale_geometry,
+        along=form["along"],
+        across=form["across"],
+        hole_tolerance=form["hole_tolerance"],
+    )
+    if not plan["ok"]:
+        flash("Cannot apply clone: resolve the blocking errors in the proposal first.", "danger")
+        return render_template(
+            "shear_stud_clone.html",
+            database=database,
+            plan=plan,
+            form=form,
+            options=model["options"],
+            units=units,
+            number_text=shear_studs.number_text,
+        )
+
+    try:
+        snapshot = snapshots.create_snapshot(
+            database,
+            f"shear-stud-clone {form['source_diameter']}->{form['target_diameter']}",
+        )
+    except Exception as e:
+        flash(
+            f"Pre-change snapshot failed, so no stud records were written: {e}",
+            "danger",
+        )
+        return render_template(
+            "shear_stud_clone.html",
+            database=database,
+            plan=plan,
+            form=form,
+            options=model["options"],
+            units=units,
+            number_text=shear_studs.number_text,
+        )
+
+    try:
+        result = shear_studs.apply_clone(
+            database,
+            standard=form["standard"],
+            material=form["material"],
+            source_diameter=form["source_diameter"],
+            target_diameter=form["target_diameter"],
+            lengths=form["lengths"],
+            scale_geometry=scale_geometry,
+            along=form["along"],
+            across=form["across"],
+            hole_tolerance=form["hole_tolerance"],
+        )
+    except Exception as e:
+        flash(f"Shear-stud clone failed (all changes rolled back): {e}", "danger")
+        return render_template(
+            "shear_stud_clone.html",
+            database=database,
+            plan=plan,
+            form=form,
+            options=model["options"],
+            units=units,
+            number_text=shear_studs.number_text,
+        )
+
+    inserted = result["inserted"]
+    summary_parts = [f"{table} ({cnt})" for table, cnt in inserted.items() if cnt]
+    flash(
+        f"Cloned {form['standard']} / {form['material']} Ø{form['target_diameter']} mm: "
+        f"inserted {result['total_inserted']} row(s) ({', '.join(summary_parts)}). "
+        f"Snapshot: {snapshot['filename']}.",
+        "success",
+    )
+    return redirect(
+        url_for(
+            "shear_stud_browser",
+            database=database,
+            standard=form["standard"],
+            material=form["material"],
+            diameter=form["target_diameter"],
+            units=units,
+        )
+    )
+
+
 # --------------------------------------------------------------------------
 # Printable anchor fabrication detail sheet (issue #2)
 # --------------------------------------------------------------------------

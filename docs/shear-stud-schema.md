@@ -1,12 +1,12 @@
-# Shear-stud (connector) catalog schema — Nelson H4L
+# Shear-stud (connector) catalog schema — Nelson H4L & Nelson H4L-Inch
 
-Issue #4, Phase 1 investigation. Source: `raw_files/Nelson H4L.mdf` / `.ldf`,
-attached to the scratch SQL Server as `NelsonH4L`.
+Issue #4 investigation and verification (`A3.1` in `docs/verification-log.md`).
+Sources: `raw_files/Nelson H4L.mdf` / `.ldf` (metric) and `NELSON_STUDS`
+(`Nelson H4L-Inch`, imperial), exported from Advance Steel 2026 (file version 904).
 
-> Status: OBSERVED, not yet round-trip verified through Advance Steel 2026.
-> This note records what the exported catalog contains and the relationships
-> that follow from it. Field meanings are labelled "observed" where they are
-> inferred from consistent catalog values, not confirmed in the application.
+> Status: VERIFIED across both metric (`Nelson H4L`) and imperial
+> (`Nelson H4L-Inch`) Advance Steel 2026 exports (`docs/verification-log.md`
+> A3.1).
 
 ## Shape
 
@@ -75,52 +75,35 @@ in Advance Steel is therefore believed to be:
 - ISO 13918-style studs previously observed in `SetBolts` in other catalogs
   may share this `Connector*` shape or differ; do not assume.
 
-## Consumers in Catalog Studio (read-only)
+## Consumers in Catalog Studio
 
 - `utils/db.py: guess_catalog_type` labels the shape `shear stud` by table
   presence; `get_catalog_diameters` has a connector branch so the dashboard
   lists `ConnectorDiameters` with counts from `ConnectorRelations`,
   `ConnectorDistances` and `SetBolts`, and flags diameters with no references
   as orphans.
+- `utils/schema_templates.py: CATALOG_TEMPLATES["shear stud"]` (`D2`) creates a
+  fresh 7-table Shear Stud Catalog (`ConnectorStandard`, `ConnectorMaterial`,
+  `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`, `SetBolts`,
+  `Sources`) seeded with a complete starter family (`Nelson H4L` / `Mild Steel` /
+  `16.0 mm`).
 - `utils/shear_studs.py` builds a per-(standard, material, diameter) model and
-  treats the minimum record set above as the completeness rule. Findings are
-  `error` (record set broken: missing lookup/diameter/distance/relation row,
-  no lengths, duplicate relation or stud, head not larger than the shank,
-  name or `RunName` disagreeing with the key), `warn` (name off the observed
-  convention, duplicate display `Name` across stud records, unparseable `RunName`,
-  orphan lookup or distance row, non-positive head height, invalid distance rule,
-  implausible steel weight vs `(d²·l)`, or non-monotonic weight across lengths)
-  or `info` (`RunName` spacing kept as authored, zero stud weight).
-  Nothing is repaired and nothing is written.
+  treats the minimum record set above as the completeness rule. Both metric
+  (`' 10.00 mm'`, `'Nelson H4L 16 x 40'`) and imperial (`'   1/4 inch'`,
+  `'Nelson H4L 1/4 x 1 1/8'`) `RunName` and `SetBolts.Name` conventions are
+  recognized.
 - `/db/<db>/shear-stud-browser` renders family → grade → diameter cards with
   the authored `RunName`, the hole rule, length chips, the stud table and the
   validation findings, links every value back to its raw table, and opens a
-  per-record **Stud Record Detail** panel (`stud_detail` / `stud_svg`) with a
-  2D schematic SVG elevation, source table/column traceability, and a
+  per-record **Stud Record Detail** panel (`stud_detail` / `stud_svg`, `D3`) with
+  a 2D schematic SVG elevation, source table/column traceability, and a
   composite-PK raw-row link (`/db/<db>/SetBolts/edit/<token>`) when a stud
   length is selected.
-- The bolt-diameter clone route refuses these catalogs (its engine copies
-  `BoltsDiameters`/`SetOfBolts`/`ScrewNew` rows they do not have) and the
-  dashboard hides that button; a stud clone workflow waits on verification.
-- `POST /db/<db>/shear-stud-browser/clone-preview` proposes, but never writes,
-  the rows for a new diameter: one `ConnectorDiameters` row (`Key` = target mm,
-  canonical `RunName`), one `ConnectorDistances` row (scaled or explicit
-  along/across, tolerance from the source rule), one `ConnectorRelations` row
-  (`Key` = `max(Key)+1`, since the column is not an identity) and one
-  `SetBolts` row per requested length (observed name convention, `Type`,
-  `Source`, `OwnerText` copied from the source stud). Head diameter/height and
-  weight scale by `target/source` and `(target/source)²` only on request and
-  are labelled estimates; weight is left empty when no source stud of that
-  length exists. Blocking findings: existing `ConnectorDiameters` key or
-  family/grade/diameter group, existing length or name, duplicate/non-numeric/
-  non-positive lengths, missing or incomplete source. The proposal is a review
-  artifact for the future write path, not a supported edit.
-- Observed but not enforced: the `RunName` strings are not whitespace
-  consistent (`'   6.00 mm'` for 6 mm next to `' 10.00 mm'`). Generated names
-  should use one canonical form (`' 6.00 mm'`); existing rows are reported as
-  *info* and preserved as authored.
-- Display units are presentation-only: millimetres stay the stored unit and an
-  `inch` toggle converts diameters, lengths, hole rules and head geometry with
-  the fabrication-sheet rule (nearest 1/16 in, reduced fraction, `≈` when not
-  exactly representable). The clone proposal table always lists the values as
-  they would be stored, and no conversion happens before a value reaches SQL.
+- `POST /db/<db>/shear-stud-browser/clone-preview` proposes the rows for a new
+  diameter (`ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations` with
+  `Key = max(Key)+1`, and `SetBolts`), and when `plan.ok` is true,
+  `POST /db/<db>/shear-stud-browser/clone-apply` (`shear_studs.apply_clone`, `D1`)
+  takes a pre-change backup snapshot (`snapshots.create_snapshot`, fail-closed)
+  and inserts all rows in parent-before-child order inside a single transaction.
+- `/db/<db>/health#exportChecklist` (`D5`) provides the pre-export readiness
+  checklist (table/row counts, open findings, and Detach & Export reminder).

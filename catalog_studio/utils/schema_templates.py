@@ -289,7 +289,84 @@ BOLT_SEED = [
     "INSERT INTO BoltsDiameters ([Key], RunName) VALUES (25.4, ' 1 inch');",
 ]
 
+SHEAR_STUD_TABLES = [
+    """
+    CREATE TABLE ConnectorStandard (
+        [Key] NVARCHAR(64) NOT NULL PRIMARY KEY,
+        RunName NVARCHAR(64) NULL,
+        OwnerText NVARCHAR(15) NULL
+    );
+    """,
+    """
+    CREATE TABLE ConnectorMaterial (
+        [Key] NVARCHAR(64) NOT NULL PRIMARY KEY,
+        RunName NVARCHAR(64) NULL,
+        weight FLOAT NULL,
+        OwnerText NVARCHAR(15) NULL
+    );
+    """,
+    """
+    CREATE TABLE ConnectorDiameters (
+        [Key] FLOAT NOT NULL PRIMARY KEY,
+        RunName NVARCHAR(64) NULL,
+        Description NVARCHAR(64) NULL
+    );
+    """,
+    """
+    CREATE TABLE ConnectorDistances (
+        [Key] FLOAT NOT NULL,
+        HoleTolerance FLOAT NOT NULL,
+        along FLOAT NULL,
+        across FLOAT NULL,
+        Description NVARCHAR(64) NULL,
+        PRIMARY KEY ([Key], HoleTolerance)
+    );
+    """,
+    """
+    CREATE TABLE ConnectorRelations (
+        [Key] INT NOT NULL PRIMARY KEY,
+        ConnectorStandard NVARCHAR(64) NULL,
+        ConnectorMaterial NVARCHAR(64) NULL,
+        ConnectorDiameter FLOAT NULL
+    );
+    """,
+    """
+    CREATE TABLE SetBolts (
+        Standard NVARCHAR(32) NOT NULL,
+        Material NVARCHAR(64) NOT NULL,
+        Diameter FLOAT NOT NULL,
+        [Length] FLOAT NOT NULL,
+        ScrewHeadOuterDiameter FLOAT NULL,
+        HeadHeight FLOAT NULL,
+        NumberOfCorners INT NULL,
+        Name NVARCHAR(255) NULL,
+        Weight FLOAT NULL,
+        OwnerText NVARCHAR(15) NULL,
+        Source NVARCHAR(15) NULL,
+        [Type] INT NULL,
+        PRIMARY KEY (Standard, Material, Diameter, [Length])
+    );
+    """,
+    """
+    CREATE TABLE Sources (
+        Short NVARCHAR(15) NOT NULL PRIMARY KEY,
+        Long NVARCHAR(255) NULL
+    );
+    """,
+]
+
+SHEAR_STUD_SEED = [
+    "INSERT INTO Sources (Short, Long) VALUES ('Nelson H4L', 'Nelson H4L');",
+    "INSERT INTO ConnectorStandard ([Key], RunName, OwnerText) VALUES ('Nelson H4L', 'Nelson H4L', 'DSC');",
+    "INSERT INTO ConnectorMaterial ([Key], RunName, weight, OwnerText) VALUES ('Mild Steel', 'Mild Steel', 0.0, 'DSC');",
+    "INSERT INTO ConnectorDiameters ([Key], RunName, Description) VALUES (16.0, ' 16.00 mm', NULL);",
+    "INSERT INTO ConnectorDistances ([Key], HoleTolerance, along, across, Description) VALUES (16.0, 0.0, 32.0, 24.0, NULL);",
+    "INSERT INTO ConnectorRelations ([Key], ConnectorStandard, ConnectorMaterial, ConnectorDiameter) VALUES (1, 'Nelson H4L', 'Mild Steel', 16.0);",
+    "INSERT INTO SetBolts (Standard, Material, Diameter, [Length], ScrewHeadOuterDiameter, HeadHeight, NumberOfCorners, Name, Weight, OwnerText, Source, [Type]) VALUES ('Nelson H4L', 'Mild Steel', 16.0, 40.0, 31.8, 7.9, 0, 'Nelson H4L 16 x 40', 0.098, 'DSC', 'Nelson H4L', 2);",
+]
+
 CATALOG_TEMPLATES = {
     "anchor": {"label": "Anchor Catalog", "tables": ANCHOR_TABLES, "seed": ANCHOR_SEED},
     "bolt": {"label": "Bolt Catalog", "tables": BOLT_TABLES, "seed": BOLT_SEED},
+    "shear stud": {"label": "Shear Stud Catalog", "tables": SHEAR_STUD_TABLES, "seed": SHEAR_STUD_SEED},
 }

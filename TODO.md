@@ -17,16 +17,17 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 557 tests; read-only bolt/anchor/stud/style views,
-the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; the
-home dashboard is split into Fastener Management and Drawing Style Management
-realms with distinct colour palettes (issue #20); both the Bolt-Set Viewer and
-Anchor Configurator include fractional-inch / `mm` dimension toggles (issue #18),
-and the Anchor Configurator has an interactive Bolt projection from concrete
-control with a 4" typical preset (issues #19, #21); writes are the bolt/anchor
-diameter clone and removal (issue #17), raw row CRUD, find & replace,
-drawing-style field/rule edits (including `Point1..15` / `Number of Points` and
-verified `AstorDetails.mdf` dimension enum labels, issue #11), and deep-copy
+Baseline: `main` green at 564 tests; read-only bolt/anchor/stud/style views,
+the health report (with `#exportChecklist`) and the DXF hand-edit diff
+(issue #15 Phase 1) exist; the home dashboard is split into Fastener Management
+and Drawing Style Management realms with distinct colour palettes (issue #20);
+both the Bolt-Set Viewer and Anchor Configurator include fractional-inch / `mm`
+dimension toggles (issue #18), and the Anchor Configurator has an interactive
+Bolt projection from concrete control with a 4" typical preset (issues #19, #21);
+writes are the bolt/anchor diameter clone and removal (issue #17), shear-stud
+diameter clone and new-catalog scaffolding (issue #4), raw row CRUD, find &
+replace, drawing-style field/rule edits (including `Point1..15` / `Number of Points`
+and verified `AstorDetails.mdf` dimension enum labels, issue #11), and deep-copy
 `RunName` prefix renaming (issue #16).
 
 ---
@@ -43,11 +44,11 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [ ] **A2 — Anchor `Position` semantics.** Same method on `US_Headed_Anchors`,
   `US_Hooked_Anchors`, `US_Threaded_Anchors`; confirm top/bottom split and
   ordering. Unblocks the anchor editing UI.
-- [ ] **A3 — Shear-stud round trip.** Attach Nelson H4L, apply one planned clone
-  by hand (or via a throwaway script), detach/export, import into AS 2026,
-  confirm the new diameter lists its lengths with correct name/geometry/weight.
-  Also confirm `ConnectorRelations.Key` allocation (identity vs manual) and
-  `SetBolts.Type` meaning. Unblocks #4 write path.
+- [x] **A3 — Shear-stud round trip.** Verified across metric (`Nelson H4L`) and
+  imperial (`Nelson H4L-Inch` / `NELSON_STUDS`) AS 2026 exports plus SQL Server
+  2019 clone & create round trip (`A3.1` in `docs/verification-log.md`);
+  confirmed `ConnectorRelations.Key` (`INT NOT NULL`, non-identity, sequential
+  `max(Key)+1`) and `SetBolts.Type = 2`. Unblocks #4 write path (`D1`, `D2`, `D5`).
 - [ ] **A4 — Drawing-style round trip.** Edit a rule and a field, export,
   import through Drawing Style Manager; confirm the style still loads, how a
   same-name style is handled, and whether `Copy of` naming matters. Unblocks
@@ -109,12 +110,14 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 
 ## D. Shear studs (issue #4)
 
-- [ ] **D1 (`[!]` A3) — Transactional clone apply.** Reuse `plan_clone()` rows,
-  insert inside one transaction with duplicate/name/relationship re-checks,
-  return row counts; no apply button until A3 passes.
-- [ ] **D2 (`[!]` A3) — New-catalog scaffolding.** Add a `shear stud` entry to
-  `CATALOG_TEMPLATES` only when the schema template is verified; include seed
-  lookups and the minimum record set from `docs/shear-stud-schema.md`.
+- [x] **D1 — Transactional clone apply.** `shear_studs.apply_clone()` and
+  `POST /db/<db>/shear-stud-browser/clone-apply` re-validate via `plan_clone()`,
+  take a pre-change backup snapshot (`snapshots.create_snapshot`, fail-closed),
+  insert across `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`,
+  and `SetBolts` in one transaction, and return row counts.
+- [x] **D2 — New-catalog scaffolding.** Added `"shear stud"` (`Shear Stud Catalog`)
+  to `CATALOG_TEMPLATES` in `schema_templates.py` with the verified 7-table DDL
+  and baseline `Nelson H4L` seed records.
 - [x] **D3 — Per-record detail.** Open one stud from the browser as a detail
   panel (`#studDetailCard`) with a dimensioned 2D schematic SVG elevation,
   source table/column traceability, raw-row links (`/db/<db>/SetBolts/edit/<token>`),
@@ -122,10 +125,12 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] **D4 — Validation depth.** Duplicate stud display names across the catalog
   (`duplicate_stud_name`), invalid/orphan `ConnectorDistances` rules
   (`invalid_distance_rule`, `orphan_distance`), weight sanity vs `(d²·l)` steel
-  mass (`weight_implausible`), and non-monotonic weights across lengths
-  (`weight_non_monotonic`).
-- [ ] **D5 — Export checklist page.** One page per catalog: counts, open
-  findings, "detach & export" reminder; reuse the health report data.
+  mass (`weight_implausible`), non-monotonic weights across lengths
+  (`weight_non_monotonic`), plus imperial `RunName` / `SetBolts.Name` support
+  (`parse_imperial_run_name`, `expected_imperial_stud_name`).
+- [x] **D5 — Export checklist.** Added `#exportChecklist` on `/db/<db>/health`
+  (linked from `/db/<db>/shear-stud-browser`) with table/row counts, open
+  findings status, and Detach & Export reminder.
 
 ## E. Drawing styles
 

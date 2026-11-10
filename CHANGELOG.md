@@ -3,6 +3,15 @@
 All notable changes to **Advance Steel Catalog Studio** are documented in this file.
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`); the canonical version string lives in [`VERSION`](VERSION) and is exposed in the application via `config.APP_VERSION`.
 
+## [0.7.0] - 2026-11-10
+
+### Added
+- **Shear-Stud Transactional Clone Apply, New-Catalog Template & Imperial Support (`#4` — `A3.1`, `D1`, `D2`, `D5`)**:
+  - Verified the 7-table connector schema (`ConnectorStandard`, `ConnectorMaterial`, `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`, `SetBolts`, `Sources`), `ConnectorRelations.Key` (`INT NOT NULL`, non-identity, sequential `max(Key)+1`), and `SetBolts.Type = 2` across both metric (`Nelson H4L`) and imperial (`Nelson H4L-Inch`) Advance Steel 2026 exports (`docs/verification-log.md` `A3.1`).
+  - Added `shear_studs.apply_clone()` and `POST /db/<db>/shear-stud-browser/clone-apply` (`D1`) with fail-closed pre-change snapshot (`snapshots.create_snapshot`) and single-transaction insert across `ConnectorDiameters` → `ConnectorDistances` → `ConnectorRelations` → `SetBolts`.
+  - Added `"shear stud"` (`Shear Stud Catalog`) to `CATALOG_TEMPLATES` in `utils/schema_templates.py` (`D2`) with baseline `Nelson H4L` seed data.
+  - Added imperial `RunName` (`parse_imperial_run_name`, e.g. `'   1/4 inch'`) and imperial `SetBolts.Name` (`expected_imperial_stud_name`, e.g. `'Nelson H4L 1/4 x 1 1/8'`) support in `utils/shear_studs.py`, plus the `#exportChecklist` pre-export readiness section on `/db/<db>/health` (`D5`).
+
 ## [0.6.0] - 2026-11-10
 
 ### Added

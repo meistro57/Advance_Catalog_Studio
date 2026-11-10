@@ -655,3 +655,172 @@ def test_stud_detail_builds_svg_and_source_traceability():
         diameter=16.0, length=40.0, units="in",
     )
     assert "in" in detail_in["svg"]
+
+
+# --- imperial Nelson H4L-Inch support & clone apply / template (D1, D2) -----
+
+def test_parse_imperial_run_name_and_expected_imperial_stud_name():
+    assert ss.parse_imperial_run_name("   1/4 inch") == pytest.approx(6.35)
+    assert ss.parse_imperial_run_name(" 1 1/4 inch") == pytest.approx(31.75)
+    assert ss.parse_imperial_run_name(" 1 inch") == pytest.approx(25.4)
+    assert ss.parse_imperial_run_name(" 10.00 mm") is None
+    assert ss.run_name_issue({"Key": 6.35, "RunName": "   1/4 inch"}) is None
+    mismatch = ss.run_name_issue({"Key": 6.35, "RunName": "   1/2 inch"})
+    assert mismatch and mismatch["code"] == "run_name_mismatch"
+
+    assert ss.expected_imperial_stud_name("Nelson H4L-Inch", 6.35, 28.575) == "Nelson H4L 1/4 x 1 1/8"
+    stud = ss.normalize_stud(
+        stud_row(
+            standard="Nelson H4L-Inch",
+            diameter=6.35,
+            length=28.575,
+            name="Nelson H4L 1/4 x 1 1/8",
+            weight=0.0107,
+        )
+    )
+    assert not any(i["code"] == "name_mismatch" for i in stud["issues"])
+
+
+def test_apply_clone_inserts_in_parent_before_child_order_and_commits(monkeypatch):
+    shape = nelson_shape()
+    table_rows = {
+        "ConnectorStandard": shape["standards"],
+        "ConnectorMaterial": shape["materials"],
+        "ConnectorDiameters": shape["diameters"],
+        "ConnectorDistances": shape["distances"],
+        "ConnectorRelations": shape["relations"],
+        "SetBolts": shape["studs"],
+    }
+    monkeypatch.setattr("utils.db.list_tables", lambda database: list(table_rows))
+    monkeypatch.setattr("utils.db.get_rows", lambda database, table, limit=1000: table_rows[table])
+
+    executed = []
+    state = {"committed": False, "rolled_back": False, "closed": False}
+
+    class FakeCursor:
+        def execute(self, sql, params=None):
+            executed.append((sql, params))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            state["committed"] = True
+
+        def rollback(self):
+            state["rolled_back"] = True
+
+        def close(self):
+            state["closed"] = True
+
+    monkeypatch.setattr("utils.db._open_connection", lambda database: FakeConn())
+
+    res = ss.apply_clone(
+        "NelsonH4L",
+        standard="Nelson H4L",
+        material="Mild Steel",
+        source_diameter=10.0,
+        target_diameter=12.0,
+        lengths="30, 35",
+        scale_geometry=True,
+    )
+    assert res["ok"] is True
+    assert res["status"] == "applied"
+    assert res["total_inserted"] == 5
+    assert res["inserted"] == {
+        "ConnectorDiameters": 1,
+        "ConnectorDistances": 1,
+        "ConnectorRelations": 1,
+        "SetBolts": 2,
+    }
+    assert state == {"committed": True, "rolled_back": False, "closed": True}
+    assert "INSERT INTO [ConnectorDiameters]" in executed[0][0]
+    assert "INSERT INTO [ConnectorDistances]" in executed[1][0]
+    assert "INSERT INTO [ConnectorRelations]" in executed[2][0]
+    assert "INSERT INTO [SetBolts]" in executed[3][0]
+    assert "INSERT INTO [SetBolts]" in executed[4][0]
+
+
+def test_apply_clone_rolls_back_on_sql_error(monkeypatch):
+    shape = nelson_shape()
+    table_rows = {
+        "ConnectorStandard": shape["standards"],
+        "ConnectorMaterial": shape["materials"],
+        "ConnectorDiameters": shape["diameters"],
+        "ConnectorDistances": shape["distances"],
+        "ConnectorRelations": shape["relations"],
+        "SetBolts": shape["studs"],
+    }
+    monkeypatch.setattr("utils.db.list_tables", lambda database: list(table_rows))
+    monkeypatch.setattr("utils.db.get_rows", lambda database, table, limit=1000: table_rows[table])
+
+    state = {"committed": False, "rolled_back": False, "closed": False}
+
+    class BoomCursor:
+        def execute(self, sql, params=None):
+            if "SetBolts" in sql:
+                raise RuntimeError("disk full")
+
+    class FakeConn:
+        def cursor(self):
+            return BoomCursor()
+
+        def commit(self):
+            state["committed"] = True
+
+        def rollback(self):
+            state["rolled_back"] = True
+
+        def close(self):
+            state["closed"] = True
+
+    monkeypatch.setattr("utils.db._open_connection", lambda database: FakeConn())
+
+    with pytest.raises(RuntimeError, match="disk full"):
+        ss.apply_clone(
+            "NelsonH4L",
+            standard="Nelson H4L",
+            material="Mild Steel",
+            source_diameter=10.0,
+            target_diameter=12.0,
+            lengths="30",
+        )
+    assert state == {"committed": False, "rolled_back": True, "closed": True}
+
+
+def test_apply_clone_refuses_invalid_plan_before_opening_connection(monkeypatch):
+    shape = nelson_shape()
+    table_rows = {
+        "ConnectorStandard": shape["standards"],
+        "ConnectorMaterial": shape["materials"],
+        "ConnectorDiameters": shape["diameters"],
+        "ConnectorDistances": shape["distances"],
+        "ConnectorRelations": shape["relations"],
+        "SetBolts": shape["studs"],
+    }
+    monkeypatch.setattr("utils.db.list_tables", lambda database: list(table_rows))
+    monkeypatch.setattr("utils.db.get_rows", lambda database, table, limit=1000: table_rows[table])
+    opened = []
+    monkeypatch.setattr("utils.db._open_connection", lambda database: opened.append(database))
+
+    with pytest.raises(ValueError, match="Clone plan has blocking errors"):
+        ss.apply_clone(
+            "NelsonH4L",
+            standard="Nelson H4L",
+            material="Mild Steel",
+            source_diameter=10.0,
+            target_diameter=10.0,  # already exists
+            lengths="30",
+        )
+    assert opened == []
+
+
+def test_shear_stud_catalog_template_registered():
+    from utils.schema_templates import CATALOG_TEMPLATES
+    assert "shear stud" in CATALOG_TEMPLATES
+    tmpl = CATALOG_TEMPLATES["shear stud"]
+    assert tmpl["label"] == "Shear Stud Catalog"
+    ddl = "\n".join(tmpl["tables"])
+    for table in ss.REQUIRED_TABLES:
+        assert f"CREATE TABLE {table}" in ddl

@@ -96,6 +96,43 @@
     </div>
 </details>
 
+<div class="card border-0 shadow-sm mb-3" id="exportChecklist">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>{{ icon('download', 16) }} Pre-export checklist</strong>
+        {% if report.summary.errors == 0 %}
+        <span class="badge bg-success">ready for export review</span>
+        {% else %}
+        <span class="badge bg-danger">{{ report.summary.errors }} blocking error(s)</span>
+        {% endif %}
+    </div>
+    <div class="card-body py-3 small">
+        <ul class="list-unstyled mb-2">
+            <li class="mb-1">
+                <strong>1. Schema &amp; table counts:</strong>
+                {{ report.tables|length }} table(s),
+                {{ report.tables|sum(attribute='rows') }} total row(s)
+                ({{ report.catalog_type or 'unknown' }} catalog).
+            </li>
+            <li class="mb-1">
+                <strong>2. Health findings:</strong>
+                {{ report.summary.errors }} error(s),
+                {{ report.summary.warnings }} warning(s),
+                {{ report.summary.notes }} note(s).
+                {% if report.summary.errors > 0 %}
+                <span class="text-danger">Resolve error findings above before exporting to Advance Steel.</span>
+                {% endif %}
+            </li>
+            <li class="mb-0">
+                <strong>3. Detach &amp; export:</strong>
+                Use <strong>Export a copy</strong> or <strong>Detach &amp; Export</strong> on the
+                <a href="/db/{{ database }}">{{ database }} overview page</a> to write the
+                SQL Server 2019 (version 904) <code>.mdf</code> / <code>_log.ldf</code> pair to
+                <code>catalog_studio/exports/</code> for Advance Steel 2026 Management Tools.
+            </li>
+        </ul>
+    </div>
+</div>
+
 <div class="text-muted small">
     Rules come from the per-type modules: bolt diameter coverage from the documented
     six-table relationship, anchor hardware matching from the configurator's own

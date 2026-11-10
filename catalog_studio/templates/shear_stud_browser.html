@@ -23,6 +23,7 @@
             <a class="btn {% if units == 'in' %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
                href="?{{ {'standard': selections.standard, 'material': selections.material, 'diameter': selections.diameter, 'length': selections.length, 'units': 'in'}|urlencode }}">inch</a>
         </div>
+        <a href="/db/{{ database }}/health#exportChecklist" class="btn btn-sm btn-outline-secondary">{{ icon('health', 14) }} Export checklist</a>
         <a href="/db/{{ database }}/SetBolts" class="btn btn-sm btn-outline-secondary">Raw SetBolts</a>
         <a href="/db/{{ database }}/ConnectorRelations" class="btn btn-sm btn-outline-secondary">Raw ConnectorRelations</a>
     </div>

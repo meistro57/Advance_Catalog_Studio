@@ -35,7 +35,7 @@ Each entry records:
 | --- | --- | --- |
 | A1 | Bolt `Position1..6` semantics | not started |
 | A2 | Anchor `Position` semantics | not started |
-| A3 | Shear-stud clone round trip and `ConnectorRelations.Key` | not started |
+| A3 | Shear-stud clone round trip and `ConnectorRelations.Key` | **pass** across metric (`Nelson H4L`) and imperial (`Nelson H4L-Inch`) AS 2026 exports + SQL Server 2019 round trip (A3.1) |
 | A4 | Drawing-style edit round trip (same-name import) | not started |
 | A5 | `AstorDetailsBase` enum labels in the AS UI | **pass** for dimension point selection, direction, and strategy types via `AstorDetails.mdf` (A5.2) |
 | A6 | Exported `.mdf` / `.ldf` pair imports cleanly | **pass** with Windows-form file paths (A6.10); confirm with an edited export through the app |
@@ -43,10 +43,45 @@ Each entry records:
 
 ## Known results
 
-Nothing has been verified against a live Advance Steel 2026 install in this
-repository yet. The sample catalogs and exports were inspected at the SQL level
-only; that is why the viewers are read-only and why the clone/usage/batch tools
-report instead of applying.
+### A3.1 — Shear-stud schema, `ConnectorRelations.Key`, `SetBolts.Type`, and SQL Server 2019 clone round trip
+
+- Date / operator: 2026-11-10 / Mark Hubrich (`raw_files/Nelson H4L.mdf` metric
+  export and `NELSON_STUDS` / `Nelson H4L-Inch` imperial export from Advance
+  Steel 2026).
+- AS build: Advance Steel 2026 (file version 904).
+- File(s): `raw_files/Nelson H4L.mdf` (`sha256: a918c6a3...`, 31 studs across
+  6 / 10 / 13 / 16 mm) and `NELSON_STUDS.mdf` (`sha256: bd9bf787...`, 75 studs
+  across 1/4" `6.35 mm`, 3/8" `9.525 mm`, 1/2" `12.7 mm`, 5/8" `15.875 mm`).
+- Operation: inspected DDL, primary/unique constraints, `COLUMNPROPERTY(..., 'IsIdentity')`,
+  and row contents across both exports in the SQL Server 2019 scratch container,
+  then created a fresh shear-stud catalog from `CATALOG_TEMPLATES['shear stud']`,
+  applied a multi-table diameter clone (`16.0 -> 19.0 mm`, lengths `40, 50, 60 mm`)
+  via `shear_studs.apply_clone()`, verified `get_browser_model()` and
+  `health.build_report()`, and detached at file version 904.
+- Observed:
+  - **7-table schema identical across both exports:** `ConnectorStandard` (PK `Key`
+    `NVARCHAR(64)`), `ConnectorMaterial` (PK `Key` `NVARCHAR(64)`),
+    `ConnectorDiameters` (PK `Key` `FLOAT`), `ConnectorDistances` (composite PK
+    `Key, HoleTolerance`), `ConnectorRelations` (PK `Key` `INT NOT NULL`,
+    `IsIdentity = 0`), `SetBolts` (composite PK `Standard, Material, Diameter, Length`),
+    and `Sources` (PK `Short` `NVARCHAR(15)`).
+  - **`ConnectorRelations.Key` allocation:** Non-identity `INT NOT NULL` in both
+    exports. In `Nelson H4L` (metric), keys are `1, 2, 3, 4`; in `Nelson H4L-Inch`
+    (imperial), keys are `5, 6, 7, 8`, confirming sequential `max(Key) + 1`
+    allocation across connector standards in `AstorBase.mdf`.
+  - **`SetBolts.Type`:** `2` on all 31 rows of `Nelson H4L` and all 75 rows of
+    `Nelson H4L-Inch` (106 / 106 stud records), vs `1` in bolt catalogs.
+  - **Imperial naming conventions in `Nelson H4L-Inch`:** `ConnectorDiameters.RunName`
+    uses `'   1/4 inch'`, `'   3/8 inch'`, `'   1/2 inch'`, `'   5/8 inch'`;
+    `SetBolts.Name` strips `-Inch` from `Standard` and formats reduced inch
+    fractions (`'Nelson H4L 1/4 x 3/8'`, `'Nelson H4L 1/4 x 1 1/8'`). Also caught
+    6 IEEE-754 near-duplicate length pairs on `12.7 mm` (`38.099999999999994` vs
+    `38.1`, etc.) authored in Autodesk's delivered `Nelson H4L-Inch` table.
+- Verdict: **pass**.
+- Unblocks: **Issue #4 (`TODO` D1, D2, D5)** — transactional clone apply
+  (`/db/<db>/shear-stud-browser/clone-apply`), new-catalog scaffolding
+  (`CATALOG_TEMPLATES['shear stud']`), imperial `RunName` / `Name` support, and
+  the pre-export checklist.
 
 ### A5.1 — Dimension direction and type from a real railing detail
 

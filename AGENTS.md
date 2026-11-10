@@ -210,15 +210,21 @@ transaction after taking a pre-change snapshot.
   live through `POST /db/<db>/drawing-style/diagram`, which reuses the same
   builders so there is one geometry implementation (no JS twin). Keep the
   "unverified" notes in the figures when touching them.
-- `catalog_studio/utils/shear_studs.py` — read-only shear-stud (connector)
-  browser model: metric display parsing/formatting, stud name convention,
+- `catalog_studio/utils/shear_studs.py` — shear-stud (connector) browser and
+  clone engine (issue #4): metric and imperial (`Nelson H4L` / `Nelson H4L-Inch`)
+  display parsing/formatting (`parse_metric_run_name`, `parse_imperial_run_name`),
+  stud name conventions (`expected_stud_name`, `expected_imperial_stud_name`),
   per-record geometry and weight sanity checks (`weight_implausible`,
   `weight_non_monotonic`, `duplicate_stud_name`, `invalid_distance_rule`,
   `orphan_distance`), per-(standard, material, diameter) grouping with the
   documented completeness rules, per-record detail panel (`stud_detail`) and 2D
   schematic SVG elevation (`stud_svg`) with composite-PK `SetBolts` row tokens,
-  filtering and summaries. Pure helpers are unit-tested; `get_browser_model()`
-  is the only SQL (reads `Connector*` + `SetBolts`). Nothing here writes.
+  filtering, summaries, preview (`plan_clone`) and single-transaction clone apply
+  (`apply_clone`, route `POST /db/<db>/shear-stud-browser/clone-apply` after
+  `snapshots.create_snapshot()`). Pure helpers are unit-tested;
+  `get_browser_model()` reads `Connector*` + `SetBolts`, and `apply_clone()`
+  writes in parent-before-child order (`ConnectorDiameters` ->
+  `ConnectorDistances` -> `ConnectorRelations` -> `SetBolts`).
   Display units are presentation-only:
   `normalize_units()` / `format_dimension()` keep storage in millimetres and
   render inches through `fabrication.format_in` (nearest 1/16 in, reduced

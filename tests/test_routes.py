@@ -270,6 +270,87 @@ def test_shear_stud_clone_preview_uses_requested_units(monkeypatch):
     assert "≈ 1/4 in" in body
     assert "≈ 5/16 in" in body
     assert "stored values (millimetres)" in body
+    assert 'id="applyCloneCard"' in body
+
+
+def test_shear_stud_clone_apply_creates_snapshot_and_applies(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")
+    monkeypatch.setattr("utils.shear_studs.get_browser_model",
+                        lambda database: _fake_shear_stud_model())
+    events = []
+    monkeypatch.setattr(
+        "utils.snapshots.create_snapshot",
+        lambda database, reason: events.append(("snapshot", database, reason)) or {"filename": "snap.bak"},
+    )
+    monkeypatch.setattr(
+        "utils.shear_studs.apply_clone",
+        lambda database, **kwargs: events.append(("apply", database, kwargs["target_diameter"])) or {
+            "status": "applied",
+            "ok": True,
+            "total_inserted": 4,
+            "inserted": {
+                "ConnectorDiameters": 1,
+                "ConnectorDistances": 1,
+                "ConnectorRelations": 1,
+                "SetBolts": 1,
+            },
+        },
+    )
+    client = app.test_client()
+    client.get("/")
+    with client.session_transaction() as sess:
+        token = sess["_csrf"]
+    resp = client.post(
+        "/db/NelsonH4L/shear-stud-browser/clone-apply",
+        data={
+            "csrf_token": token,
+            "standard": "Nelson H4L",
+            "material": "Mild Steel",
+            "source_diameter": "6",
+            "target_diameter": "8",
+            "lengths": "20",
+            "scale_geometry": "on",
+            "units": "mm",
+        },
+    )
+    assert resp.status_code == 302
+    assert "/db/NelsonH4L/shear-stud-browser" in resp.headers["Location"]
+    assert [e[0] for e in events] == ["snapshot", "apply"]
+
+
+def test_shear_stud_clone_apply_aborts_when_snapshot_fails(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")
+    monkeypatch.setattr("utils.shear_studs.get_browser_model",
+                        lambda database: _fake_shear_stud_model())
+
+    def fail_snap(database, reason):
+        raise RuntimeError("backup failed")
+
+    applied = []
+    monkeypatch.setattr("utils.snapshots.create_snapshot", fail_snap)
+    monkeypatch.setattr("utils.shear_studs.apply_clone", lambda *a, **k: applied.append(1))
+
+    client = app.test_client()
+    client.get("/")
+    with client.session_transaction() as sess:
+        token = sess["_csrf"]
+    resp = client.post(
+        "/db/NelsonH4L/shear-stud-browser/clone-apply",
+        data={
+            "csrf_token": token,
+            "standard": "Nelson H4L",
+            "material": "Mild Steel",
+            "source_diameter": "6",
+            "target_diameter": "8",
+            "lengths": "20",
+            "scale_geometry": "on",
+        },
+    )
+    assert resp.status_code == 200
+    assert "Pre-change snapshot failed" in resp.get_data(as_text=True)
+    assert applied == []
 
 
 # --- catalog health report --------------------------------------------------

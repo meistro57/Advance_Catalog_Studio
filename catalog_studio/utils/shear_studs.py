@@ -51,6 +51,12 @@ ROW_LIMIT = 5000
 
 _TOLERANCE = 1e-6
 _METRIC_RUN_NAME = re.compile(r"^\s*(?P<value>\d+(?:\.\d+)?)\s*(?:mm)?\s*$", re.IGNORECASE)
+_IMPERIAL_RUN_NAME = re.compile(
+    r'^\s*(?:(?P<whole>\d+)\s+(?P<num>\d+)\s*/\s*(?P<den>\d+)'
+    r'|(?P<fnum>\d+)\s*/\s*(?P<fden>\d+)'
+    r'|(?P<only>\d+))\s*(?:in|inch|inches|")\s*$',
+    re.IGNORECASE,
+)
 
 
 # --------------------------------------------------------------------------
@@ -118,12 +124,46 @@ def expected_stud_name(standard, diameter, length):
     return f"{str(standard or '').strip()} {number_text(diameter)} x {number_text(length)}".strip()
 
 
+def expected_imperial_stud_name(standard, diameter, length):
+    """Imperial stud name convention observed in Nelson H4L-Inch ('Nelson H4L 1/4 x 1 1/8')."""
+    d_val = to_float(diameter)
+    l_val = to_float(length)
+    if d_val is None or l_val is None or d_val <= 0 or l_val <= 0:
+        return ""
+    d_in = fabrication.format_in(d_val).replace("≈", "").strip()
+    l_in = fabrication.format_in(l_val).replace("≈", "").strip()
+    std = re.sub(r"-Inch$", "", str(standard or "").strip(), flags=re.IGNORECASE).strip()
+    return f"{std} {d_in} x {l_in}".strip()
+
+
 def parse_metric_run_name(text):
     """Parse a metric diameter display string (' 10.00 mm', '16 mm', '6.0')."""
     if text is None:
         return None
     match = _METRIC_RUN_NAME.match(str(text))
     return float(match.group("value")) if match else None
+
+
+def parse_imperial_run_name(text):
+    """Parse an imperial diameter display string ('   1/4 inch', ' 1 1/4 inch') into mm."""
+    if text is None:
+        return None
+    match = _IMPERIAL_RUN_NAME.match(str(text))
+    if not match:
+        return None
+    if match.group("only") is not None:
+        inches = float(match.group("only"))
+    elif match.group("fnum") is not None:
+        den = int(match.group("fden"))
+        if den == 0:
+            return None
+        inches = int(match.group("fnum")) / den
+    else:
+        den = int(match.group("den"))
+        if den == 0:
+            return None
+        inches = int(match.group("whole")) + (int(match.group("num")) / den)
+    return inches * 25.4
 
 
 def format_metric_run_name(diameter):
@@ -165,6 +205,15 @@ def run_name_issue(diameter_row):
         return None
     parsed = parse_metric_run_name(run_name)
     if parsed is None:
+        imp_mm = parse_imperial_run_name(run_name)
+        if imp_mm is not None:
+            if not same_number(imp_mm, key):
+                return issue(
+                    "error", "run_name_mismatch",
+                    f"ConnectorDiameters.RunName {run_name!r} disagrees with Key {number_text(key)} mm.",
+                    CONNECTOR_DIAMETERS, diameter=key, run_name=run_name,
+                )
+            return None
         return issue(
             "warn", "run_name_unparsed",
             f"ConnectorDiameters.RunName {run_name!r} is not a metric diameter string.",
@@ -247,7 +296,9 @@ def validate_stud(stud):
                 STUDS, diameter=diameter, length=length, weight=weight,
             ))
     expected = expected_stud_name(stud.get("standard"), diameter, length)
-    if stud.get("name") and expected and stud["name"] != expected:
+    expected_imp = expected_imperial_stud_name(stud.get("standard"), diameter, length)
+    valid_names = {n for n in (expected, expected_imp) if n}
+    if stud.get("name") and valid_names and stud["name"] not in valid_names:
         issues.append(issue(
             "warn", "name_mismatch",
             f"Stud name {stud['name']!r} does not follow the observed convention "
@@ -1274,4 +1325,123 @@ def get_browser_model(database):
         "options": filter_options(groups),
         "diameter_keys": sorted(_diameter_index(diameter_rows)),
         "relation_keys": [to_int(r.get("Key")) for r in relation_rows],
+    }
+
+
+def apply_clone(database, standard, material, source_diameter, target_diameter,
+                lengths, scale_geometry=True, along=None, across=None,
+                hole_tolerance=None):
+    """Apply a verified shear-stud diameter clone in one SQL transaction (D1).
+
+    Re-reads the catalog and re-runs `plan_clone()` on the server before opening
+    a transaction, so browser parameters are never trusted directly. Inserts into
+    `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`, and
+    `SetBolts` in parent-before-child order and rolls back on any error.
+    """
+    model = get_browser_model(database)
+    plan = plan_clone(
+        model["groups"],
+        model["relation_keys"],
+        model["diameter_keys"],
+        standard=standard,
+        material=material,
+        source_diameter=source_diameter,
+        target_diameter=target_diameter,
+        lengths=lengths,
+        scale_geometry=scale_geometry,
+        along=along,
+        across=across,
+        hole_tolerance=hole_tolerance,
+    )
+    if not plan["ok"]:
+        err_msgs = [i["message"] for i in plan["issues"] if i["severity"] == "error"]
+        raise ValueError(
+            "Clone plan has blocking errors: " + "; ".join(err_msgs or ["invalid clone parameters"])
+        )
+
+    tables_by_name = {t["table"]: t["rows"] for t in plan["tables"]}
+    inserted = {
+        CONNECTOR_DIAMETERS: 0,
+        CONNECTOR_DISTANCES: 0,
+        CONNECTOR_RELATIONS: 0,
+        STUDS: 0,
+    }
+
+    conn = dbcore._open_connection(database)
+    try:
+        cur = conn.cursor()
+        for row in tables_by_name.get(CONNECTOR_DIAMETERS, []):
+            cur.execute(
+                "INSERT INTO [ConnectorDiameters] ([Key], [RunName], [Description]) "
+                "VALUES (%s, %s, %s)",
+                (row["Key"], row["RunName"], row.get("Description")),
+            )
+            inserted[CONNECTOR_DIAMETERS] += 1
+
+        for row in tables_by_name.get(CONNECTOR_DISTANCES, []):
+            cur.execute(
+                "INSERT INTO [ConnectorDistances] "
+                "([Key], [HoleTolerance], [along], [across], [Description]) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (
+                    row["Key"],
+                    row["HoleTolerance"],
+                    row.get("along"),
+                    row.get("across"),
+                    row.get("Description"),
+                ),
+            )
+            inserted[CONNECTOR_DISTANCES] += 1
+
+        for row in tables_by_name.get(CONNECTOR_RELATIONS, []):
+            cur.execute(
+                "INSERT INTO [ConnectorRelations] "
+                "([Key], [ConnectorStandard], [ConnectorMaterial], [ConnectorDiameter]) "
+                "VALUES (%s, %s, %s, %s)",
+                (
+                    row["Key"],
+                    row["ConnectorStandard"],
+                    row["ConnectorMaterial"],
+                    row["ConnectorDiameter"],
+                ),
+            )
+            inserted[CONNECTOR_RELATIONS] += 1
+
+        for row in tables_by_name.get(STUDS, []):
+            cur.execute(
+                "INSERT INTO [SetBolts] "
+                "([Standard], [Material], [Diameter], [Length], "
+                "[ScrewHeadOuterDiameter], [HeadHeight], [NumberOfCorners], "
+                "[Name], [Weight], [OwnerText], [Source], [Type]) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    row["Standard"],
+                    row["Material"],
+                    row["Diameter"],
+                    row["Length"],
+                    row.get("ScrewHeadOuterDiameter"),
+                    row.get("HeadHeight"),
+                    row.get("NumberOfCorners"),
+                    row.get("Name"),
+                    row.get("Weight"),
+                    row.get("OwnerText"),
+                    row.get("Source"),
+                    row.get("Type"),
+                ),
+            )
+            inserted[STUDS] += 1
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {
+        "status": "applied",
+        "ok": True,
+        "plan": plan,
+        "inserted": inserted,
+        "total_inserted": sum(inserted.values()),
     }
