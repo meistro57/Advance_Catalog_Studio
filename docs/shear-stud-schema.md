@@ -87,12 +87,18 @@ in Advance Steel is therefore believed to be:
   `error` (record set broken: missing lookup/diameter/distance/relation row,
   no lengths, duplicate relation or stud, head not larger than the shank,
   name or `RunName` disagreeing with the key), `warn` (name off the observed
-  convention, unparseable `RunName`, orphan lookup row, non-positive head
-  height) or `info` (`RunName` spacing kept as authored, zero stud weight).
+  convention, duplicate display `Name` across stud records, unparseable `RunName`,
+  orphan lookup or distance row, non-positive head height, invalid distance rule,
+  implausible steel weight vs `(d²·l)`, or non-monotonic weight across lengths)
+  or `info` (`RunName` spacing kept as authored, zero stud weight).
   Nothing is repaired and nothing is written.
 - `/db/<db>/shear-stud-browser` renders family → grade → diameter cards with
   the authored `RunName`, the hole rule, length chips, the stud table and the
-  validation findings, and links every value back to its raw table.
+  validation findings, links every value back to its raw table, and opens a
+  per-record **Stud Record Detail** panel (`stud_detail` / `stud_svg`) with a
+  2D schematic SVG elevation, source table/column traceability, and a
+  composite-PK raw-row link (`/db/<db>/SetBolts/edit/<token>`) when a stud
+  length is selected.
 - The bolt-diameter clone route refuses these catalogs (its engine copies
   `BoltsDiameters`/`SetOfBolts`/`ScrewNew` rows they do not have) and the
   dashboard hides that button; a stud clone workflow waits on verification.

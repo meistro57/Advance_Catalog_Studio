@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 547 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 553 tests; read-only bolt/anchor/stud/style views,
 the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; the
 home dashboard is split into Fastener Management and Drawing Style Management
 realms with distinct colour palettes (issue #20); both the Bolt-Set Viewer and
@@ -289,3 +289,7 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   added interactive anchor bolt projection control with a `4"` typical preset
   (issue #19), and added fractional-inch / `mm` dimension display toggles across
   both the Bolt-Set Viewer and Anchor Configurator (issue #18, 547 tests).
+- [x] Shear-stud per-record detail panel (`stud_detail`, `stud_svg`, composite-PK
+  `SetBolts` row links) and deeper validation (`duplicate_stud_name`,
+  `weight_implausible`, `weight_non_monotonic`, `invalid_distance_rule`,
+  `orphan_distance`, issue #4 D3/D4, 553 tests).
