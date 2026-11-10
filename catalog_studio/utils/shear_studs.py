@@ -20,8 +20,11 @@ completeness rules and filtering are unit-tested without a database. The SQL
 helpers at the bottom only read.
 """
 
+import html
+import math
 import re
 from collections import defaultdict
+from urllib.parse import urlencode
 
 from utils import db as dbcore
 from utils import fabrication
@@ -225,6 +228,24 @@ def validate_stud(stud):
             "Stud weight is zero; mass properties will be empty in Advance Steel.",
             STUDS, diameter=diameter, length=length,
         ))
+    elif (
+        weight is not None
+        and weight > 0
+        and diameter is not None
+        and diameter > 0
+        and length is not None
+        and length > 0
+    ):
+        shank_mass_kg = (math.pi / 4.0) * (diameter ** 2) * length * 7.85e-6
+        ratio = weight / shank_mass_kg if shank_mass_kg > 0 else 1.0
+        if ratio < 0.03 or ratio > 15.0:
+            issues.append(issue(
+                "warn", "weight_implausible",
+                f"Stud weight {number_text(weight)} kg is outside the plausible "
+                f"steel mass range for Ø{number_text(diameter)} × {number_text(length)} mm "
+                f"(shank cylinder ≈ {shank_mass_kg:.4f} kg).",
+                STUDS, diameter=diameter, length=length, weight=weight,
+            ))
     expected = expected_stud_name(stud.get("standard"), diameter, length)
     if stud.get("name") and expected and stud["name"] != expected:
         issues.append(issue(
@@ -258,6 +279,23 @@ def normalize_stud(row):
         "owner": row.get("OwnerText"),
         "type": to_int(row.get("Type")),
     }
+    if (
+        stud["standard"]
+        and stud["material"]
+        and stud["diameter"] is not None
+        and stud["length"] is not None
+    ):
+        stud["row_token"] = dbcore.make_row_token(
+            {
+                "Standard": stud["standard"],
+                "Material": stud["material"],
+                "Diameter": stud["diameter"],
+                "Length": stud["length"],
+            },
+            ["Standard", "Material", "Diameter", "Length"],
+        )
+    else:
+        stud["row_token"] = None
     stud["issues"] = validate_stud(stud)
     stud["has_errors"] = has_errors(stud["issues"])
     return stud
@@ -328,6 +366,8 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
     studs_by_triple = defaultdict(list)
     duplicate_studs = []
     seen_studs = set()
+    seen_names = {}
+    duplicate_names = []
     for row in stud_rows:
         diameter = to_float(row.get("Diameter"))
         length = to_float(row.get("Length"))
@@ -340,6 +380,13 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
         if key in seen_studs:
             duplicate_studs.append(key)
         seen_studs.add(key)
+        name = stud.get("name")
+        if name:
+            prev_key = seen_names.get(name)
+            if prev_key is not None and prev_key != key and name not in duplicate_names:
+                duplicate_names.append(name)
+            else:
+                seen_names[name] = key
 
     global_issues = []
     for triple, _ in duplicate_studs:
@@ -349,6 +396,12 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
             f"Duplicate stud row for {standard} / {material} / "
             f"{number_text(diameter)} mm.",
             STUDS, standard=standard, material=material, diameter=diameter,
+        ))
+    for name in duplicate_names:
+        global_issues.append(issue(
+            "warn", "duplicate_stud_name",
+            f"Stud display name {name!r} is shared by multiple stud records.",
+            STUDS, name=name,
         ))
 
     triples = set(relations_by_triple) | set(studs_by_triple)
@@ -399,6 +452,23 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
                 f"{number_text(diameter)} mm.",
                 CONNECTOR_DISTANCES, diameter=diameter,
             ))
+        else:
+            for r in distance_rows:
+                along_v = to_float(r.get("along"))
+                across_v = to_float(r.get("across"))
+                tol_v = to_float(r.get("HoleTolerance"))
+                if (
+                    (along_v is not None and along_v <= 0)
+                    or (across_v is not None and across_v <= 0)
+                    or (tol_v is not None and tol_v < 0)
+                ):
+                    issues.append(issue(
+                        "warn", "invalid_distance_rule",
+                        f"{CONNECTOR_DISTANCES} rule for {number_text(diameter)} mm "
+                        f"has non-positive spacing or negative hole tolerance.",
+                        CONNECTOR_DISTANCES, diameter=diameter,
+                    ))
+                    break
         if not relation_rows:
             issues.append(issue(
                 "error", "missing_relation",
@@ -426,6 +496,24 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
                 f"{STUDS} lengths, so Advance Steel has nothing to list.",
                 STUDS, diameter=diameter,
             ))
+        else:
+            prev_len = None
+            prev_wt = None
+            for s in studs:
+                wt = s.get("weight")
+                ln = s.get("length")
+                if wt is not None and wt > 0 and ln is not None and ln > 0:
+                    if prev_wt is not None and wt < prev_wt - 1e-6:
+                        issues.append(issue(
+                            "warn", "weight_non_monotonic",
+                            f"Stud weights in {standard} / {material} / "
+                            f"{number_text(diameter)} mm decrease as length increases "
+                            f"({number_text(prev_len)} mm -> {number_text(ln)} mm).",
+                            STUDS, diameter=diameter, length=ln,
+                        ))
+                        break
+                    prev_len = ln
+                    prev_wt = wt
 
         groups.append({
             "standard": standard,
@@ -476,6 +564,14 @@ def build_groups(standards, materials, diameters, distances, relations, stud_row
                 f"{CONNECTOR_DIAMETERS} row {number_text(key)} mm has no relations "
                 f"or studs.",
                 CONNECTOR_DIAMETERS, diameter=key,
+            ))
+    for key in sorted(distances_index):
+        if key not in used_diameters:
+            global_issues.append(issue(
+                "warn", "orphan_distance",
+                f"{CONNECTOR_DISTANCES} row for {number_text(key)} mm has no "
+                f"relations or studs.",
+                CONNECTOR_DISTANCES, diameter=key,
             ))
 
     return {"groups": groups, "issues": global_issues}
@@ -594,6 +690,253 @@ def filter_options(groups):
         "materials": sorted({g["material"] for g in groups}),
         "diameters": sorted({g["diameter"] for g in groups if g["diameter"] is not None}),
         "lengths": sorted({s["length"] for g in groups for s in g["studs"] if s["length"] is not None}),
+    }
+
+
+# --------------------------------------------------------------------------
+# Per-record stud detail & schematic SVG (D3)
+# --------------------------------------------------------------------------
+
+def _esc(value):
+    return html.escape("" if value is None else str(value), quote=False)
+
+
+def stud_svg(stud, group=None, units="mm"):
+    """Schematic 2D elevation SVG of one headed shear stud."""
+    stud = stud or {}
+    group = group or {}
+    u = normalize_units(units)
+    d = max(to_float(stud.get("diameter")) or 0.0, 0.0)
+    l_mm = max(to_float(stud.get("length")) or 0.0, 0.0)
+    hd = max(to_float(stud.get("head_diameter")) or (d * 2.0), 0.0)
+    hh = max(to_float(stud.get("head_height")) or (d * 0.5), 0.0)
+    total = l_mm + hh
+    if d <= 0 or l_mm <= 0:
+        return (
+            '<svg class="stud-svg" viewBox="0 0 540 80" role="img" '
+            'aria-label="Shear stud schematic" xmlns="http://www.w3.org/2000/svg">'
+            '<text x="12" y="42" fill="#64748b" font-size="12" font-family="system-ui, sans-serif">'
+            "Insufficient stud geometry to draw elevation.</text></svg>"
+        )
+
+    draw_w = 340.0
+    max_h = 90.0
+    scale = min(draw_w / max(total, 1.0), max_h / max(hd, d, 1.0))
+    head_w_px = max(hh * scale, 10.0)
+    head_h_px = max(hd * scale, 18.0)
+    shank_w_px = max(l_mm * scale, 24.0)
+    shank_h_px = max(d * scale, 8.0)
+
+    x0 = 40.0
+    cy = 72.0
+    x_neck = x0 + head_w_px
+    x_tip = x_neck + shank_w_px
+
+    title = _esc(stud.get("name") or expected_stud_name(stud.get("standard"), d, l_mm))
+    dim_shank = _esc(f"length {format_dimension(l_mm, u)}")
+    dim_dia = _esc(f"shank Ø {format_dimension(d, u)}")
+    dim_head = _esc(
+        f"head Ø {format_dimension(stud.get('head_diameter'), u)} × "
+        f"{format_dimension(stud.get('head_height'), u)}"
+    )
+    rules = group.get("distances") or []
+    rule_txt = ""
+    if rules:
+        r0 = rules[0]
+        rule_txt = _esc(
+            f"hole spacing: along {format_dimension(r0.get('along'), u)} × "
+            f"across {format_dimension(r0.get('across'), u)} "
+            f"(tol {format_dimension(r0.get('hole_tolerance'), u)})"
+        )
+
+    parts = [
+        f'<svg class="stud-svg" viewBox="0 0 540 185" role="img" '
+        f'aria-label="Shear stud elevation: {title}" xmlns="http://www.w3.org/2000/svg" '
+        f'style="width:100%;height:auto;max-width:560px;display:block">',
+        f'<text x="16" y="20" fill="#1e293b" font-size="12.5" font-weight="700" '
+        f'font-family="system-ui, sans-serif">{title}</text>',
+        f'<line x1="{x0 - 12:.1f}" y1="{cy:.1f}" x2="{x_tip + 16:.1f}" y2="{cy:.1f}" '
+        f'stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,3"/>',
+        f'<rect x="{x0:.1f}" y="{cy - head_h_px / 2:.1f}" width="{head_w_px:.1f}" '
+        f'height="{head_h_px:.1f}" rx="2" fill="#5c6f83" stroke="#334155" stroke-width="1.2"/>',
+        f'<rect x="{x_neck:.1f}" y="{cy - shank_h_px / 2:.1f}" width="{shank_w_px:.1f}" '
+        f'height="{shank_h_px:.1f}" fill="#8fa3b8" stroke="#334155" stroke-width="1.2"/>',
+        # Shank length dimension bracket
+        f'<line x1="{x_neck:.1f}" y1="{cy + head_h_px / 2 + 10:.1f}" '
+        f'x2="{x_neck:.1f}" y2="{cy + head_h_px / 2 + 18:.1f}" stroke="#475569" stroke-width="1"/>',
+        f'<line x1="{x_tip:.1f}" y1="{cy + head_h_px / 2 + 10:.1f}" '
+        f'x2="{x_tip:.1f}" y2="{cy + head_h_px / 2 + 18:.1f}" stroke="#475569" stroke-width="1"/>',
+        f'<line x1="{x_neck:.1f}" y1="{cy + head_h_px / 2 + 14:.1f}" '
+        f'x2="{x_tip:.1f}" y2="{cy + head_h_px / 2 + 14:.1f}" stroke="#475569" stroke-width="1"/>',
+        f'<text x="{(x_neck + x_tip) / 2:.1f}" y="{cy + head_h_px / 2 + 27:.1f}" '
+        f'text-anchor="middle" fill="#1e293b" font-size="11" font-weight="600" '
+        f'font-family="system-ui, sans-serif">{dim_shank}</text>',
+        # Metadata notes
+        f'<text x="16" y="148" fill="#334155" font-size="11" '
+        f'font-family="system-ui, sans-serif">{dim_dia} · {dim_head}</text>',
+    ]
+    if rule_txt:
+        parts.append(
+            f'<text x="16" y="163" fill="#475569" font-size="10.5" '
+            f'font-family="system-ui, sans-serif">{rule_txt}</text>'
+        )
+    parts.append(
+        '<text x="16" y="178" fill="#64748b" font-size="9.5" '
+        'font-family="system-ui, sans-serif">'
+        "Schematic from observed SetBolts + Connector* records; not round-trip verified.</text>"
+    )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def stud_detail(database, groups, standard=None, material=None, diameter=None,
+                length=None, units="mm"):
+    """Build a per-record inspection model with source-table traceability and SVG."""
+    u = normalize_units(units)
+    dia_val = to_float(diameter)
+    len_val = to_float(length)
+
+    matched_group = None
+    matched_stud = None
+    if len_val is not None:
+        for g in groups:
+            if standard and g["standard"] != standard:
+                continue
+            if material and g["material"] != material:
+                continue
+            if dia_val is not None and not same_number(g["diameter"], dia_val):
+                continue
+            for s in g["studs"]:
+                if same_number(s["length"], len_val):
+                    matched_group = g
+                    matched_stud = s
+                    break
+            if matched_stud is not None:
+                break
+
+    if matched_stud is None or matched_group is None:
+        return None
+
+    stud_row_url = (
+        f"/db/{database}/{STUDS}/edit/{matched_stud['row_token']}"
+        if matched_stud.get("row_token")
+        else f"/db/{database}/{STUDS}?{urlencode({'filter_col': 'Diameter', 'filter_val': matched_stud['diameter']})}"
+    )
+    std_url = (
+        f"/db/{database}/{CONNECTOR_STANDARD}?"
+        f"{urlencode({'filter_col': 'Key', 'filter_val': matched_group['standard']})}"
+    )
+    mat_url = (
+        f"/db/{database}/{CONNECTOR_MATERIAL}?"
+        f"{urlencode({'filter_col': 'Key', 'filter_val': matched_group['material']})}"
+    )
+    dia_url = (
+        f"/db/{database}/{CONNECTOR_DIAMETERS}?"
+        f"{urlencode({'filter_col': 'Key', 'filter_val': matched_group['diameter']})}"
+    )
+    dist_url = (
+        f"/db/{database}/{CONNECTOR_DISTANCES}?"
+        f"{urlencode({'filter_col': 'Key', 'filter_val': matched_group['diameter']})}"
+    )
+    rel_url = (
+        f"/db/{database}/{CONNECTOR_RELATIONS}?"
+        f"{urlencode({'filter_col': 'ConnectorDiameter', 'filter_val': matched_group['diameter']})}"
+    )
+
+    rule = (matched_group.get("distances") or [{}])[0]
+    traceability = [
+        {
+            "label": "Display name",
+            "value": matched_stud.get("name") or "—",
+            "table": STUDS,
+            "column": "Name",
+            "url": stud_row_url,
+        },
+        {
+            "label": "Family / standard",
+            "value": f"{matched_group['standard']} ({matched_group['standard_run_name']})",
+            "table": f"{STUDS} → {CONNECTOR_STANDARD}",
+            "column": "Standard / Key",
+            "url": std_url,
+        },
+        {
+            "label": "Grade / material",
+            "value": f"{matched_group['material']} ({matched_group['material_run_name']})",
+            "table": f"{STUDS} → {CONNECTOR_MATERIAL}",
+            "column": "Material / Key",
+            "url": mat_url,
+        },
+        {
+            "label": "Nominal diameter",
+            "value": f"{format_dimension(matched_stud.get('diameter'), u)} (RunName: {matched_group['diameter_display']!r})",
+            "table": f"{STUDS} → {CONNECTOR_DIAMETERS}",
+            "column": "Diameter / Key",
+            "url": dia_url,
+        },
+        {
+            "label": "Overall length",
+            "value": format_dimension(matched_stud.get("length"), u),
+            "table": STUDS,
+            "column": "Length",
+            "url": stud_row_url,
+        },
+        {
+            "label": "Head geometry",
+            "value": (
+                f"{format_dimension(matched_stud.get('head_diameter'), u)} × "
+                f"{format_dimension(matched_stud.get('head_height'), u)} "
+                f"({'round' if not matched_stud.get('corners') else str(matched_stud.get('corners')) + '-sided'})"
+            ),
+            "table": STUDS,
+            "column": "ScrewHeadOuterDiameter, HeadHeight, NumberOfCorners",
+            "url": stud_row_url,
+        },
+        {
+            "label": "Stud weight",
+            "value": f"{matched_stud['weight']} kg" if matched_stud.get("weight") is not None else "—",
+            "table": STUDS,
+            "column": "Weight",
+            "url": stud_row_url,
+        },
+        {
+            "label": "Hole / spacing rule",
+            "value": (
+                f"along {format_dimension(rule.get('along'), u)} × "
+                f"across {format_dimension(rule.get('across'), u)} "
+                f"(tol {format_dimension(rule.get('hole_tolerance'), u)})"
+                if rule else "missing"
+            ),
+            "table": CONNECTOR_DISTANCES,
+            "column": "along, across, HoleTolerance",
+            "url": dist_url,
+        },
+        {
+            "label": "Relation key(s)",
+            "value": ", ".join(str(k) for k in matched_group.get("relation_keys") or []) or "missing",
+            "table": CONNECTOR_RELATIONS,
+            "column": "Key (ConnectorStandard, ConnectorMaterial, ConnectorDiameter)",
+            "url": rel_url,
+        },
+        {
+            "label": "Source / owner / Type",
+            "value": (
+                f"Source={matched_stud.get('source') or '—'}, "
+                f"OwnerText={matched_stud.get('owner') or '—'}, "
+                f"Type={matched_stud.get('type') if matched_stud.get('type') is not None else '—'} (observed)"
+            ),
+            "table": STUDS,
+            "column": "Source, OwnerText, Type",
+            "url": stud_row_url,
+        },
+    ]
+
+    return {
+        "stud": matched_stud,
+        "group": matched_group,
+        "svg": stud_svg(matched_stud, matched_group, units=u),
+        "raw_row_url": stud_row_url,
+        "traceability": traceability,
+        "issues": list(matched_group.get("issues") or []) + list(matched_stud.get("issues") or []),
     }
 
 

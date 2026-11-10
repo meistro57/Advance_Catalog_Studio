@@ -114,11 +114,15 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [ ] **D2 (`[!]` A3) — New-catalog scaffolding.** Add a `shear stud` entry to
   `CATALOG_TEMPLATES` only when the schema template is verified; include seed
   lookups and the minimum record set from `docs/shear-stud-schema.md`.
-- [ ] **D3 — Per-record detail.** Open one stud from the browser as a detail
-  panel (like the anchor viewer) with raw-row links and its issue list.
-- [ ] **D4 — Validation depth.** Duplicate names across families, distance-rule
-  coverage per diameter, weight sanity vs `(d²·l)` ratio, and a warning when a
-  family has no `ConnectorDistances` row.
+- [x] **D3 — Per-record detail.** Open one stud from the browser as a detail
+  panel (`#studDetailCard`) with a dimensioned 2D schematic SVG elevation,
+  source table/column traceability, raw-row links (`/db/<db>/SetBolts/edit/<token>`),
+  and its issue list.
+- [x] **D4 — Validation depth.** Duplicate stud display names across the catalog
+  (`duplicate_stud_name`), invalid/orphan `ConnectorDistances` rules
+  (`invalid_distance_rule`, `orphan_distance`), weight sanity vs `(d²·l)` steel
+  mass (`weight_implausible`), and non-monotonic weights across lengths
+  (`weight_non_monotonic`).
 - [ ] **D5 — Export checklist page.** One page per catalog: counts, open
   findings, "detach & export" reminder; reuse the health report data.
 

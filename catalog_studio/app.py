@@ -800,6 +800,15 @@ def shear_stud_browser(database):
         length=filters["length"],
     )
     issues = shear_studs.collect_issues(groups, model["global_issues"])
+    detail = shear_studs.stud_detail(
+        database,
+        groups,
+        standard=selections["standard"] or None,
+        material=selections["material"] or None,
+        diameter=filters["diameter"],
+        length=filters["length"],
+        units=units,
+    )
 
     return render_template(
         "shear_stud_browser.html",
@@ -812,6 +821,7 @@ def shear_stud_browser(database):
         selections=selections,
         units=units,
         number_text=shear_studs.number_text,
+        stud_detail=detail,
     )
 
 

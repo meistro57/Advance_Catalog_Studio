@@ -176,6 +176,20 @@ def test_shear_stud_browser_applies_length_filter(monkeypatch):
     assert "No studs match the current filters." in resp.get_data(as_text=True)
 
 
+def test_shear_stud_browser_renders_stud_detail_panel(monkeypatch):
+    from app import app
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")
+    monkeypatch.setattr("utils.shear_studs.get_browser_model",
+                        lambda database: _fake_shear_stud_model())
+    resp = app.test_client().get("/db/NelsonH4L/shear-stud-browser?diameter=6&length=20")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'id="studDetailCard"' in body
+    assert "Source Table &amp; Column Traceability" in body
+    assert "stud-svg" in body
+    assert "/db/NelsonH4L/SetBolts/edit/" in body
+
+
 def test_add_diameter_redirects_for_shear_stud_catalogs(monkeypatch):
     from app import app
     monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "shear stud")

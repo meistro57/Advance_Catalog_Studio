@@ -582,3 +582,76 @@ def test_format_dimension_converts_to_reduced_inches():
 def test_format_dimension_handles_missing_values():
     assert ss.format_dimension(None) == "—"
     assert ss.format_dimension(None, "in") == "—"
+
+
+# --- per-record detail & validation depth (D3, D4) --------------------------
+
+def test_normalize_stud_includes_row_token():
+    stud = ss.normalize_stud(stud_row(diameter=16.0, length=40.0))
+    assert stud["row_token"]
+    from utils import db as dbcore
+    decoded = dbcore.parse_row_token(
+        stud["row_token"], ["Standard", "Material", "Diameter", "Length"]
+    )
+    assert decoded == {
+        "Standard": "Nelson H4L",
+        "Material": "Mild Steel",
+        "Diameter": 16.0,
+        "Length": 40.0,
+    }
+
+
+def test_validate_stud_flags_implausible_weight():
+    # 59.0 kg for a 16x40 mm stud is ~1000x steel mass (entered in grams instead of kg)
+    stud = ss.normalize_stud(stud_row(diameter=16.0, length=40.0, weight=59.0))
+    assert any(i["code"] == "weight_implausible" for i in stud["issues"])
+
+
+def test_build_groups_flags_non_monotonic_weights_and_duplicate_names():
+    shape = nelson_shape()
+    studs = list(shape["studs"]) + [
+        # Longer stud (70 mm) weighing less than 65 mm stud (0.0059 kg) AND colliding on Name
+        stud_row(diameter=16.0, length=70.0, weight=0.001, name="Nelson H4L 16 x 65"),
+    ]
+    built = build(
+        studs=studs,
+        distances=shape["distances"] + [distance_row(22.0)],
+    )
+    global_codes = {i["code"] for i in built["issues"]}
+    assert "duplicate_stud_name" in global_codes
+    assert "orphan_distance" in global_codes
+    g16 = [g for g in built["groups"] if g["diameter"] == 16.0][0]
+    assert any(i["code"] == "weight_non_monotonic" for i in g16["issues"])
+
+
+def test_build_groups_flags_invalid_distance_rule():
+    shape = nelson_shape()
+    bad_dists = [distance_row(6.0, along=0.0)] + shape["distances"][1:]
+    built = build(distances=bad_dists)
+    g6 = built["groups"][0]
+    assert any(i["code"] == "invalid_distance_rule" for i in g6["issues"])
+
+
+def test_stud_detail_builds_svg_and_source_traceability():
+    built = build()
+    detail_mm = ss.stud_detail(
+        "NelsonH4L", built["groups"],
+        standard="Nelson H4L", material="Mild Steel",
+        diameter=16.0, length=40.0, units="mm",
+    )
+    assert detail_mm is not None
+    assert detail_mm["stud"]["name"] == "Nelson H4L 16 x 40"
+    assert "<svg" in detail_mm["svg"]
+    assert "length 40 mm" in detail_mm["svg"]
+    assert "/db/NelsonH4L/SetBolts/edit/" in detail_mm["raw_row_url"]
+    tables = {row["table"] for row in detail_mm["traceability"]}
+    assert "SetBolts" in tables
+    assert "ConnectorDistances" in tables
+    assert "ConnectorRelations" in tables
+
+    detail_in = ss.stud_detail(
+        "NelsonH4L", built["groups"],
+        standard="Nelson H4L", material="Mild Steel",
+        diameter=16.0, length=40.0, units="in",
+    )
+    assert "in" in detail_in["svg"]
