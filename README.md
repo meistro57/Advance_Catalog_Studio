@@ -289,9 +289,11 @@ It answers "what changed between my original export and this repaired copy?" wit
 
 The page is read-only and parses both uploads in the request without storing them. The same POST returns the full report as JSON with `format=json` for an agent or an MCP server. Assumptions, the parser limits and the real-drawing verification procedure are in `docs/dxf-diff.md`; the apply path stays blocked until verification A4 passes and a real pair is checked under A7.
 
-### Add / Clone Diameter wizard
+### Add / Clone and Remove Diameter wizards
 
-This is the relationship-aware part of Catalog Studio. The wizard lets you:
+These are the relationship-aware diameter operations in Catalog Studio.
+
+**Add / Clone Diameter (`/db/<db>/add-diameter`)** lets you:
 
 1. choose a standard imperial or metric target diameter;
 2. select a known-working source diameter;
@@ -305,9 +307,15 @@ If any insert fails, the transaction rolls back rather than leaving half a diame
 
 Re-applying the same target diameter is safe: the wizard replaces the existing target rows instead of duplicating them (bolt tables are cleared first, and on anchor catalogs the hole and length rows are removed before their parent anchor records). The preview shows how many existing rows will be replaced. Cloning a diameter onto itself is refused.
 
+**Remove Diameter (`/db/<db>/remove-diameter`, issue #17)** is the companion operation for bolt and anchor catalogs:
+
+- pick an existing diameter from the dropdown (or click `&times;` on any diameter badge on the database page);
+- preview the exact row counts and sample rows that will be deleted across every related table (`SetBolts`, `SetNutsBolts`, `SetOfBolts`, `ScrewNew`, `BoltsDistances`, `BoltsDiameters` for bolts; `AnchorsHoleDefinition`, `AnchorsDefinition`, `AnchorsName`, `SetNutsBolts`, `BoltsDistances`, `BoltsDiameters` for anchors), with a warning when removing the last diameter in the catalog;
+- take a fail-closed `COPY_ONLY` snapshot first, then cascade-delete in child-before-parent order inside one transaction.
+
 ### Pre-change snapshots
 
-Before a batch write (diameter clone, find & replace) Catalog Studio takes a `COPY_ONLY` backup of the scratch database inside the container and copies it to `catalog_studio/snapshots/<database>/` next to a JSON manifest. If the snapshot cannot be taken, the write does not run.
+Before a batch write (diameter clone, diameter removal, deep-copy `RunName` rename, or find & replace) Catalog Studio takes a `COPY_ONLY` backup of the scratch database inside the container and copies it to `catalog_studio/snapshots/<database>/` next to a JSON manifest. If the snapshot cannot be taken, the write does not run.
 
 The database page lists the snapshots for that database and offers **Prune older**, which keeps the newest N (default 5) and deletes the rest — an explicit action, never automatic, because a snapshot can be hundreds of megabytes.
 
@@ -378,6 +386,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
 - **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. Each library is its own menu screen rather than a tab strip, so it is reachable directly by hash and never pushes the style content down the page.
 - **Integrity check** — every in-file reference is checked before you export.
+- **Rename Deep Copies (`/db/<db>/drawing-style/rename-copies`, issue #16)** — Advance Steel's **Deep copy** duplicates every sub-style level and prefixes `RunName` with `Copy of ` or `Copy (n) `. This tool scans all drawing-style `RunName` tables (`DetailStyle`, `DetViewRequest`, `DetViewDimStrategy`, `DetObjReprMap`, `DetObjQualifierSet`, `DetViewLabelStrategy`, `DetObjAppearance`), previews before/after names with optional strip, custom prefix/suffix, or find/replace, blocks same-table `RunName` collisions, takes a pre-change snapshot, and updates all selected rows in one transaction.
 - **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
 
 ![Drawing Style Editor: style identity, title formula preview, view settings](docs/images/drawing-style-editor.png)
@@ -645,9 +654,9 @@ These are planned features, not claims about the current release. Development wi
 - The drawing-style usage page only reads. Purging orphan rows, deduplicating records with key remapping, cloning style branches and compacting/shrinking the database are **not** implemented: those write paths have not been round-trip verified, and deleting the `_log.ldf` would break the `.mdf` / `.ldf` pair Advance Steel imports.
 - If detaching a database fails, Catalog Studio restores it to multi-user mode so it can still be reconnected. A database stuck in `RECOVERY_PENDING` ("Access is denied" on its files) can neither be detached nor brought online: restart the container, and if it survives that, `DROP DATABASE` it and re-attach from its own `.mdf` / `.ldf` copy. Each database now gets its own files (`<db>.mdf` / `<db>_log.ldf`), so two databases can no longer share one `mdf` — the cause of that state.
 - Databases attached from a delivered Advance Steel library file (`AstorDetails.mdf`, `AstorBase.mdf`, `AstorAddIn.mdf`, `AstorSettings.mdf`) are recorded as such and kept **read-only**: every write route refuses them with an explanation. Attach a copy under a new database name to edit it.
-- Every request that can change something (uploads, attach, create, detach, clone, find & replace, row CRUD, style edits, snapshot pruning) requires a session CSRF token; the central guard and the full route list are in `docs/csrf-audit.md`.
+- Every request that can change something (uploads, attach, create, detach, diameter clone/removal, find & replace, row CRUD, style edits, deep-copy rename, snapshot pruning) requires a session CSRF token; the central guard and the full route list are in `docs/csrf-audit.md`.
 - Snapshot pruning is manual and keeps the newest five by default; restoring a snapshot is a documented `docker cp` + `RESTORE DATABASE ... WITH REPLACE` step, never automatic.
-- Batch writes take a **pre-change snapshot** first: the bolt-diameter clone and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
+- Batch writes take a **pre-change snapshot** first: diameter clone, diameter removal, deep-copy `RunName` rename, and database-wide find & replace run `BACKUP DATABASE ... WITH COPY_ONLY` inside the scratch container and copy the `.bak` to `catalog_studio/snapshots/<database>/` with a JSON manifest. If the snapshot fails, the change is not attempted. Snapshots are runtime files and are git-ignored.
 
 ## Contributing
 

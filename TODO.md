@@ -77,6 +77,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   raw `SetNutsBolts` / `SetBolts` row (row token URLs), like the stud browser.
 - [ ] **B5 — Accessibility.** Keyboard navigation for the component table,
   focus states, `aria-label`s on the explode/perspective toggles.
+- [ ] **B6 — Dimension unit toggle (issue #18).** Add fractional-inch / `mm`
+  toggle buttons in the Bolt-Set Viewer and Anchor Configurator so users can
+  switch displayed dimensions between imperial fractions and millimetres.
 
 ## C. Anchor configurator and fabrication sheets
 
@@ -91,6 +94,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   dimension. Keep "NTS — USE WRITTEN DIMENSIONS".
 - [ ] **C4 — Hole definition table.** Show `AnchorsHoleDefinition` on the
   configurator with its source rows; currently only the elevation is visualised.
+- [ ] **C5 — Anchor projection control (issue #19).** Add an interactive
+  projection control in the Anchor Configurator (with a quick 4" typical preset)
+  to preview top projection and resulting embedment depth.
 
 ## D. Shear studs (issue #4)
 

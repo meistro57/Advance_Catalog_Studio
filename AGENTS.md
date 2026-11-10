@@ -249,7 +249,8 @@ transaction after taking a pre-change snapshot.
 - `catalog_studio/utils/snapshots.py` — data-safety net for batch writes:
   `create_snapshot()` runs `BACKUP DATABASE ... WITH COPY_ONLY` inside the
   scratch container, copies the `.bak` to `catalog_studio/snapshots/<db>/` and
-  writes a JSON manifest. `add-diameter` (apply) and `find-replace` (apply) call
+  writes a JSON manifest. `add-diameter` (apply), `remove-diameter` (apply),
+  `drawing-style/rename-copies` (apply), and `find-replace` (apply) call
   it first and abort when it fails; any new batch mutation must do the same
   (fail closed, never "warn and continue"). Snapshots are runtime files
   (git-ignored); the exported mdf/ldf pair remains the deliverable. Tests patch
@@ -630,8 +631,9 @@ dimension logic of its own.
   library, and prefer authoring into a copy of the user library.
 - **Naming:** generated names follow the observed conventions (` 10.00 mm`,
   `1/2 inch`, `<family> <dia> x <length>`) and are token-safe; never emit
-  recursive `Copy (1) of ...` names. Deep-copy naming is a project decision to
-  make when that write path is verified.
+  recursive `Copy (1) of ...` names. Drawing-style deep-copy prefixes (`Copy of `,
+  `Copy (n) of `, `Copy (n) `) are stripped or renamed in batch via
+  `/db/<db>/drawing-style/rename-copies` (issue #16).
 - **Performance:** catalog tables can hold tens of thousands of rows. Prefer one
   connection per operation, parameterised batch statements and indexed lookups.
   `preview_find_replace` / `apply_find_replace` still run one `COUNT`/`UPDATE`
