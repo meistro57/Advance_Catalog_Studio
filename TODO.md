@@ -308,3 +308,10 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   `DetViewDimRequestLinear.Direction`, and `DetViewDimStrategyItems.Type` from
   delivered `AstorDetails.mdf` (`A5.2`, issue #11 / E1b) and added `Point1..15`
   + `Number of Points` editing and validation (`E1`, 557 tests).
+- [x] Completed shear-stud catalog support (issue #4, `A3.1`, `D1`, `D2`, `D5`):
+  verified 7-table connector schema across metric (`Nelson H4L`) and imperial
+  (`Nelson H4L-Inch`) AS 2026 exports, added `shear_studs.apply_clone()` and
+  `POST /db/<db>/shear-stud-browser/clone-apply` (with fail-closed pre-change
+  snapshot), added `"shear stud"` to `CATALOG_TEMPLATES` in `schema_templates.py`,
+  added imperial `RunName` / `SetBolts.Name` support, and added `#exportChecklist`
+  on `/db/<db>/health` (564 tests).

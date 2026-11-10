@@ -266,14 +266,14 @@ transaction after taking a pre-change snapshot.
   `create_snapshot()` runs `BACKUP DATABASE ... WITH COPY_ONLY` inside the
   scratch container, copies the `.bak` to `catalog_studio/snapshots/<db>/` and
   writes a JSON manifest. `add-diameter` (apply), `remove-diameter` (apply),
-  `drawing-style/rename-copies` (apply), and `find-replace` (apply) call
-  it first and abort when it fails; any new batch mutation must do the same
-  (fail closed, never "warn and continue"). Snapshots are runtime files
-  (git-ignored); the exported mdf/ldf pair remains the deliverable. Tests patch
-  `db.backup_database` / `docker_ops.copy_out_of_container`, so no DB is needed.
-  Retention is explicit: `snapshot_files()` lists the `.bak` files (newest
-  first, manifest optional), `prune_snapshots(keep=5)` deletes the surplus and
-  backs the database page's **Prune older** button
+  `shear-stud-browser/clone-apply`, `drawing-style/rename-copies` (apply), and
+  `find-replace` (apply) call it first and abort when it fails; any new batch
+  mutation must do the same (fail closed, never "warn and continue"). Snapshots
+  are runtime files (git-ignored); the exported mdf/ldf pair remains the
+  deliverable. Tests patch `db.backup_database` / `docker_ops.copy_out_of_container`,
+  so no DB is needed. Retention is explicit: `snapshot_files()` lists the `.bak`
+  files (newest first, manifest optional), `prune_snapshots(keep=5)` deletes the
+  surplus and backs the database page's **Prune older** button
   (`POST /db/<db>/snapshots/prune`, CSRF-checked), and `restore_plan()` returns
   the `docker cp` + `RESTORE DATABASE ... WITH REPLACE` commands for a manual
   restore. Nothing here executes a restore.
@@ -285,19 +285,19 @@ transaction after taking a pre-change snapshot.
   `summary`) are unit-tested; `build_comparison()` is the only SQL. It never
   writes and refuses a database with itself.
 - `catalog_studio/utils/health.py` — read-only catalog health report
-  (`/db/<db>/health`, template `catalog_health.html`, "Health Report" button on
-  the database page; the same findings download as `/db/<db>/health.json` and
-  `/db/<db>/health.csv`). It adds no new catalog semantics: `build_report()`
-  dispatches on `db.guess_catalog_type` and reuses `db.get_catalog_diameters`
-  (bolt diameter coverage against the documented six-table relationship),
-  `bolt_sets.parse_component_slots`/`annotate_components` (anchor hardware
-  slots), `shear_studs.get_browser_model` (stud findings) and
+  (`/db/<db>/health`, template `catalog_health.html` with `#exportChecklist`,
+  "Health Report" button on the database page; the same findings download as
+  `/db/<db>/health.json` and `/db/<db>/health.csv`). It adds no new catalog
+  semantics: `build_report()` dispatches on `db.guess_catalog_type` and reuses
+  `db.get_catalog_diameters` (bolt diameter coverage against the documented
+  six-table relationship), `bolt_sets.parse_component_slots`/`annotate_components`
+  (anchor hardware slots), `shear_studs.get_browser_model` (stud findings) and
   `drawing_styles.integrity_report` (dangling references). Pure collectors,
   sorting, summary and section grouping are unit-tested; keep new rules in the
   owning module and only aggregate here. It never repairs; a clean report is
   not a claim of Advance Steel validity.
 - `catalog_studio/utils/schema_templates.py` — reverse-engineered DDL + seed
-  data for freshly created anchor/bolt catalogs.
+  data for freshly created anchor, bolt, and shear-stud (`"shear stud"`) catalogs.
 - `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the
   same assembly (head/shank/hardware/clamped material, numbered balloons, part
   legend, inch/fractional-inch/`mm` dimensions). Pure and unit-tested; the
