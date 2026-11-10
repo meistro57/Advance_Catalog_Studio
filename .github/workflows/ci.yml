@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 jobs:
@@ -21,6 +22,15 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Compile every module
         run: python -m compileall -q catalog_studio tests *.py
+      - name: Verify version file and changelog alignment
+        run: |
+          python -c "
+          import pathlib, re
+          ver = pathlib.Path('VERSION').read_text().strip()
+          assert re.match(r'^\d+\.\d+\.\d+$', ver), f'Invalid VERSION: {ver}'
+          changelog = pathlib.Path('CHANGELOG.md').read_text()
+          assert f'[{ver}]' in changelog, f'Version {ver} missing from CHANGELOG.md'
+          "
       - name: Run the test suite (no SQL Server needed)
         run: python -m pytest tests/ -q
 

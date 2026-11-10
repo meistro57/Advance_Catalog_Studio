@@ -6,6 +6,14 @@ SQL Server container. Never touches your live Advance Steel install."""
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_DIR = os.path.dirname(BASE_DIR)
+VERSION_FILE = os.path.join(REPO_DIR, "VERSION")
+try:
+    with open(VERSION_FILE, encoding="utf-8") as _vf:
+        APP_VERSION = _vf.read().strip() or "0.4.0"
+except OSError:
+    APP_VERSION = "0.4.0"
+
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 EXPORT_DIR = os.path.join(BASE_DIR, "exports")
 

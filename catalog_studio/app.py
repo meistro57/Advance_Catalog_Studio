@@ -72,7 +72,11 @@ def _blocked_write(database):
 
 @app.context_processor
 def _inject_csrf():
-    return {"csrf_token": _csrf_token(), "issues_url": config.ISSUES_URL}
+    return {
+        "csrf_token": _csrf_token(),
+        "issues_url": config.ISSUES_URL,
+        "app_version": config.APP_VERSION,
+    }
 
 
 # POST endpoints that only render a preview and never touch the database. They

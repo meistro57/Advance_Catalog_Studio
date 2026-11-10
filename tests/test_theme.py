@@ -144,3 +144,22 @@ def test_drawing_style_workspace_has_distinct_theme_classes_and_tokens(monkeypat
     monkeypatch.setattr("utils.db.guess_catalog_type", lambda db_name: "bolt")
     bolt_db_html = client.get("/db/A325Bolts").get_data(as_text=True)
     assert 'class="cs-style-workspace"' not in bolt_db_html
+
+
+def test_app_version_and_changelog_are_aligned():
+    """VERSION file, config.APP_VERSION, CHANGELOG.md, and navbar badge stay in sync."""
+    import re
+    import config
+    from app import app
+
+    ver_file = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    assert re.match(r"^\d+\.\d+\.\d+$", ver_file)
+    assert config.APP_VERSION == ver_file
+
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"[{ver_file}]" in changelog
+
+    resp = app.test_client().get("/db/SomeDb/find-replace")
+    body = resp.get_data(as_text=True)
+    assert f"v{ver_file}" in body
+    assert 'id="appVersionBadge"' in body
