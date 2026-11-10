@@ -26,6 +26,7 @@
         <a href="/db/{{ database }}/shear-stud-browser" class="btn btn-sm btn-success">{{ icon('bolt') }} Shear Stud Browser</a>
         {% elif catalog_type == 'drawing style' %}
         <a href="/db/{{ database }}/drawing-style" class="btn btn-sm btn-success">{{ icon('drawing') }} Drawing Style Editor</a>
+        <a href="/db/{{ database }}/drawing-style/rename-copies" class="btn btn-sm btn-outline-warning">{{ icon('tag') }} Rename Deep Copies</a>
         {% endif %}
         {% if catalog_type != 'drawing style' and catalog_type != 'shear stud' %}
         <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary">{{ icon('add') }} Add / Clone Diameter</a>

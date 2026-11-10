@@ -138,9 +138,12 @@ Behaviour confirmed by the guides:
 - **Copy shares, Deep copy duplicates.** The guide: *"The Copy function will
   create a new DS, but referring (sharing) the same sub-styles with the original
   DS"*; deep copy duplicates the full structure and prefixes every copied level
-  with `Copy of`. The handout adds that copied sub-style rows are *"all new
+  with `Copy of` (and `Copy (1)`, `Copy (2)`, `Copy (3)` on subsequent deep
+  copies in `AstorAddIn`). The handout adds that copied sub-style rows are *"all new
   records in the database"*. This is the hazard the sub-style usage page exists
-  to expose.
+  to expose, and `/db/<db>/drawing-style/rename-copies` (issue #16) strips or
+  replaces those prefixes across all style/sub-style `RunName` columns in one
+  snapshot-backed transaction.
 - **The manager can warn about shared edits.** *"Modifying a sub-style modifies
   all drawing styles that use that sub-style. The Drawing Style Manager can be
   set up to display a warning when a shared item ... is modified."* So the

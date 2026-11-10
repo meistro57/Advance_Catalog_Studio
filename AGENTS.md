@@ -129,7 +129,11 @@ and display-name token replacement.
   style tree for `templates/drawing_style.html`, parses label formulas
   (`parse_label_format`), converts mm <-> ft-in (`format_ft_in`/`parse_length`),
   reorders representation rules (`(Key, Order)` swaps through a temp Order),
-  and runs `integrity_report`. Pure helpers are unit-tested in
+  previews and applies batch renames of `Copy of ` / `Copy (n) ` `RunName`
+  prefixes left by Advance Steel's Deep copy (`plan_deep_copy_rename` /
+  `preview_deep_copy_rename` / `apply_deep_copy_rename`, route
+  `/db/<db>/drawing-style/rename-copies`, issue #16), and runs
+  `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
   Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
   Do not reimplement compaction: the Style Manager's own **Compact database**

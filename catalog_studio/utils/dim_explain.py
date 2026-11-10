@@ -107,7 +107,10 @@ POSITION_WORDS = (
     "Bottom", "Left", "Right", "Top", "Any",
 )
 
-COPY_PREFIX = re.compile(r"^(?:copy(?:\s*\(\d+\))?\s+of\s+)+", re.I)
+# Advance Steel Deep Copy prefixes: "Copy of X", "Copy (2) of X", and
+# "Copy (3) X" (without "of", seen in DetViewArrangeStrategy and subsequent
+# deep copies in AstorAddIn), including chained prefixes.
+COPY_PREFIX = re.compile(r"^(?:copy(?:\s*\(\d+\)(?:\s+of)?|\s+of)\s+)+", re.I)
 
 NULL_REFS = {None, 0, -1, "", "0", "-1"}
 
@@ -206,9 +209,26 @@ def name_code_check(name, linear):
     return {"code": decoded["code"], "agree": agree, "disagree": disagree}
 
 
+def split_copy_prefix(name):
+    """Split leading 'Copy of ' / 'Copy (n) ' prefixes from a RunName.
+
+    Returns ``(prefix, base_name)``. When ``name`` has no deep-copy prefix
+    (or nothing left after the prefix), returns ``("", str(name or ""))``.
+    """
+    text = str(name or "")
+    match = COPY_PREFIX.match(text)
+    if not match:
+        return "", text
+    base = text[match.end():]
+    if not base.strip():
+        return "", text
+    return match.group(0), base
+
+
 def clean_name(name):
-    """Drop deep-copy prefixes ("Copy of Copy of X" -> "X") for display."""
-    return COPY_PREFIX.sub("", str(name or "")).strip()
+    """Drop deep-copy prefixes ("Copy of Copy of X" / "Copy (3) X" -> "X") for display."""
+    _, base = split_copy_prefix(name)
+    return base.strip()
 
 
 def read_position(text):

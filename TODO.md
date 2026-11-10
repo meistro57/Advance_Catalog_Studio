@@ -17,10 +17,10 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 521 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 536 tests; read-only bolt/anchor/stud/style views,
 the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; writes
-are the bolt diameter clone, raw row CRUD, find & replace, and drawing-style
-field/rule edits.
+are the bolt diameter clone, raw row CRUD, find & replace, drawing-style
+field/rule edits, and deep-copy `RunName` prefix renaming (issue #16).
 
 ---
 
@@ -138,6 +138,12 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   dimension, title) and keep the escape buttons.
 - [ ] **E8 — Health rows for styles.** When an export has more than one style,
   report shared sub-styles in the health report, with counts per table.
+- [x] **E10 — Rename deep-copy prefixes (issue #16).** Preview and transactional
+  rename (`/db/<db>/drawing-style/rename-copies`) for the `Copy of ` and
+  `Copy (n) ` `RunName` prefixes Advance Steel's Deep copy leaves on sub-style
+  records across the style tables, with optional replacement prefix, table
+  filtering, duplicate-name warnings, delivered-library guard and fail-closed
+  pre-change snapshot (536 tests).
 - [x] **E9 — Detail diff (issue #15, Phase 1).** Read-only `/detail-diff`: two
   ASCII DXFs plus an optional style export become a report of added, removed,
   moved and changed entities, with the feature, direction, side and chain
@@ -250,3 +256,7 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] DXF hand-edit diff, Phase 1 of issue #15: read-only parser, entity
   classification, diff, chain intent, style mapping, request matching, shared
   sub-style flags, scale detection and the `/detail-diff` page/JSON (521 tests).
+- [x] Deep-copy prefix rename (`/db/<db>/drawing-style/rename-copies`, issue #16):
+  matches `Copy of `, `Copy (n) of ` and `Copy (n) ` across drawing-style
+  `RunName` tables, previews before/after and same-table collisions, snapshots
+  first, and updates in one transaction (536 tests).

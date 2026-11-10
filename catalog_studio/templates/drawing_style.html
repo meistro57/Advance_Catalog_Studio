@@ -236,6 +236,7 @@
     {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
   </h4>
   <div class="d-flex gap-2 flex-wrap">
+    <a href="/db/{{ database }}/drawing-style/rename-copies" class="btn btn-sm btn-outline-warning">{{ icon('tag') }} Rename deep copies</a>
     <a href="/db/{{ database }}/drawing-style/usage" class="btn btn-sm btn-outline-primary">Sub-style usage</a>
     <a href="/db/{{ database }}" class="btn btn-sm btn-outline-secondary">Raw tables</a>
     <form method="post" action="/db/{{ database }}/export-copy" class="m-0">

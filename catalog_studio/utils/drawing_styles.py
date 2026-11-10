@@ -80,6 +80,148 @@ LENGTH_COLUMNS = {
 
 STANDARD_SCALE_DENOMINATORS = [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 384]
 
+# Tables whose RunName column receives "Copy of " / "Copy (n) " when Advance
+# Steel's Drawing Style Manager performs a Deep Copy (issue #16). Ordered from
+# style root down to views, presentation rules/libraries, and dimension chains.
+DEEP_COPY_NAME_TABLES = (
+    ("DetailMasterTable", "Style picker entry"),
+    ("DetailStyle", "Drawing style"),
+    ("DetViewRequest", "Views"),
+    ("DetViewArrangeStrategy", "View arrangement strategies"),
+    ("DetViewSystemAndBox", "View coordinate system & box"),
+    ("DetViewLengthClip", "Length clipping rules"),
+    ("DetObjReprMapsNew", "Object presentation maps"),
+    ("DetObjQualifierSet", "Model object sets"),
+    ("DetObjAppearance", "Appearances"),
+    ("DetHatchSettings", "Hatch settings"),
+    ("DetObjAnnotationStrategy", "Labeling strategies"),
+    ("DetAnnotationType", "Label formulas"),
+    ("DetArrangerStrategy", "Label arranger strategies"),
+    ("DetViewDimStrategyNew", "Dimension strategies"),
+    ("DetViewDimRequestLinear", "Dimension requests"),
+    ("DetViewDimPointSelection", "Dimension point selection rules"),
+)
+
+
+def format_copy_rename(raw_name, replacement_prefix=""):
+    """Replace a leading 'Copy of ' / 'Copy (n) ' prefix on ``raw_name``.
+
+    When ``replacement_prefix`` is blank, the deep-copy prefix is stripped.
+    When non-blank, it replaces the deep-copy prefix (adding a separating space
+    unless ``replacement_prefix`` already ends with whitespace or ``_``, and
+    avoiding a duplicate prefix if the base name already starts with it).
+    Returns ``(new_name, matched_prefix)`` or ``(raw_name, "")`` when the name
+    has no deep-copy prefix.
+    """
+    prefix, base = dim_explain.split_copy_prefix(raw_name)
+    if not prefix:
+        return str(raw_name or ""), ""
+    clean_base = base.strip()
+    rep = str(replacement_prefix or "").lstrip()
+    if not rep:
+        return clean_base, prefix.strip()
+    if not rep[-1].isspace() and not rep.endswith("_"):
+        rep_with_sep = rep + " "
+    else:
+        rep_with_sep = rep
+    if clean_base.lower().startswith(rep.rstrip().lower()):
+        return clean_base, prefix.strip()
+    return f"{rep_with_sep}{clean_base}", prefix.strip()
+
+
+def plan_deep_copy_rename(rows_by_table, pk_by_table, replacement_prefix="", include_tables=None):
+    """Build a preview/apply plan for renaming deep-copied RunName values.
+
+    Pure helper (no database): ``rows_by_table`` is ``{table: [row, ...]}`` and
+    ``pk_by_table`` is ``{table: [pk_col, ...]}``.
+    """
+    known_labels = dict(DEEP_COPY_NAME_TABLES)
+    ordered_tables = [t for t, _ in DEEP_COPY_NAME_TABLES if t in rows_by_table]
+    for t in sorted(rows_by_table):
+        if t not in known_labels:
+            ordered_tables.append(t)
+
+    include_set = set(include_tables) if include_tables is not None else None
+    available_tables = []
+    planned_tables = []
+    prefixes_seen = set()
+    warnings = []
+
+    for table in ordered_tables:
+        pk_cols = pk_by_table.get(table) or []
+        if not pk_cols:
+            continue
+        rows = rows_by_table.get(table) or []
+        candidates = []
+        untouched_names = []
+        for r in rows:
+            if "RunName" not in r:
+                continue
+            old_name = str(r.get("RunName") or "")
+            new_name, matched_prefix = format_copy_rename(old_name, replacement_prefix)
+            if not matched_prefix or new_name == old_name:
+                if old_name.strip():
+                    untouched_names.append(old_name.strip().lower())
+                continue
+            prefixes_seen.add(matched_prefix)
+            pk = {col: r[col] for col in pk_cols}
+            candidates.append({
+                "pk": pk,
+                "key_display": ", ".join(str(r[col]) for col in pk_cols),
+                "old_name": old_name,
+                "new_name": new_name,
+                "prefix": matched_prefix,
+                "collision": False,
+            })
+        if not candidates:
+            continue
+        selected = include_set is None or table in include_set
+        label = known_labels.get(table, table)
+        available_tables.append({
+            "table": table,
+            "label": label,
+            "count": len(candidates),
+            "selected": selected,
+        })
+        if not selected:
+            continue
+
+        final_counts = {}
+        for name_lower in untouched_names:
+            final_counts[name_lower] = final_counts.get(name_lower, 0) + 1
+        for item in candidates:
+            key = item["new_name"].strip().lower()
+            final_counts[key] = final_counts.get(key, 0) + 1
+
+        collided_names = set()
+        for item in candidates:
+            key = item["new_name"].strip().lower()
+            if final_counts.get(key, 0) > 1:
+                item["collision"] = True
+                collided_names.add(item["new_name"])
+        for cname in sorted(collided_names):
+            warnings.append(
+                f"{table}: '{cname}' would appear more than once in this table."
+            )
+
+        planned_tables.append({
+            "table": table,
+            "label": label,
+            "pk_cols": list(pk_cols),
+            "count": len(candidates),
+            "rows": candidates,
+        })
+
+    return {
+        "replacement_prefix": str(replacement_prefix or ""),
+        "available_tables": available_tables,
+        "tables": planned_tables,
+        "total_rows": sum(t["count"] for t in planned_tables),
+        "total_available_rows": sum(t["count"] for t in available_tables),
+        "prefixes_seen": sorted(prefixes_seen),
+        "warnings": warnings,
+    }
+
 
 def _clean_col(name):
     """InfoTableRelations sometimes has 'CompanyText AS Ausdr1'."""
@@ -849,3 +991,74 @@ def integrity_report(database, relations=None):
                 )
     return {"dangling": problems, "notes": notes,
             "checked": sum(1 for r in relations.values() if r.get("local"))}
+
+
+def preview_deep_copy_rename(database, replacement_prefix="", include_tables=None):
+    """Scan a drawing-style export for 'Copy of ' / 'Copy (n) ' RunName values."""
+    db = _db()
+    present_tables = db.list_tables(database)
+    rows_by_table = {}
+    pk_by_table = {}
+    for table in present_tables:
+        cols = {c["COLUMN_NAME"] for c in db.get_columns(database, table)}
+        if "RunName" not in cols:
+            continue
+        pk_cols = db.get_primary_key_columns(database, table)
+        if not pk_cols or not all(c in cols for c in pk_cols):
+            continue
+        select_cols = list(dict.fromkeys(list(pk_cols) + ["RunName"]))
+        col_sql = ", ".join(f"[{c}]" for c in select_cols)
+        order_sql = ", ".join(f"[{c}]" for c in pk_cols)
+        rows_by_table[table] = _rows(
+            database, f"SELECT {col_sql} FROM [{table}] ORDER BY {order_sql}"
+        )
+        pk_by_table[table] = pk_cols
+
+    plan = plan_deep_copy_rename(
+        rows_by_table,
+        pk_by_table,
+        replacement_prefix=replacement_prefix,
+        include_tables=include_tables,
+    )
+    for tbl in plan["tables"]:
+        for item in tbl["rows"]:
+            item["token"] = db.make_row_token(item["pk"], tbl["pk_cols"])
+    return plan
+
+
+def apply_deep_copy_rename(database, replacement_prefix="", include_tables=None):
+    """Rename deep-copied RunName values across the selected tables in one transaction."""
+    db = _db()
+    plan = preview_deep_copy_rename(
+        database,
+        replacement_prefix=replacement_prefix,
+        include_tables=include_tables,
+    )
+    if not plan["total_rows"]:
+        return {}
+
+    conn, cur = db.connect(database)
+    conn.autocommit(False)
+    counts = {}
+    try:
+        for tbl in plan["tables"]:
+            table = tbl["table"]
+            pk_cols = tbl["pk_cols"]
+            where_sql = " AND ".join(f"[{c}] = %s" for c in pk_cols)
+            sql = f"UPDATE [{table}] SET [RunName] = %s WHERE {where_sql}"
+            for item in tbl["rows"]:
+                params = [item["new_name"]] + [item["pk"][c] for c in pk_cols]
+                cur.execute(sql, params)
+                if cur.rowcount != 1:
+                    raise RuntimeError(
+                        f"Expected 1 row updated in {table} ({item['key_display']}), "
+                        f"got {cur.rowcount}."
+                    )
+            counts[table] = tbl["count"]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return counts

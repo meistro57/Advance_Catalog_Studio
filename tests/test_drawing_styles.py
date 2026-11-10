@@ -224,3 +224,194 @@ def test_short_view_names_never_split_a_word():
     reqs = [{"row": {"Key": 1, "RunName": "Plan North"}}, {"row": {"Key": 2, "RunName": "Plan Nest"}}]
     ds.set_short_view_names(reqs)
     assert reqs[0]["short_name"] == "Plan North" and reqs[1]["short_name"] == "Plan Nest"
+
+
+# --- deep-copy rename (issue #16) -------------------------------------------
+
+@pytest.mark.parametrize("raw,prefix,expected,matched", [
+    ("Copy of External objects", "", "External objects", "Copy of"),
+    ("Copy (3) Not Visible", "", "Not Visible", "Copy (3)"),
+    ('Copy (1) 0" distance', "", '0" distance', "Copy (1)"),
+    ("Copy (2) of Mp - Beam", "", "Mp - Beam", "Copy (2) of"),
+    ("Copy of Copy (3) Off", "", "Off", "Copy of Copy (3)"),
+    ("Copy (3) Not Visible", "MARK", "MARK Not Visible", "Copy (3)"),
+    ("Copy of External objects", "MARK -", "MARK - External objects", "Copy of"),
+    ("Copy of External objects", "MARK - ", "MARK - External objects", "Copy of"),
+    ("Copy of Off", "MH_", "MH_Off", "Copy of"),
+    ("Copy of 6 - Railing", "Marks", "Marks 6 - Railing", "Copy of"),
+    ("Copy of Marks 6 - Railing", "Marks", "Marks 6 - Railing", "Copy of"),
+    ("Plain name", "MARK", "Plain name", ""),
+])
+def test_format_copy_rename(raw, prefix, expected, matched):
+    assert ds.format_copy_rename(raw, prefix) == (expected, matched)
+
+
+def test_plan_deep_copy_rename_groups_tables_and_detects_collisions():
+    rows_by_table = {
+        "DetObjQualifierSet": [
+            {"Key": 22001, "RunName": "Copy (3) Not Visible"},
+            {"Key": 22002, "RunName": "Copy of External objects"},
+            {"Key": 22003, "RunName": "Not Visible"},
+        ],
+        "DetObjAppearance": [
+            {"Key": 22010, "RunName": "Copy (3) Off"},
+            {"Key": 22011, "RunName": "Copy of VisibleHidden"},
+        ],
+    }
+    pk_by_table = {
+        "DetObjQualifierSet": ["Key"],
+        "DetObjAppearance": ["Key"],
+    }
+
+    plan = ds.plan_deep_copy_rename(rows_by_table, pk_by_table, replacement_prefix="")
+    assert plan["total_rows"] == 4
+    assert plan["prefixes_seen"] == ["Copy (3)", "Copy of"]
+    assert [t["table"] for t in plan["tables"]] == ["DetObjQualifierSet", "DetObjAppearance"]
+    qset_rows = plan["tables"][0]["rows"]
+    assert qset_rows[0]["new_name"] == "Not Visible"
+    assert qset_rows[0]["collision"] is True
+    assert qset_rows[1]["collision"] is False
+    assert any("DetObjQualifierSet: 'Not Visible'" in w for w in plan["warnings"])
+
+    # Replacing with a custom prefix avoids colliding with the stock "Not Visible" row.
+    prefixed = ds.plan_deep_copy_rename(rows_by_table, pk_by_table, replacement_prefix="MARK -")
+    assert prefixed["warnings"] == []
+    assert prefixed["tables"][0]["rows"][0]["new_name"] == "MARK - Not Visible"
+
+    # Table filter restricts the active plan while keeping available_tables intact.
+    filtered = ds.plan_deep_copy_rename(
+        rows_by_table, pk_by_table, replacement_prefix="MARK", include_tables=["DetObjAppearance"]
+    )
+    assert filtered["total_rows"] == 2
+    assert filtered["total_available_rows"] == 4
+    assert [t["table"] for t in filtered["tables"]] == ["DetObjAppearance"]
+
+
+def test_apply_deep_copy_rename_commits_in_one_transaction_and_rolls_back_on_mismatch(monkeypatch):
+    executed = []
+    state = {"committed": False, "rolled_back": False, "closed": False, "rowcount": 1}
+
+    class FakeCursor:
+        @property
+        def rowcount(self):
+            return state["rowcount"]
+
+        def execute(self, sql, params=()):
+            executed.append((sql, list(params)))
+
+    class FakeConn:
+        def autocommit(self, val):
+            state["autocommit"] = val
+
+        def commit(self):
+            state["committed"] = True
+
+        def rollback(self):
+            state["rolled_back"] = True
+
+        def close(self):
+            state["closed"] = True
+
+    fake_plan = {
+        "total_rows": 2,
+        "tables": [{
+            "table": "DetObjAppearance",
+            "label": "Appearances",
+            "pk_cols": ["Key"],
+            "count": 2,
+            "rows": [
+                {"pk": {"Key": 22001}, "key_display": "22001", "old_name": "Copy (3) Off", "new_name": "MARK Off"},
+                {"pk": {"Key": 22002}, "key_display": "22002", "old_name": "Copy of Visible", "new_name": "MARK Visible"},
+            ],
+        }],
+    }
+    monkeypatch.setattr(ds, "preview_deep_copy_rename", lambda *a, **k: fake_plan)
+    monkeypatch.setattr("utils.db.connect", lambda database: (FakeConn(), FakeCursor()))
+
+    counts = ds.apply_deep_copy_rename("Marks_Railing", replacement_prefix="MARK")
+    assert counts == {"DetObjAppearance": 2}
+    assert state["autocommit"] is False
+    assert state["committed"] is True and not state["rolled_back"] and state["closed"] is True
+    assert executed == [
+        ("UPDATE [DetObjAppearance] SET [RunName] = %s WHERE [Key] = %s", ["MARK Off", 22001]),
+        ("UPDATE [DetObjAppearance] SET [RunName] = %s WHERE [Key] = %s", ["MARK Visible", 22002]),
+    ]
+
+    # If a row update affects != 1 row, the whole transaction rolls back.
+    executed.clear()
+    state.update({"committed": False, "rolled_back": False, "closed": False, "rowcount": 0})
+    with pytest.raises(RuntimeError, match="Expected 1 row updated"):
+        ds.apply_deep_copy_rename("Marks_Railing", replacement_prefix="MARK")
+    assert state["rolled_back"] is True and not state["committed"] and state["closed"] is True
+
+
+def test_drawing_style_rename_copies_route_preview_and_apply(monkeypatch):
+    from app import app
+
+    fake_plan = {
+        "replacement_prefix": "MARK",
+        "available_tables": [{"table": "DetObjAppearance", "label": "Appearances", "count": 1, "selected": True}],
+        "tables": [{
+            "table": "DetObjAppearance",
+            "label": "Appearances",
+            "pk_cols": ["Key"],
+            "count": 1,
+            "rows": [{
+                "pk": {"Key": 22001},
+                "key_display": "22001",
+                "old_name": "Copy (3) Off",
+                "new_name": "MARK Off",
+                "prefix": "Copy (3)",
+                "collision": False,
+                "token": "22001",
+            }],
+        }],
+        "total_rows": 1,
+        "total_available_rows": 1,
+        "prefixes_seen": ["Copy (3)"],
+        "warnings": [],
+    }
+    monkeypatch.setattr("utils.db.guess_catalog_type", lambda database: "drawing style")
+    monkeypatch.setattr("utils.metadata.get", lambda database: {})
+    monkeypatch.setattr("utils.drawing_styles.preview_deep_copy_rename", lambda *a, **k: fake_plan)
+
+    client = app.test_client()
+    get_resp = client.get("/db/Marks_Railing/drawing-style/rename-copies?replacement_prefix=MARK")
+    assert get_resp.status_code == 200
+    body = get_resp.get_data(as_text=True)
+    assert "Copy (3) Off" in body and "MARK Off" in body
+
+    with client.session_transaction() as sess:
+        csrf = sess["_csrf"]
+
+    # Fail-closed when snapshot fails: apply_deep_copy_rename must not run.
+    applied = []
+    monkeypatch.setattr(
+        "utils.drawing_styles.apply_deep_copy_rename",
+        lambda *a, **k: applied.append((a, k)) or {"DetObjAppearance": 1},
+    )
+
+    def fail_snap(database, reason):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr("utils.snapshots.create_snapshot", fail_snap)
+    fail_resp = client.post(
+        "/db/Marks_Railing/drawing-style/rename-copies",
+        data={"csrf_token": csrf, "action": "apply", "replacement_prefix": "MARK"},
+    )
+    assert fail_resp.status_code == 200
+    assert "Pre-change snapshot failed" in fail_resp.get_data(as_text=True)
+    assert applied == []
+
+    # When snapshot succeeds, apply runs and redirects to the style editor.
+    monkeypatch.setattr(
+        "utils.snapshots.create_snapshot",
+        lambda database, reason: {"filename": "Marks_Railing_snap.bak"},
+    )
+    ok_resp = client.post(
+        "/db/Marks_Railing/drawing-style/rename-copies",
+        data={"csrf_token": csrf, "action": "apply", "replacement_prefix": "MARK"},
+    )
+    assert ok_resp.status_code == 302
+    assert ok_resp.headers["Location"].endswith("/db/Marks_Railing/drawing-style")
+    assert len(applied) == 1

@@ -1,0 +1,172 @@
+<!-- templates/drawing_style_rename.html -->
+{% extends "base.html" %}
+{% block title %}Rename Deep Copies &mdash; {{ database }}{% endblock %}
+{% block content %}
+<p>
+  <a href="/db/{{ database }}">&laquo; {{ database }}</a>
+  &middot;
+  <a href="/db/{{ database }}/drawing-style">Drawing Style Editor</a>
+</p>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="mb-0">
+    {{ icon('tag', 18) }} Rename Deep-Copy Prefixes
+    <small class="text-muted">{{ database }}</small>
+  </h4>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/db/{{ database }}/drawing-style" class="btn btn-sm btn-outline-primary">{{ icon('drawing') }} Style Editor</a>
+    <a href="/db/{{ database }}/drawing-style/usage" class="btn btn-sm btn-outline-secondary">Sub-style usage</a>
+  </div>
+</div>
+
+{% if library_label %}
+<div class="alert alert-warning d-flex justify-content-between align-items-start gap-3">
+  <div>
+    <strong>Read-only copy.</strong>
+    This database was attached from a delivered Advance Steel library ({{ library_label }}).
+    You can preview the rename plan below, but applying changes is blocked.
+  </div>
+  <span class="badge bg-warning text-dark text-nowrap">read-only</span>
+</div>
+{% endif %}
+
+<div class="card shadow-sm border-0 mb-3 bg-white">
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      Advance Steel's <strong>Deep copy</strong> duplicates a drawing style and every sub-style it references,
+      prefixing each copied record's <code>RunName</code> with <code>Copy of</code> or <code>Copy (1)</code>,
+      <code>Copy (2)</code>, <code>Copy (3)</code>, and so on. Use this tool to strip those prefixes or replace
+      them with your own prefix (for example <code>MARK</code> or <code>Marks -</code>) across all style and
+      sub-style tables in one transaction after a pre-change backup snapshot.
+    </p>
+
+    <form method="post" action="{{ url_for('drawing_style_rename_copies', database=database) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="table_filter_submitted" value="1">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label for="replacementPrefix" class="form-label small fw-bold mb-1">
+            Replacement prefix <span class="text-muted fw-normal">(leave blank to strip <code>Copy of</code> / <code>Copy (n)</code>)</span>
+          </label>
+          <input type="text" id="replacementPrefix" name="replacement_prefix"
+                 value="{{ replacement_prefix }}"
+                 placeholder="e.g. MARK or Marks - (blank strips prefix)"
+                 class="form-control form-control-sm">
+        </div>
+        <div class="col-md-7 d-flex gap-2 flex-wrap">
+          <button type="submit" name="action" value="preview" class="btn btn-sm btn-primary">
+            {{ icon('preview') }} Preview Changes
+          </button>
+          {% if plan.total_rows > 0 and not library_label %}
+          <button type="submit" name="action" value="apply" class="btn btn-sm btn-warning fw-bold"
+                  onclick="return confirm('Take a snapshot and rename {{ plan.total_rows }} deep-copied record(s) across {{ plan.tables|length }} table(s)?');">
+            {{ icon('save') }} Apply Rename ({{ plan.total_rows }} row{{ '' if plan.total_rows == 1 else 's' }})
+          </button>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if plan.available_tables %}
+      <div class="mt-3 pt-2 border-top">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="small fw-bold text-muted text-uppercase">Tables with deep-copy prefixes ({{ plan.available_tables|length }})</span>
+          <span class="small">
+            <button type="button" class="btn btn-link btn-sm p-0 me-2"
+                    onclick="document.querySelectorAll('.dc-tbl-check').forEach(c => c.checked = true)">Select all</button>
+            <button type="button" class="btn btn-link btn-sm p-0"
+                    onclick="document.querySelectorAll('.dc-tbl-check').forEach(c => c.checked = false)">Clear all</button>
+          </span>
+        </div>
+        <div class="d-flex flex-wrap gap-3 small">
+          {% for t in plan.available_tables %}
+          <label class="form-check-label d-flex align-items-center gap-1">
+            <input type="checkbox" class="form-check-input dc-tbl-check m-0"
+                   name="include_tables" value="{{ t.table }}"
+                   {% if t.selected %}checked{% endif %}>
+            <span>{{ t.label }} <code class="text-muted">({{ t.table }})</code></span>
+            <span class="badge bg-secondary">{{ t.count }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if plan.warnings %}
+<div class="alert alert-warning small">
+  <strong>{{ icon('warn') }} Duplicate name warning:</strong>
+  <ul class="mb-0 mt-1">
+    {% for w in plan.warnings %}
+    <li>{{ w }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if plan.total_available_rows == 0 %}
+<div class="alert alert-success small">
+  &#10004; No records with a leading <code>Copy of</code> or <code>Copy (n)</code> prefix were found in <strong>{{ database }}</strong>.
+</div>
+{% elif plan.total_rows == 0 %}
+<div class="alert alert-info small">
+  {{ plan.total_available_rows }} deep-copied record(s) exist in this export, but no tables are currently selected. Check at least one table above and click <strong>Preview Changes</strong>.
+</div>
+{% else %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 small text-muted">
+  <span>
+    Showing <strong>{{ plan.total_rows }}</strong> proposed rename{{ '' if plan.total_rows == 1 else 's' }}
+    across <strong>{{ plan.tables|length }}</strong> table{{ '' if plan.tables|length == 1 else 's' }}.
+    {% if plan.prefixes_seen %}
+    Matched prefix{{ '' if plan.prefixes_seen|length == 1 else 'es' }}:
+    {% for p in plan.prefixes_seen %}<code class="me-1">{{ p }}</code>{% endfor %}
+    {% endif %}
+  </span>
+</div>
+
+{% for tbl in plan.tables %}
+<div class="card shadow-sm border-0 mb-3 bg-white">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+    <span><strong>{{ tbl.label }}</strong> <code class="text-white-50 ms-1">{{ tbl.table }}</code></span>
+    <span class="badge bg-light text-dark">{{ tbl.count }} row{{ '' if tbl.count == 1 else 's' }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 small align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:7rem">Key</th>
+          <th style="width:8rem">Matched prefix</th>
+          <th>Current <code>RunName</code></th>
+          <th>Proposed <code>RunName</code></th>
+          <th style="width:4rem"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in tbl.rows %}
+        <tr {% if r.collision %}class="table-warning"{% endif %}>
+          <td><code>#{{ r.key_display }}</code></td>
+          <td><span class="badge bg-light text-dark border"><code>{{ r.prefix }}</code></span></td>
+          <td><code>{{ r.old_name }}</code></td>
+          <td>
+            <strong><code>{{ r.new_name }}</code></strong>
+            {% if r.collision %}
+            <span class="badge bg-warning text-dark ms-1" title="Another row in {{ tbl.table }} will have this same RunName">duplicate in table</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            {% if r.token %}
+            <a href="{{ url_for('edit_row', database=database, table=tbl.table, pk_val=r.token, return_to=url_for('drawing_style_rename_copies', database=database)) }}"
+               class="text-decoration-none" title="Open raw row">row &rarr;</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

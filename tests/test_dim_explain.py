@@ -223,7 +223,11 @@ RAIL_GROUPS = {1: "Mp\r\n", 14: "Railings\r\n"}
 def test_copy_prefixes_are_dropped_for_display():
     assert dx.clean_name("Copy of Copy of X view") == "X view"
     assert dx.clean_name("Copy (2) of Mp") == "Mp"
+    assert dx.clean_name("Copy (3) Not Visible") == "Not Visible"
+    assert dx.clean_name('Copy (1) 0" distance') == '0" distance'
     assert dx.clean_name("Copyright plate") == "Copyright plate"
+    assert dx.split_copy_prefix("Copy (3) Off") == ("Copy (3) ", "Off")
+    assert dx.split_copy_prefix("Copy of ") == ("", "Copy of ")
 
 
 def test_pipe_style_rule_names_are_read():

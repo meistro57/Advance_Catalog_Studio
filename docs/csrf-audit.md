@@ -43,6 +43,7 @@ session CSRF token.
 | `/db/<db>/<table>/<pk>/delete` | `delete_row_route` | DELETE | required |
 | `/db/<db>/drawing-style/save` | `drawing_style_save` | UPDATE style fields | required |
 | `/db/<db>/drawing-style/rule` | `drawing_style_rule` | rule copy/reorder/delete | required |
+| `/db/<db>/drawing-style/rename-copies` | `drawing_style_rename_copies` | snapshot + multi-table deep-copy `RunName` rename | required |
 | `/db/<db>/drawing-style/diagram` | `drawing_style_diagram` | none (redraws a figure) | required anyway (htmx posts it) |
 | `/detail-diff` | `detail_diff` | none (parses two uploaded DXFs in the request) | required anyway (a file upload is a POST) |
 

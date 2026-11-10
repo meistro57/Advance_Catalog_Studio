@@ -1318,6 +1318,104 @@ def drawing_style_usage(database):
     )
 
 
+@app.route("/db/<database>/drawing-style/rename-copies", methods=["GET", "POST"])
+def drawing_style_rename_copies(database):
+    """Preview and rename 'Copy of ' / 'Copy (n) ' prefixes from Deep Copy (issue #16)."""
+    if db.guess_catalog_type(database) != "drawing style":
+        flash("This database isn't a drawing-style export.", "warning")
+        return redirect(url_for("show_database", database=database))
+
+    replacement_prefix = request.values.get("replacement_prefix", "")
+    if request.method == "POST" and "table_filter_submitted" in request.form:
+        include_tables = request.form.getlist("include_tables")
+    else:
+        include_tables = None
+
+    lib_label = metadata.library_label(metadata.get(database).get("library"))
+
+    if request.method == "POST" and request.form.get("action") == "apply":
+        blocked = _blocked_write(database)
+        if blocked:
+            return blocked
+        try:
+            plan = drawing_styles.preview_deep_copy_rename(
+                database,
+                replacement_prefix=replacement_prefix,
+                include_tables=include_tables,
+            )
+        except Exception as e:
+            flash(f"Could not build the rename plan: {e}", "danger")
+            return redirect(url_for("drawing_style", database=database))
+
+        if not plan["total_rows"]:
+            flash("No deep-copy prefixes matched in the selected tables.", "warning")
+            return render_template(
+                "drawing_style_rename.html",
+                database=database,
+                plan=plan,
+                replacement_prefix=replacement_prefix,
+                library_label=lib_label,
+            )
+
+        reason_tag = replacement_prefix.strip() or "strip"
+        try:
+            snapshot = snapshots.create_snapshot(
+                database, f"rename deep copies ({reason_tag[:20]})"
+            )
+        except Exception as e:
+            flash(
+                f"Pre-change snapshot failed, so nothing was renamed: {e}",
+                "danger",
+            )
+            return render_template(
+                "drawing_style_rename.html",
+                database=database,
+                plan=plan,
+                replacement_prefix=replacement_prefix,
+                library_label=lib_label,
+            )
+
+        try:
+            counts = drawing_styles.apply_deep_copy_rename(
+                database,
+                replacement_prefix=replacement_prefix,
+                include_tables=include_tables,
+            )
+            total = sum(counts.values())
+            summary_parts = [f"{t} ({cnt})" for t, cnt in counts.items()]
+            action_desc = (
+                f"replaced deep-copy prefixes with '{replacement_prefix.strip()}'"
+                if replacement_prefix.strip()
+                else "stripped deep-copy prefixes"
+            )
+            flash(
+                f"Renamed {total} record(s) across {len(counts)} table(s) ({action_desc}): "
+                f"{', '.join(summary_parts)}. Snapshot: {snapshot['filename']}.",
+                "success",
+            )
+            return redirect(url_for("drawing_style", database=database))
+        except Exception as e:
+            flash(f"Deep-copy rename failed: {e}", "danger")
+
+    try:
+        plan = drawing_styles.preview_deep_copy_rename(
+            database,
+            replacement_prefix=replacement_prefix,
+            include_tables=include_tables,
+        )
+    except Exception as e:
+        flash(f"Could not build the rename preview: {e}", "danger")
+        return redirect(url_for("drawing_style", database=database))
+
+    return render_template(
+        "drawing_style_rename.html",
+        database=database,
+        plan=plan,
+        replacement_prefix=replacement_prefix,
+        library_label=lib_label,
+    )
+
+
 @app.route("/db/<database>/drawing-style")
 def drawing_style(database):
     if db.guess_catalog_type(database) != "drawing style":
