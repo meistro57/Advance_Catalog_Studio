@@ -15,6 +15,8 @@ manufacturing drawing.
 import html
 import math
 
+from utils import fabrication as fab
+
 MM_PER_IN = 25.4
 
 INK = "#212529"
@@ -60,6 +62,15 @@ def _in(mm):
     if rounded == int(rounded):
         return str(int(rounded))
     return f"{rounded:g}"
+
+
+def _dim(mm, units="in"):
+    """Format a millimetre value in 'in' (decimal), 'frac' (1/16 in), or 'mm'."""
+    if units == "mm":
+        return f"{fab.format_mm(_to_float(mm, 0.0))} mm"
+    if units == "frac":
+        return f"{fab.format_in(_to_float(mm, 0.0))} in"
+    return f"{_in(mm)} in"
 
 
 def _text(x, y, content, cls="bp-label", anchor="start"):
@@ -195,18 +206,22 @@ def profile_svg(view):
         parts.append(f'<circle class="bp-balloon" cx="{balloon_x:.1f}" cy="{balloon_y:.1f}" r="7.5"/>')
         parts.append(_text(balloon_x, balloon_y + 3.4, str(i + 1), "bp-balloon-text", "middle"))
 
+    units = str(view.get("units") or "in").strip().lower()
+    if units not in ("in", "frac", "mm"):
+        units = "in"
+
     head_px = max(head_w * scale, 6.0)
     dim_y = axis_y + max(grip_w_mm * scale, head_px) / 2 + 26
-    parts += _bracket(x_head0, x_tip, dim_y, f"overall {_in(total)} in")
-    parts += _bracket(x_face, x_tip, dim_y + 22, f"shank under head {_in(length)} in")
+    parts += _bracket(x_head0, x_tip, dim_y, f"overall {_dim(total, units)}")
+    parts += _bracket(x_face, x_tip, dim_y + 22, f"shank under head {_dim(length, units)}")
     if grip_thickness > 0:
         gx0 = x_face + grip_bottom * scale
         gx1 = x_face + (grip_bottom + grip_thickness) * scale
-        parts += _bracket(gx0, gx1, dim_y + 44, f"grip {_in(grip_thickness)} in")
+        parts += _bracket(gx0, gx1, dim_y + 44, f"grip {_dim(grip_thickness, units)}")
 
-    head_note = f"head {_in(head_w)} in across flats \u00d7 {_in(head_h)} in high"
+    head_note = f"head {_dim(head_w, units)} across flats \u00d7 {_dim(head_h, units)} high"
     parts.append(_text(left, dim_y + 84, head_note, "bp-note"))
-    parts.append(_text(left, dim_y + 98, f"shank \u2300 {_in(diameter)} in", "bp-note"))
+    parts.append(_text(left, dim_y + 98, f"shank \u2300 {_dim(diameter, units)}", "bp-note"))
 
     legend_top = dim_y + 120
     legend = []
@@ -219,7 +234,7 @@ def profile_svg(view):
             f"{_wrap_label(c.get('standard') or c.get('din') or '?', 18)}"
         )
         height_mm = _to_float(c.get("height"))
-        entry += f" · h {_in(height_mm)} in" if height_mm else " · no height"
+        entry += f" · h {_dim(height_mm, units)}" if height_mm else " · no height"
         if c.get("matched") is False:
             entry += " · UNMATCHED"
         if c.get("schematic_height"):
@@ -232,11 +247,12 @@ def profile_svg(view):
         row = i % rows
         parts.append(_text(left + column * 300, legend_top + row * 14, entry, "bp-legend"))
     note_y = legend_top + rows * 14 + 10
+    unit_word = "millimetres" if units == "mm" else "inches"
     parts.append(
         _text(
             left,
             note_y,
-            "Schematic from catalog records and shown in inches; not a manufacturing drawing. "
+            f"Schematic from catalog records and shown in {unit_word}; not a manufacturing drawing. "
             "Side split from the Position sign is unverified.",
             "bp-note",
         )
@@ -295,4 +311,11 @@ def sanitize_layout(payload):
             "matched": bool(item.get("matched", True)),
             "schematic_height": bool(item.get("schematic_height", False)),
         })
-    return {"bolt": clean_bolt, "grip": clean_grip, "components": clean_components}
+    raw_units = str(payload.get("units") or "in").strip().lower()
+    units = raw_units if raw_units in ("in", "frac", "mm") else "in"
+    return {
+        "bolt": clean_bolt,
+        "grip": clean_grip,
+        "components": clean_components,
+        "units": units,
+    }

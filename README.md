@@ -46,9 +46,9 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Catalog types | Bolt, anchor, shear-stud (connector) and drawing-style exports |
 | Table editor raw row operations | Implemented |
 | Guided bolt/anchor diameter cloning & removal | Implemented (`/db/<db>/add-diameter`, `/db/<db>/remove-diameter`) |
-| Bolt-set visualizer (read-only) | 3D schematic + dimensioned 2D profile implemented |
+| Bolt-set visualizer (read-only) | 3D schematic + dimensioned 2D profile implemented (with fractional-inch / `mm` dimension toggle) |
 | Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
-| Anchor configurator (graphical viewer) | Implemented (read-only) |
+| Anchor configurator (graphical viewer) | Implemented (read-only, with fractional-inch / `mm` toggle and interactive **Bolt projection from concrete** control + `4″ Typical` preset) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Auto-detected; read-only family/diameter/length browser with completeness checks and a preview-only clone proposal (write path pending schema verification) |
 | Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) with JSON/CSV downloads |

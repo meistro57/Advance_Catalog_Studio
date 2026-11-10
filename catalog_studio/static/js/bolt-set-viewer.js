@@ -46,6 +46,13 @@ const els = {
     ortho: $('orthoToggle'),
     resetView: $('resetViewBtn'),
     fitView: $('fitViewBtn'),
+    unitInBtn: $('unitInBtn'),
+    unitMmBtn: $('unitMmBtn'),
+    profileUnitHint: $('profileUnitHint'),
+    thDia: $('thDia'),
+    thHeight: $('thHeight'),
+    thWidth: $('thWidth'),
+    gripUnitLabel: $('gripUnitLabel'),
     caption: $('sceneCaption'),
     canvasHost: $('viewer3d'),
     fallback: $('webglFallback'),
@@ -71,6 +78,7 @@ const els = {
 let serverView = null;   // last payload from the server (original catalog state)
 let draft = null;        // client-side editable copy
 let display = null;      // draft run through layoutAssembly (what is rendered)
+let unitMode = 'in';     // 'in' (1/16" fractions) or 'mm'
 let scene, renderer, controls;
 let perspCamera, orthoCamera, camera;
 let assemblyGroup, labelGroup;
@@ -107,6 +115,38 @@ const MM_PER_IN = 25.4;
 function fin(mm) {
     if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
     return fmt(Number(mm) / MM_PER_IN);
+}
+
+function gcd(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) { const t = b; b = a % b; a = t; }
+    return a || 1;
+}
+
+function fracIn(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    const v = Number(mm);
+    const sign = v < 0 ? '-' : '';
+    const inches = Math.abs(v) / MM_PER_IN;
+    const sixteenths = Math.round(inches * 16);
+    const approx = Math.abs(inches - sixteenths / 16) > 5e-4 ? '\u2248 ' : '';
+    if (sixteenths === 0) return `${approx}0`;
+    const whole = Math.floor(sixteenths / 16);
+    const rem = sixteenths % 16;
+    if (rem === 0) return `${approx}${sign}${whole}`;
+    const g = gcd(rem, 16);
+    const frac = `${rem / g}/${16 / g}`;
+    return whole ? `${approx}${sign}${whole} ${frac}` : `${approx}${sign}${frac}`;
+}
+
+function fval(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    return unitMode === 'mm' ? fmt(mm) : fracIn(mm);
+}
+
+function fdim(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    return unitMode === 'mm' ? `${fmt(mm)} mm` : `${fracIn(mm)} in`;
 }
 
 function hexRadius(acrossFlats, sides = 6) {
@@ -315,7 +355,7 @@ function buildModel(view) {
     const headH = Number(bolt.head_height) || 0;
     const dia = Number(bolt.diameter) || 0;
     const headBottom = -headH;
-    const caption = `${view.selection.standard} / ${view.selection.set} / \u2300${fin(view.selection.diameter)} \u00d7 ${fin(view.selection.length)} in`;
+    const caption = `${view.selection.standard} / ${view.selection.set} / \u2300${fval(view.selection.diameter)} \u00d7 ${fdim(view.selection.length)}`;
 
     if (!assemblyGroup) {
         els.caption.textContent = caption;
@@ -378,16 +418,16 @@ function buildModel(view) {
     axis.computeLineDistances();
     dims.add(axis);
 
-    dimensionLine(axisBottom, axisTop, dimX, `total ${fin(L + headH)} in`, dims);
+    dimensionLine(axisBottom, axisTop, dimX, `total ${fdim(L + headH)}`, dims);
     if (gripH > 0.01) {
-        dimensionLine(gripBottom, gripBottom + gripH, dimX + 24, `grip ${fin(gripH)} in`, dims);
+        dimensionLine(gripBottom, gripBottom + gripH, dimX + 24, `grip ${fdim(gripH)}`, dims);
     }
     const diaLine = new THREE.LineBasicMaterial({ color: COLORS.dimline });
     const dx = shankR;
     const dY = axisBottom - 10;
     dims.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
         [new THREE.Vector3(-dx, dY, 0), new THREE.Vector3(dx, dY, 0)]), diaLine));
-    const diaLabel = makeLabel(`\u2300 ${fin(dia)} in`);
+    const diaLabel = makeLabel(`\u2300 ${fdim(dia)}`);
     diaLabel.position.set(0, dY - 4.5, 0);
     dims.add(diaLabel);
     assemblyGroup.add(dims);
@@ -556,7 +596,7 @@ function buildDisplay(d) {
         if (!p.matched) {
             warnings.push({
                 severity: p.role !== 'part' ? 'danger' : 'warning', code: 'unmatched_component',
-                message: `Slot ${p.slot}: no unique SetNutsBolts record for Standard '${p.standard}', diameter ${fin(p.diameter)} in. Shown without catalog dimensions.`,
+                message: `Slot ${p.slot}: no unique SetNutsBolts record for Standard '${p.standard}', diameter ${fdim(p.diameter)}. Shown without catalog dimensions.`,
             });
         }
     }
@@ -594,9 +634,9 @@ function renderBoltPanel() {
     infoRows(els.boltInfo, [
         ['Standard', b.standard || '\u2013'],
         ['Material', b.material || '\u2013'],
-        ['Diameter', `${fin(b.diameter)} in`],
-        ['Length (under head)', `${fin(b.length)} in`],
-        ['Head', `${fin(b.head_width)} w \u00d7 ${fin(b.head_height)} h, ${b.head_corners || 6}-sided${b.head_corners_assumed ? ' *' : ''}`],
+        ['Diameter', fdim(b.diameter)],
+        ['Length (under head)', fdim(b.length)],
+        ['Head', `${fval(b.head_width)} w \u00d7 ${fdim(b.head_height)} h, ${b.head_corners || 6}-sided${b.head_corners_assumed ? ' *' : ''}`],
         ['Name', b.name || '\u2013'],
         ['Weight', b.weight != null ? `${fmt(b.weight)} kg` : '\u2013'],
         ['Source', 'SetBolts'],
@@ -624,13 +664,13 @@ function renderSummary() {
     const gripMode = draft && draft.gripMode === 'fixed' ? 'fixed' : 'auto';
 
     infoRows(els.summary, [
-        ['Bolt', `${b.standard || '\u2013'} &middot; &#8960; ${fin(b.diameter)} &times; ${fin(b.length)} in`],
-        ['Head', `${fin(b.head_width)} across flats &times; ${fin(b.head_height)} high${b.head_corners_assumed ? ' (6 sides assumed)' : ''}`],
-        ['Overall with head', `${fin((Number(b.length) || 0) + (Number(b.head_height) || 0))} in`],
-        ['Clamped material', `${fin(display.grip ? display.grip.thickness : 0)} in (${gripMode})`],
-        ['Head-side hardware', `${headSide.length} part(s) &middot; ${fin(headUsed)} in`],
-        ['Nut-side hardware', `${nutSide.length} part(s) &middot; ${fin(nutUsed)} in`],
-        ['Thread past nut', protrusion == null ? '\u2013' : `${fin(protrusion)} in`],
+        ['Bolt', `${b.standard || '\u2013'} &middot; &#8960; ${fval(b.diameter)} &times; ${fdim(b.length)}`],
+        ['Head', `${fdim(b.head_width)} across flats &times; ${fdim(b.head_height)} high${b.head_corners_assumed ? ' (6 sides assumed)' : ''}`],
+        ['Overall with head', fdim((Number(b.length) || 0) + (Number(b.head_height) || 0))],
+        ['Clamped material', `${fdim(display.grip ? display.grip.thickness : 0)} (${gripMode})`],
+        ['Head-side hardware', `${headSide.length} part(s) &middot; ${fdim(headUsed)}`],
+        ['Nut-side hardware', `${nutSide.length} part(s) &middot; ${fdim(nutUsed)}`],
+        ['Thread past nut', protrusion == null ? '\u2013' : fdim(protrusion)],
         ['Records', `${parts.length} slot(s) &middot; ${unmatched} unmatched &middot; ${schematic} schematic`],
     ]);
 }
@@ -640,12 +680,16 @@ function updateProfileBadge() {
     const dirty = display && display.dirty;
     els.profileBadge.textContent = dirty ? 'your preview' : 'catalog records';
     els.profileBadge.className = `badge ${dirty ? 'bg-info text-dark' : 'bg-secondary'}`;
+    if (els.profileUnitHint) {
+        els.profileUnitHint.textContent = unitMode === 'mm' ? '(mm, schematic)' : '(fractional inches, schematic)';
+    }
 }
 
 function profilePayload() {
     if (!display || !display.ok) return null;
     return {
         csrf_token: window.BOLT_CSRF || '',
+        units: unitMode === 'mm' ? 'mm' : 'frac',
         bolt: display.bolt || {},
         grip: display.grip || {},
         components: (display.components || []).map((p) => ({
@@ -690,9 +734,9 @@ function describePart(p) {
         ['Slot', `DIN${p.slot}`],
         ['Standard', p.standard],
         ['Material', p.material || '\u2013'],
-        ['Diameter', p.diameter != null ? `${fin(p.diameter)} in` : '\u2013'],
-        ['Height', p.height != null ? `${fin(p.height)} in` : 'no record'],
-        ['Width', p.width != null ? `${fin(p.width)} in` : 'no record'],
+        ['Diameter', p.diameter != null ? fdim(p.diameter) : '\u2013'],
+        ['Height', p.height != null ? fdim(p.height) : 'no record'],
+        ['Width', p.width != null ? fdim(p.width) : 'no record'],
         ['Corners', p.corners != null ? String(p.corners) : 'no record'],
         ['Position field', p.position != null ? String(p.position) : '\u2013'],
     ];
@@ -757,19 +801,20 @@ function renderRules(view) {
         els.rules.innerHTML = '<div class="text-muted small">No ScrewNew length rules for this diameter.</div>';
         return;
     }
+    const unitLabel = unitMode === 'mm' ? 'mm' : 'in';
     const active = view.active_screw_band;
     const tbl = document.createElement('table');
     tbl.className = 'table table-sm table-striped mb-0 small';
-    tbl.innerHTML = '<thead><tr><th>Grip range (in)</th><th>Base length (in)</th><th>Delta (in)</th><th>Set</th></tr></thead>';
+    tbl.innerHTML = `<thead><tr><th>Grip range (${unitLabel})</th><th>Base length (${unitLabel})</th><th>Delta (${unitLabel})</th><th>Set</th></tr></thead>`;
     const body = document.createElement('tbody');
     for (const band of bands) {
         const tr = document.createElement('tr');
         const isActive = active && active.grip_min === band.grip_min && active.grip_max === band.grip_max && active.base_length === band.base_length;
         if (isActive) tr.className = 'table-info';
         tr.innerHTML = [
-            `<td>${fin(band.grip_min)}\u2013${fin(band.grip_max)}${isActive ? ' \u2190 grip' : ''}</td>`,
-            `<td>${fin(band.base_length)}</td>`,
-            `<td>${fin(band.length_delta)}</td>`,
+            `<td>${fval(band.grip_min)}\u2013${fval(band.grip_max)}${isActive ? ' \u2190 grip' : ''}</td>`,
+            `<td>${fval(band.base_length)}</td>`,
+            `<td>${fval(band.length_delta)}</td>`,
             `<td>${band.set || '\u2013'}</td>`,
         ].join('');
         body.appendChild(tr);
@@ -787,6 +832,10 @@ const ROLE_SWATCH = {
 };
 
 function renderTable(view) {
+    const unitLabel = unitMode === 'mm' ? 'mm' : 'in';
+    if (els.thDia) els.thDia.textContent = `Dia (${unitLabel})`;
+    if (els.thHeight) els.thHeight.textContent = `Height (${unitLabel})`;
+    if (els.thWidth) els.thWidth.textContent = `Width (${unitLabel})`;
     const rows = view.components || [];
     els.tableBody.innerHTML = '';
     if (!rows.length) {
@@ -801,7 +850,7 @@ function renderTable(view) {
             ? '<span class="badge bg-danger">unmatched</span>'
             : (p.changed ? '<span class="badge bg-info text-dark">preview</span>' : '<span class="badge bg-success">ok</span>');
         const height = p.height != null
-            ? `${fin(p.height)}${p.schematic_height ? ' <span class="text-muted" title="No height in SetNutsBolts; a schematic thickness is drawn.">*</span>' : ''}`
+            ? `${fval(p.height)}${p.schematic_height ? ' <span class="text-muted" title="No height in SetNutsBolts; a schematic thickness is drawn.">*</span>' : ''}`
             : '<span class="text-muted">–</span>';
         const swatch = ROLE_SWATCH[p.role] || ROLE_SWATCH.part;
         tr.innerHTML = [
@@ -811,9 +860,9 @@ function renderTable(view) {
             `<td class="text-end">${p.layer != null ? Number(p.layer) + 1 : '\u2013'}</td>`,
             `<td>${p.standard}${p.changed && p.standard !== p.orig_din ? ` <span class="text-muted small" title="original: ${p.orig_din}">(orig ${p.orig_din})</span>` : ''}</td>`,
             `<td>${p.material || '\u2013'}</td>`,
-            `<td class="text-end">${fin(p.diameter)}</td>`,
+            `<td class="text-end">${fval(p.diameter)}</td>`,
             `<td class="text-end">${height}</td>`,
-            `<td class="text-end">${fin(p.width)}</td>`,
+            `<td class="text-end">${fval(p.width)}</td>`,
             `<td class="text-end">${p.position != null ? p.position : '\u2013'}</td>`,
             `<td>${p.name || p.standard}</td>`,
             `<td>${badge}</td>`,
@@ -1019,13 +1068,13 @@ function renderEditor() {
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = currentKey
-            ? `${s.part.standard} \u00b7 ${s.part.name || ''} \u00b7 ${s.part.material} \u00b7 h ${fin(s.part.height)} \u00b7 \u2300${fin(s.part.width || s.part.diameter)} in`
+            ? `${s.part.standard} \u00b7 ${s.part.name || ''} \u00b7 ${s.part.material} \u00b7 h ${fval(s.part.height)} \u00b7 \u2300${fdim(s.part.width || s.part.diameter)}`
             : `(no SetNutsBolts record for ${s.orig.part.standard})`;
         partSel.appendChild(placeholder);
         for (const p of opts) {
             const o = document.createElement('option');
             o.value = optionKey(p);
-            o.textContent = `${p.standard} \u00b7 ${p.name || ''} \u00b7 ${p.material} \u00b7 h ${fin(p.height)} \u00b7 \u2300${fin(p.width || p.diameter)} in`;
+            o.textContent = `${p.standard} \u00b7 ${p.name || ''} \u00b7 ${p.material} \u00b7 h ${fval(p.height)} \u00b7 \u2300${fdim(p.width || p.diameter)}`;
             if (currentKey && o.value === currentKey) {
                 placeholder.disabled = true;
                 o.selected = true;
@@ -1114,16 +1163,39 @@ function commit() {
     els.detail.innerHTML = '<div class="text-muted small">Hover a rendered component to identify its source record.</div>';
 }
 
+function updateComboDropdownLabels() {
+    if (!els.combo) return;
+    for (const opt of Array.from(els.combo.options)) {
+        const diaMm = opt.dataset.diameter;
+        if (diaMm === undefined || diaMm === '') continue;
+        opt.textContent = `${opt.dataset.standard || ''} \u00b7 ${opt.dataset.set || ''} \u00b7 ${opt.dataset.material || ''} \u00b7 \u2300 ${fdim(diaMm)}`;
+    }
+}
+
+function updateLengthDropdownLabels(view) {
+    if (!els.length || !view) return;
+    const current = Number(view.selection.length);
+    els.length.innerHTML = '';
+    for (const len of view.available_lengths || []) {
+        const opt = document.createElement('option');
+        opt.value = len;
+        opt.textContent = fdim(len);
+        if (len === current) opt.selected = true;
+        els.length.appendChild(opt);
+    }
+}
+
 function updateDirtyUI() {
     const dirty = display && display.dirty;
     els.editorBadge.textContent = dirty ? 'unsaved preview changes' : 'no changes';
     els.editorBadge.className = `badge ${dirty ? 'bg-warning text-dark' : 'bg-secondary'}`;
     els.resetDraft.disabled = !dirty;
     els.draftNotice.classList.toggle('d-none', !dirty);
+    if (els.gripUnitLabel) els.gripUnitLabel.textContent = unitMode === 'mm' ? 'mm' : 'in';
     const grip = display ? display.grip : null;
     const modeTxt = draft.gripMode === 'fixed' ? 'fixed' : 'auto';
     els.gripResult.textContent = grip
-        ? `effective grip: ${fin(grip.thickness)} in (${modeTxt})`
+        ? `effective grip: ${fdim(grip.thickness)} (${modeTxt})`
         : '';
 }
 
@@ -1134,6 +1206,24 @@ function resetDraft() {
     els.gripValue.disabled = true;
     els.gripValue.value = '';
     commit();
+}
+
+function setUnitMode(nextMode) {
+    unitMode = nextMode === 'mm' ? 'mm' : 'in';
+    if (els.unitInBtn) els.unitInBtn.classList.toggle('active', unitMode === 'in');
+    if (els.unitMmBtn) els.unitMmBtn.classList.toggle('active', unitMode === 'mm');
+    updateComboDropdownLabels();
+    if (serverView) {
+        updateLengthDropdownLabels(serverView);
+        renderBoltPanel();
+        renderRules(serverView);
+        if (!els.gripAuto.checked && draft) {
+            const mmVal = Math.max(Number(draft.gripValue) || 0, 0);
+            els.gripValue.value = unitMode === 'mm' ? fmt(mmVal) : fmt(mmVal / MM_PER_IN);
+        }
+        profileClean = false;
+        commit();
+    }
 }
 
 /* ------------------------------------------------------------------ data loading */
@@ -1163,20 +1253,12 @@ async function loadSelection(preserveLength = true) {
         const view = await fetchPayload(params);
         if (seq !== loadSeq) return;
 
-        const current = Number(view.selection.length);
-        els.length.innerHTML = '';
-        for (const len of view.available_lengths || []) {
-            const opt = document.createElement('option');
-            opt.value = len;
-            opt.textContent = `${fin(len)} in`;
-            if (len === current) opt.selected = true;
-            els.length.appendChild(opt);
-        }
-
         serverView = view;
+        updateComboDropdownLabels();
+        updateLengthDropdownLabels(view);
         if (els.profile) {
             els.profile.innerHTML = view.profile_svg || '';
-            profileClean = true;
+            profileClean = false;
         }
         renderBoltPanel();
         renderRules(view);
@@ -1231,14 +1313,18 @@ function wire() {
         els.gripValue.disabled = els.gripAuto.checked;
         if (!els.gripAuto.checked && !els.gripValue.value) {
             const d = display ? display.grip.thickness : (serverView.grip ? serverView.grip.thickness : 0);
-            els.gripValue.value = fmt(Math.max(Number(d) || 0, 0) / MM_PER_IN);
+            const mmVal = Math.max(Number(d) || 0, 0);
+            els.gripValue.value = unitMode === 'mm' ? fmt(mmVal) : fmt(mmVal / MM_PER_IN);
         }
         commit();
     });
     els.gripValue.addEventListener('input', () => {
-        draft.gripValue = els.gripValue.value === '' ? 0 : (Number(els.gripValue.value) * MM_PER_IN);
+        const raw = Number(els.gripValue.value);
+        draft.gripValue = els.gripValue.value === '' ? 0 : (unitMode === 'mm' ? raw : raw * MM_PER_IN);
         commit();
     });
+    if (els.unitInBtn) els.unitInBtn.addEventListener('click', () => setUnitMode('in'));
+    if (els.unitMmBtn) els.unitMmBtn.addEventListener('click', () => setUnitMode('mm'));
 }
 
 initScene();

@@ -64,7 +64,8 @@ def test_classify_termination_kinds():
 def test_collect_distances_ignores_empty_fields():
     dists = an.collect_distances(def_row(DistanceA=38.1))
     labels = [d["label"] for d in dists]
-    assert "Top distance" in labels and "Distance A" in labels
+    assert "Bolt projection from concrete" in labels and "Distance A" in labels
+    assert "Top distance" not in labels
     assert all(d["value_mm"] not in (None, 0) for d in dists)
 
 
@@ -120,3 +121,51 @@ def test_build_anchor_layout_warns_when_stack_intrudes_below_concrete():
         {"length": 152.4, "thread_length": 76.2, "top_distance": 6.0}, top, [])
     codes = [w["code"] for w in layout["warnings"]]
     assert "stack_below_concrete" in codes
+
+
+def test_anchor_view_supports_top_distance_override(monkeypatch):
+    """Issue #19: anchor_view accepts top_distance_override while preserving catalog_top_distance_mm."""
+    monkeypatch.setattr(
+        an.dbcore, "list_tables", lambda db: ["AnchorsName", "AnchorsDefinition", "SetNutsBolts"]
+    )
+    monkeypatch.setattr(an, "_fetch_anchor_name", lambda db, aid: name_row())
+    monkeypatch.setattr(an, "_fetch_anchor_def", lambda db, did: def_row(length=304.8, top=50.8))
+    monkeypatch.setattr(an, "_fetch_nut_rows", lambda db: [])
+
+    default_view = an.anchor_view("US_Headed_Anchors", 1, 1)
+    assert default_view["ok"] is True
+    assert default_view["geometry"]["top_distance_mm"] == 50.8
+    assert default_view["geometry"]["catalog_top_distance_mm"] == 50.8
+    assert default_view["concrete_y"] == 254.0
+
+    overridden = an.anchor_view("US_Headed_Anchors", 1, 1, top_distance_override=101.6)
+    assert overridden["geometry"]["top_distance_mm"] == 101.6
+    assert overridden["geometry"]["catalog_top_distance_mm"] == 50.8
+    assert overridden["concrete_y"] == 203.2
+
+
+def test_anchor_configurator_template_has_projection_and_unit_controls():
+    """Issues #18, #19, #21: template includes projection controls, unit toggle, and all script element IDs."""
+    import os
+    import re
+    from flask import render_template
+    from app import app
+
+    with app.test_request_context("/"):
+        html = render_template(
+            "anchor_configurator.html",
+            database="US_Headed_Anchors",
+            options=[{
+                "anchor_id": 1, "standard": "ASTM F1554", "set_name": "MuS",
+                "material": "Gr36", "diameter": 19.05, "def_count": 4,
+            }],
+        )
+    assert "Bolt projection from concrete" in html
+    assert 'id="projectionInput"' in html
+    assert 'id="projTypical4Btn"' in html
+    assert 'id="projResetBtn"' in html
+    assert 'id="unitInBtn"' in html and 'id="unitMmBtn"' in html
+    script = open(os.path.join(app.root_path, "static", "js", "anchor-configurator.js")).read()
+    ids = set(re.findall(r"\$\('([A-Za-z0-9_]+)'\)", script))
+    missing = sorted(i for i in ids if f'id="{i}"' not in html)
+    assert missing == []

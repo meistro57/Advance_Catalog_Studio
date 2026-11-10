@@ -27,22 +27,27 @@
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-body py-3">
         <div class="row g-2 align-items-end">
-            <div class="col-lg-6">
+            <div class="col-lg-5">
                 <label class="form-label small fw-semibold text-muted mb-1">Anchor</label>
                 <select id="anchorSelect" class="form-select form-select-sm">
                     {% for o in options %}
                     <option value="{{ o.anchor_id }}"
-                            data-anchor-id="{{ o.anchor_id }}">
+                            data-anchor-id="{{ o.anchor_id }}"
+                            data-standard="{{ o.standard }}"
+                            data-set-name="{{ o.set_name }}"
+                            data-material="{{ o.material }}"
+                            data-diameter-mm="{{ o.diameter }}"
+                            data-def-count="{{ o.def_count }}">
                         {{ o.standard }} &middot; {{ o.set_name }} &middot; {{ o.material }} &middot; &#8960; {{ '%.4g'|format(o.diameter / 25.4) }} in {% if o.def_count == 0 %}(no lengths){% endif %}
                     </option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-3">
                 <label class="form-label small fw-semibold text-muted mb-1">Anchor Length / Part</label>
                 <select id="lengthSelect" class="form-select form-select-sm"></select>
             </div>
-            <div class="col-lg-2 d-flex gap-2 justify-content-end">
+            <div class="col-lg-2">
                 <label class="form-label small fw-semibold text-muted mb-1">Display</label>
                 <select id="modeSelect" class="form-select form-select-sm">
                     <option value="assembled">Assembled</option>
@@ -52,6 +57,29 @@
             <div class="col-lg-2 d-flex justify-content-end">
                 <a id="sheetLink" class="btn btn-sm btn-outline-primary d-none" target="_blank"
                    title="Open a printable fabrication detail sheet for the selected anchor">{{ icon('file') }} Detail Sheet</a>
+            </div>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <label for="projectionInput" class="form-label small fw-semibold text-muted mb-0">
+                    Bolt projection from concrete (<span id="projUnitLabel">in</span>)
+                </label>
+                <input id="projectionInput" type="number" min="0" step="0.0625"
+                       class="form-control form-control-sm" style="width:7.5rem"
+                       title="Adjust how far the anchor rod projects above the concrete top surface">
+                <button type="button" id="projTypical4Btn" class="btn btn-sm btn-outline-primary"
+                        title="Set bolt projection from concrete to typical 4 in (101.6 mm)">4&Prime; Typical</button>
+                <button type="button" id="projResetBtn" class="btn btn-sm btn-outline-secondary"
+                        title="Reset bolt projection to the catalog record's TopDistance">Catalog default</button>
+                <span id="projStatusText" class="text-muted small"></span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-semibold">Units:</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Dimension display units">
+                    <button type="button" id="unitInBtn" class="btn btn-outline-secondary active" title="Show dimensions in fractional inches (nearest 1/16 in)">Fractional in</button>
+                    <button type="button" id="unitMmBtn" class="btn btn-outline-secondary" title="Show dimensions in millimetres">mm</button>
+                </div>
             </div>
         </div>
     </div>
@@ -96,8 +124,8 @@
                 <table class="table table-sm table-striped mb-0" id="componentTable">
                     <thead><tr>
                         <th>Slot</th><th>End</th><th>Role</th><th>Standard (DIN)</th><th>Material</th>
-                        <th class="text-end">Dia (in)</th><th class="text-end">Height (in)</th>
-                        <th class="text-end">Width (in)</th><th class="text-end">Pos</th>
+                        <th class="text-end" id="thDia">Dia (in)</th><th class="text-end" id="thHeight">Height (in)</th>
+                        <th class="text-end" id="thWidth">Width (in)</th><th class="text-end">Pos</th>
                         <th>Name</th><th>Match</th>
                     </tr></thead>
                     <tbody></tbody>

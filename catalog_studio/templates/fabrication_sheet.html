@@ -13,6 +13,9 @@
     <form class="toolbar-form" method="get" id="sheetForm">
         <input type="hidden" name="anchor_id" value="{{ view.selection.anchor_id }}">
         <input type="hidden" name="def_id" value="{{ view.selection.def_id }}">
+        {% if request.args.get('projection_mm') %}
+        <input type="hidden" name="projection_mm" value="{{ request.args.get('projection_mm') }}">
+        {% endif %}
         <label>Paper
             <select name="page" onchange="this.form.submit()">
                 {% for key, sz in sheet_sizes.items() %}
@@ -94,7 +97,7 @@
                 <tr class="dim-row"><td>Thread length (top)</td>
                     <td class="val in">{{ geo.thread_length_mm|fin_fraction }} in</td></tr>
                 {% if geo.top_distance_mm %}
-                <tr class="dim-row"><td>Top projection</td>
+                <tr class="dim-row"><td>Bolt projection from concrete</td>
                     <td class="val in">{{ geo.top_distance_mm|fin_fraction }} in</td></tr>
                 {% endif %}
                 </tbody>

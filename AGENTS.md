@@ -284,10 +284,11 @@ transaction after taking a pre-change snapshot.
   data for freshly created anchor/bolt catalogs.
 - `catalog_studio/utils/bolt_profile.py` — dimensioned 2D elevation of the
   same assembly (head/shank/hardware/clamped material, numbered balloons, part
-  legend, inch dimensions). Pure and unit-tested; the browser posts its current
-  layout to `POST /db/<db>/bolt-set-viewer/sketch` so the drawing always matches
-  the 3D preview, and the payload embeds the initial profile. Keep it schematic
-  and keep the "unverified" footer wording.
+  legend, inch/fractional-inch/`mm` dimensions). Pure and unit-tested; the
+  browser posts its current layout (including `units`: `"in"`, `"frac"`, or
+  `"mm"`) to `POST /db/<db>/bolt-set-viewer/sketch` so the drawing always
+  matches the 3D preview, and the payload embeds the initial profile. Keep it
+  schematic and keep the "unverified" footer wording.
 - `catalog_studio/utils/bolt_sets.py` — bolt-set view model for the graphical
   bolt-set viewer (issue #1). Pure mapping functions (slot parsing,
   SetNutsBolts matching, Position interpretation, stack/grip layout, screw-rule
@@ -296,7 +297,11 @@ transaction after taking a pre-change snapshot.
   anchor configurator. Pure mapping functions (termination classification,
   end splitting, anchor layout) are unit-tested and shared slot/matching code
   is reused from `bolt_sets.py` (anchor component columns are `DiameterN`
-  without the bolt schema's " (mm)" suffix).
+  without the bolt schema's " (mm)" suffix). `TopDistance` is labelled `"Bolt
+  projection from concrete"` (issue #21), and `anchor_view()` accepts an
+  optional `top_distance_override` while preserving `catalog_top_distance_mm`
+  for the interactive projection control (issue #19). Both configurators offer
+  a **Fractional in** / **`mm`** dimension display toggle (issue #18).
 - `catalog_studio/utils/fabrication.py` — printable fabrication detail sheet
   (issue #2). Owns the documented US_Hooked_Anchors field mapping, inch
   fraction / metric / dual dimension formatting (nearest 1/16 in with an

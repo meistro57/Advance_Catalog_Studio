@@ -17,10 +17,13 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 543 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 547 tests; read-only bolt/anchor/stud/style views,
 the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; the
 home dashboard is split into Fastener Management and Drawing Style Management
-realms with distinct colour palettes (issue #20); writes are the bolt/anchor
+realms with distinct colour palettes (issue #20); both the Bolt-Set Viewer and
+Anchor Configurator include fractional-inch / `mm` dimension toggles (issue #18),
+and the Anchor Configurator has an interactive Bolt projection from concrete
+control with a 4" typical preset (issues #19, #21); writes are the bolt/anchor
 diameter clone and removal (issue #17), raw row CRUD, find & replace,
 drawing-style field/rule edits, and deep-copy `RunName` prefix renaming
 (issue #16).
@@ -79,9 +82,10 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   raw `SetNutsBolts` / `SetBolts` row (row token URLs), like the stud browser.
 - [ ] **B5 — Accessibility.** Keyboard navigation for the component table,
   focus states, `aria-label`s on the explode/perspective toggles.
-- [ ] **B6 — Dimension unit toggle (issue #18).** Add fractional-inch / `mm`
-  toggle buttons in the Bolt-Set Viewer and Anchor Configurator so users can
-  switch displayed dimensions between imperial fractions and millimetres.
+- [x] **B6 — Dimension unit toggle (issue #18).** Added fractional-inch (`1/16"`)
+  / `mm` toggle buttons in the Bolt-Set Viewer (`bolt_set_viewer.html`,
+  `bolt-set-viewer.js`, `bolt_profile.py`) and Anchor Configurator
+  (`anchor_configurator.html`, `anchor-configurator.js`).
 
 ## C. Anchor configurator and fabrication sheets
 
@@ -96,9 +100,11 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   dimension. Keep "NTS — USE WRITTEN DIMENSIONS".
 - [ ] **C4 — Hole definition table.** Show `AnchorsHoleDefinition` on the
   configurator with its source rows; currently only the elevation is visualised.
-- [ ] **C5 — Anchor projection control (issue #19).** Add an interactive
-  projection control in the Anchor Configurator (with a quick 4" typical preset)
-  to preview top projection and resulting embedment depth.
+- [x] **C5 — Anchor projection control & label (issues #19, #21).** Renamed
+  `TopDistance` display label to `"Bolt projection from concrete"` and added an
+  interactive projection control in the Anchor Configurator (with a quick 4"
+  typical preset, catalog reset, embedment readout, and `projection_mm`
+  pass-through to the fabrication detail sheet).
 
 ## D. Shear studs (issue #4)
 
@@ -275,3 +281,7 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [x] Split home interface into Fastener Management and Drawing Style Management
   realms with distinct cobalt-steel vs drafting-teal themes across the home page
   and drawing-style workspace pages (issue #20, 543 tests).
+- [x] Renamed `"Top distance"` to `"Bolt projection from concrete"` (issue #21),
+  added interactive anchor bolt projection control with a `4"` typical preset
+  (issue #19), and added fractional-inch / `mm` dimension display toggles across
+  both the Bolt-Set Viewer and Anchor Configurator (issue #18, 547 tests).

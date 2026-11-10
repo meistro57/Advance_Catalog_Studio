@@ -729,7 +729,21 @@ def anchor_configurator_payload(database):
             })
         if def_id not in [l["def_id"] for l in lengths]:
             def_id = lengths[0]["def_id"]
-        view = anchor_sets.anchor_view(database, anchor_id, def_id)
+        raw_proj = (request.args.get("projection_mm") or "").strip()
+        proj_override = None
+        if raw_proj:
+            try:
+                val = float(raw_proj)
+                if 0.0 <= val <= 10000.0:
+                    proj_override = val
+            except ValueError:
+                pass
+        if proj_override is not None:
+            view = anchor_sets.anchor_view(
+                database, anchor_id, def_id, top_distance_override=proj_override
+            )
+        else:
+            view = anchor_sets.anchor_view(database, anchor_id, def_id)
         view["available_lengths"] = lengths
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -877,7 +891,21 @@ def fabrication_sheet(database):
         flash("Select an anchor and a length to open its detail sheet.", "warning")
         return redirect(url_for("anchor_configurator", database=database))
 
-    view = anchor_sets.anchor_view(database, anchor_id, def_id)
+    raw_proj = (request.args.get("projection_mm") or "").strip()
+    proj_override = None
+    if raw_proj:
+        try:
+            val = float(raw_proj)
+            if 0.0 <= val <= 10000.0:
+                proj_override = val
+        except ValueError:
+            pass
+    if proj_override is not None:
+        view = anchor_sets.anchor_view(
+            database, anchor_id, def_id, top_distance_override=proj_override
+        )
+    else:
+        view = anchor_sets.anchor_view(database, anchor_id, def_id)
     if not view.get("ok"):
         flash(view.get("error", "Could not load that anchor record."), "danger")
         return redirect(url_for("anchor_configurator", database=database))

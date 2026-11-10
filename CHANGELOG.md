@@ -3,6 +3,15 @@
 All notable changes to **Advance Steel Catalog Studio** are documented in this file.
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`); the canonical version string lives in [`VERSION`](VERSION) and is exposed in the application via `config.APP_VERSION`.
 
+## [0.5.0] - 2026-11-10
+
+### Added
+- **Fractional-Inch / `mm` Dimension Toggle (`#18`)**: Added **Fractional in** (`1/16"` reduced fractions with `≈` markers) and **`mm`** toggle buttons in both the **Bolt-Set Viewer** (`/db/<db>/bolt-set-viewer`) and **Anchor Configurator** (`/db/<db>/anchor-configurator`), switching 3D dimension callouts, 2D profile sketches (`utils/bolt_profile.py`), dropdown labels, and component/geometry tables between imperial fractions and millimetres.
+- **Interactive Anchor Bolt Projection Control (`#19`)**: Added a live **Bolt projection from concrete** input, a **`4″ Typical`** (`101.6 mm`) preset button, and a **Catalog default** reset in the Anchor Configurator (plus `projection_mm` pass-through to the printable Fabrication Detail Sheet) to preview custom projections and resulting concrete embedment depth.
+
+### Changed
+- **Renamed `"Top distance"` to `"Bolt projection from concrete"` (`#21`)**: Updated the display label for `AnchorsDefinition.TopDistance` across `utils/anchor_sets.py`, the Anchor Configurator geometry panel and 3D callouts, and `templates/fabrication_sheet.html`.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added

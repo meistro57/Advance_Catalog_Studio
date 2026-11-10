@@ -34,7 +34,7 @@ from utils import bolt_sets as bs
 # Geometric fields on AnchorsDefinition that are meaningful but not drawn;
 # shown in the geometry summary with these labels.
 DISTANCE_FIELDS = [
-    ("TopDistance", "Top distance"),
+    ("TopDistance", "Bolt projection from concrete"),
     ("DistanceA", "Distance A"),
     ("DistanceE", "Distance E"),
     ("DistanceF", "Distance F"),
@@ -250,7 +250,12 @@ def _fetch_nut_rows(database: str) -> list:
     return rows
 
 
-def anchor_view(database: str, anchor_id: int, def_id: int) -> dict:
+def anchor_view(
+    database: str,
+    anchor_id: int,
+    def_id: int,
+    top_distance_override: float = None,
+) -> dict:
     """Assemble the full read-only anchor view model for one selection."""
     tables = set(dbcore.list_tables(database))
     if "AnchorsName" not in tables or "AnchorsDefinition" not in tables:
@@ -268,10 +273,16 @@ def anchor_view(database: str, anchor_id: int, def_id: int) -> dict:
     components = bs.annotate_components(slots, nut_rows)
     sides = split_sides(components)
 
+    catalog_top_distance = _round4(def_row.get("TopDistance"))
+    if top_distance_override is not None:
+        effective_top_distance = _round4(max(0.0, float(top_distance_override)))
+    else:
+        effective_top_distance = catalog_top_distance
+
     geometry = {
         "length": _round4(def_row.get("Length")),
         "thread_length": _round4(def_row.get("ThreadLength")),
-        "top_distance": _round4(def_row.get("TopDistance")),
+        "top_distance": effective_top_distance,
     }
     termination = classify_termination(def_row)
     bottom_start = termination["height"] if termination["kind"] == "head" else 0.0
@@ -327,6 +338,7 @@ def anchor_view(database: str, anchor_id: int, def_id: int) -> dict:
             "length_mm": geometry["length"],
             "thread_length_mm": geometry["thread_length"],
             "top_distance_mm": geometry["top_distance"],
+            "catalog_top_distance_mm": catalog_top_distance,
             "termination": termination,
             "distances": distances,
         },

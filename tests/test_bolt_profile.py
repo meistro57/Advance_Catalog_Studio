@@ -72,6 +72,24 @@ def test_profile_dimensions_are_reported_in_inches():
     assert "shank \u2300 0.75 in" in svg
 
 
+def test_profile_dimensions_support_fractional_inches_and_mm():
+    """Issue #18: profile_svg renders fractional inches ('frac') and millimetres ('mm')."""
+    svg_frac = bp.profile_svg(_view(units="frac"))
+    assert "overall 4 3/8 in" in svg_frac
+    assert "shank under head 4 in" in svg_frac
+    assert "head 7/8 in across flats \u00d7 3/8 in high" in svg_frac
+    assert "shank \u2300 3/4 in" in svg_frac
+    assert "h 1/8 in" in svg_frac
+
+    svg_mm = bp.profile_svg(_view(units="mm"))
+    assert "overall 111.125 mm" in svg_mm
+    assert "shank under head 101.6 mm" in svg_mm
+    assert "grip 50.8 mm" in svg_mm
+    assert "head 22.225 mm across flats \u00d7 9.525 mm high" in svg_mm
+    assert "shank \u2300 19.05 mm" in svg_mm
+    assert "shown in millimetres" in svg_mm
+
+
 def test_profile_balloons_and_legend_number_every_component():
     svg = bp.profile_svg(_view())
     assert svg.count('class="bp-balloon"') == 4
@@ -211,6 +229,7 @@ def test_viewer_template_has_every_element_id_the_script_uses():
         )
     assert 'window.BOLT_CSRF = "tok"' in html
     assert 'id="componentTable"' in html and "<tbody>" in html
+    assert 'id="unitInBtn"' in html and 'id="unitMmBtn"' in html
     script = open(os.path.join(app.root_path, "static", "js", "bolt-set-viewer.js")).read()
     ids = set(re.findall(r"\$\('([A-Za-z0-9_]+)'\)", script))
     missing = sorted(i for i in ids if f'id="{i}"' not in html)

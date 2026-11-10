@@ -29,6 +29,7 @@ const DATABASE = window.ANCHOR_DATABASE;
 const LABEL_WORLD_H = 6;
 const DIM_RIGHT_MARGIN = 52;
 const MM_PER_IN = 25.4;
+const TYPICAL_PROJECTION_MM = 101.6; // 4 in typical projection
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -37,6 +38,16 @@ const els = {
     mode: $('modeSelect'),
     resetView: $('resetViewBtn'),
     sheetLink: $('sheetLink'),
+    projectionInput: $('projectionInput'),
+    projUnitLabel: $('projUnitLabel'),
+    projTypical4Btn: $('projTypical4Btn'),
+    projResetBtn: $('projResetBtn'),
+    projStatusText: $('projStatusText'),
+    unitInBtn: $('unitInBtn'),
+    unitMmBtn: $('unitMmBtn'),
+    thDia: $('thDia'),
+    thHeight: $('thHeight'),
+    thWidth: $('thWidth'),
     caption: $('sceneCaption'),
     canvasHost: $('viewer3d'),
     fallback: $('webglFallback'),
@@ -50,6 +61,8 @@ const els = {
 };
 
 let view = null;
+let unitMode = 'in'; // 'in' (1/16" fractions) or 'mm'
+let customProjectionMm = null;
 let scene, camera, renderer, controls;
 let assemblyGroup;
 let partMeshes = [];
@@ -71,6 +84,38 @@ function fmt(n) {
 function fin(mm) {
     if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
     return fmt(Number(mm) / MM_PER_IN);
+}
+
+function gcd(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) { const t = b; b = a % b; a = t; }
+    return a || 1;
+}
+
+function fracIn(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    const v = Number(mm);
+    const sign = v < 0 ? '-' : '';
+    const inches = Math.abs(v) / MM_PER_IN;
+    const sixteenths = Math.round(inches * 16);
+    const approx = Math.abs(inches - sixteenths / 16) > 5e-4 ? '\u2248 ' : '';
+    if (sixteenths === 0) return `${approx}0`;
+    const whole = Math.floor(sixteenths / 16);
+    const rem = sixteenths % 16;
+    if (rem === 0) return `${approx}${sign}${whole}`;
+    const g = gcd(rem, 16);
+    const frac = `${rem / g}/${16 / g}`;
+    return whole ? `${approx}${sign}${whole} ${frac}` : `${approx}${sign}${frac}`;
+}
+
+function fval(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    return unitMode === 'mm' ? fmt(mm) : fracIn(mm);
+}
+
+function fdim(mm) {
+    if (mm === null || mm === undefined || Number.isNaN(Number(mm))) return '\u2013';
+    return unitMode === 'mm' ? `${fmt(mm)} mm` : `${fracIn(mm)} in`;
 }
 
 function makeLabel(text) {
@@ -269,7 +314,7 @@ function buildModel(v) {
     const rodR = Math.max(dia / 2, 0.01);
     const term = v.geometry.termination || { kind: 'plain' };
     const headH = term.kind === 'head' ? (Number(term.height) || 0) : 0;
-    const caption = `${v.selection.part_name || ''} \u00b7 \u2300${fin(dia)} \u00d7 ${fin(L)} in`;
+    const caption = `${v.selection.part_name || ''} \u00b7 \u2300${fval(dia)} \u00d7 ${fdim(L)}`;
 
     // rod body (from top of the bottom termination to the rod tip)
     const rodBottom = headH;
@@ -356,21 +401,21 @@ function buildModel(v) {
     axis.computeLineDistances();
     dims.add(axis);
 
-    dimensionLine(axisBottom, axisTop, dimX, `total ${fin(L)} in`, dims);
+    dimensionLine(axisBottom, axisTop, dimX, `total ${fdim(L)}`, dims);
     let extraDim = 0;
     if (tTop - tBottom > 0.5) {
-        dimensionLine(tBottom, tTop, dimX + 26, `thread ${fin(tTop - tBottom)} in`, dims);
+        dimensionLine(tBottom, tTop, dimX + 26, `thread ${fdim(tTop - tBottom)}`, dims);
         extraDim += 26;
     }
     if (concY !== null && concY > rodBottom && concY < L) {
-        dimensionLine(concY, L, dimX + extraDim + 26, `top ${fin(L - concY)} in`, dims);
+        dimensionLine(concY, L, dimX + extraDim + 26, `projection ${fdim(L - concY)}`, dims);
     }
     // diameter callout near the bottom of the rod
     const dY = axisBottom - 8;
     const diaLine = new THREE.LineBasicMaterial({ color: COLORS.dimline });
     dims.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
         [new THREE.Vector3(-rodR, dY, 0), new THREE.Vector3(rodR, dY, 0)]), diaLine));
-    const diaLabel = makeLabel(`\u2300 ${fin(dia)} in`);
+    const diaLabel = makeLabel(`\u2300 ${fdim(dia)}`);
     diaLabel.position.set(0, dY - 4.5, 0);
     dims.add(diaLabel);
     assemblyGroup.add(dims);
@@ -408,9 +453,9 @@ function infoRows(container, rows) {
 function termText(term) {
     if (term.kind === 'head') {
         const sides = Math.min(Math.max(term.corners || 6, 3), 12);
-        return `Head ${fin(term.width)} w \u00d7 ${fin(term.height)} h, ${sides}-sided`;
+        return `Head ${fval(term.width)} w \u00d7 ${fdim(term.height)} h, ${sides}-sided`;
     }
-    if (term.kind === 'hook') return `Hook: 90\u00b0 L-bend, radius ${fin(term.hook_radius)} in (schematic)`;
+    if (term.kind === 'hook') return `Hook: 90\u00b0 L-bend, radius ${fdim(term.hook_radius)} (schematic)`;
     return 'Plain (rod) end';
 }
 
@@ -419,7 +464,7 @@ function renderAnchorPanel(v) {
         ['Standard', v.anchor.standard || '\u2013'],
         ['Set (SetName)', v.anchor.set_name || '\u2013'],
         ['Material', v.anchor.material || '\u2013'],
-        ['Diameter', `${fin(v.anchor.diameter)} in`],
+        ['Diameter', fdim(v.anchor.diameter)],
         ['Part name', v.selection.part_name || '\u2013'],
         ['NumItems', v.anchor.num_items != null ? String(v.anchor.num_items) : '\u2013'],
         ['Explodable', v.anchor.explodable ? 'yes' : 'no'],
@@ -432,13 +477,15 @@ function renderAnchorPanel(v) {
 function renderGeometryPanel(v) {
     const g = v.geometry;
     const rows = [
-        ['Overall length', `${fin(g.length_mm)} in`],
-        ['Thread length', g.thread_length_mm != null && g.thread_length_mm > 0 ? `${fin(g.thread_length_mm)} in` : '\u2013'],
-        ['Top distance', g.top_distance_mm != null && g.top_distance_mm > 0 ? `${fin(g.top_distance_mm)} in` : '\u2013'],
+        ['Overall length', fdim(g.length_mm)],
+        ['Thread length', g.thread_length_mm != null && g.thread_length_mm > 0 ? fdim(g.thread_length_mm) : '\u2013'],
+        ['Bolt projection from concrete', g.top_distance_mm != null && g.top_distance_mm > 0 ? fdim(g.top_distance_mm) : '\u2013'],
+        ['Embedment depth', v.concrete_y != null ? fdim(v.concrete_y) : '\u2013'],
         ['Bottom termination', termText(g.termination)],
     ];
     for (const d of g.distances) {
-        rows.push([d.label, `${fin(d.value_mm)} in`]);
+        if (d.field === 'TopDistance') continue;
+        rows.push([d.label, fdim(d.value_mm)]);
     }
     infoRows(els.geometry, rows);
 }
@@ -450,9 +497,9 @@ function describePart(p) {
         ['End', p.side === 'top' ? 'top (surface end)' : 'embedded end'],
         ['Standard', p.din],
         ['Material', p.material || '\u2013'],
-        ['Diameter', p.diameter != null ? `${fin(p.diameter)} in` : '\u2013'],
-        ['Height', p.height != null ? `${fin(p.height)} in` : 'no record'],
-        ['Width', p.width != null ? `${fin(p.width)} in` : 'no record'],
+        ['Diameter', p.diameter != null ? fdim(p.diameter) : '\u2013'],
+        ['Height', p.height != null ? fdim(p.height) : 'no record'],
+        ['Width', p.width != null ? fdim(p.width) : 'no record'],
         ['Corners', p.corners != null ? String(p.corners) : 'no record'],
         ['Position field', p.position != null ? String(p.position) : '\u2013'],
         ['Record', p.matched ? `${p.name || p.din} (SetNutsBolts)` : 'NO MATCH in SetNutsBolts'],
@@ -497,13 +544,13 @@ function onPointerClick() {
 function formatWarning(w) {
     switch (w.code) {
     case 'unmatched_component':
-        return `Slot ${w.values.slot}: no unique SetNutsBolts record for Standard '${w.values.standard}', diameter ${fin(w.values.diameter_mm)} in.`;
+        return `Slot ${w.values.slot}: no unique SetNutsBolts record for Standard '${w.values.standard}', diameter ${fdim(w.values.diameter_mm)}.`;
     case 'schematic_height':
         return 'Some components have no height in SetNutsBolts; schematic thicknesses are used for display.';
     case 'stack_below_concrete':
-        return `Top hardware stack reaches ${fin(w.values.stack_mm)} in below the concrete plane; check the TopDistance / Length interpretation.`;
+        return `Top hardware stack reaches ${fdim(w.values.stack_mm)} below the concrete plane; check the Bolt projection from concrete / Length interpretation.`;
     case 'thread_exceeds_length':
-        return `Recorded thread length ${fin(w.values.thread_mm)} in exceeds the overall rod length ${fin(w.values.length_mm)} in; thread zone clamped to the rod.`;
+        return `Recorded thread length ${fdim(w.values.thread_mm)} exceeds the overall rod length ${fdim(w.values.length_mm)}; thread zone clamped to the rod.`;
     default:
         return w.message || w.code;
     }
@@ -540,6 +587,10 @@ function renderWarnings(v) {
 }
 
 function renderTable(v) {
+    const unitLabel = unitMode === 'mm' ? 'mm' : 'in';
+    if (els.thDia) els.thDia.textContent = `Dia (${unitLabel})`;
+    if (els.thHeight) els.thHeight.textContent = `Height (${unitLabel})`;
+    if (els.thWidth) els.thWidth.textContent = `Width (${unitLabel})`;
     const rows = v.components || [];
     els.tableBody.innerHTML = '';
     if (!rows.length) {
@@ -557,9 +608,9 @@ function renderTable(v) {
             `<td>${p.role}</td>`,
             `<td>${p.din}</td>`,
             `<td>${p.material || '\u2013'}</td>`,
-            `<td class="text-end">${fin(p.diameter)}</td>`,
-            `<td class="text-end">${fin(p.height)}</td>`,
-            `<td class="text-end">${fin(p.width)}</td>`,
+            `<td class="text-end">${fval(p.diameter)}</td>`,
+            `<td class="text-end">${fval(p.height)}</td>`,
+            `<td class="text-end">${fval(p.width)}</td>`,
             `<td class="text-end">${p.position != null ? p.position : '\u2013'}</td>`,
             `<td>${p.name || p.din}</td>`,
             `<td>${badge}</td>`,
@@ -629,6 +680,92 @@ function animate() {
 
 /* ------------------------------------------------------------------ data */
 
+function updateAnchorDropdownLabels() {
+    if (!els.anchor) return;
+    for (const opt of Array.from(els.anchor.options)) {
+        const diaMm = opt.dataset.diameterMm;
+        if (diaMm === undefined || diaMm === '') continue;
+        const std = opt.dataset.standard || '';
+        const setName = opt.dataset.setName || '';
+        const mat = opt.dataset.material || '';
+        const noLen = Number(opt.dataset.defCount) === 0 ? ' (no lengths)' : '';
+        opt.textContent = `${std} \u00b7 ${setName} \u00b7 ${mat} \u00b7 \u2300 ${fdim(diaMm)}${noLen}`;
+    }
+}
+
+function updateLengthDropdownLabels(v) {
+    if (!els.length || !v) return;
+    const currentDef = Number(v.selection.def_id);
+    els.length.innerHTML = '';
+    for (const l of v.available_lengths || []) {
+        const opt = document.createElement('option');
+        opt.value = l.def_id;
+        opt.textContent = `${l.part_name || ''} \u00b7 ${fdim(l.length_mm)}`;
+        if (l.def_id === currentDef) opt.selected = true;
+        els.length.appendChild(opt);
+    }
+}
+
+function applyProjectionToView(v, projMm) {
+    if (!v || !v.ok) return;
+    const L = Number(v.geometry.length_mm) || 0;
+    const catMm = v.geometry.catalog_top_distance_mm != null
+        ? Number(v.geometry.catalog_top_distance_mm)
+        : (Number(v.geometry.top_distance_mm) || 0);
+    const activeMm = projMm !== null && projMm !== undefined ? Math.max(0, Number(projMm)) : catMm;
+    v.geometry.top_distance_mm = Math.round(activeMm * 10000) / 10000;
+    v.concrete_y = (activeMm > 0 && activeMm < L) ? Math.round((L - activeMm) * 10000) / 10000 : null;
+    for (const d of v.geometry.distances || []) {
+        if (d.field === 'TopDistance') d.value_mm = v.geometry.top_distance_mm;
+    }
+    const baseWarnings = (v.warnings || []).filter((w) => w.code !== 'stack_below_concrete');
+    const topParts = (v.components || []).filter((p) => p.side === 'top');
+    if (v.concrete_y !== null && topParts.length) {
+        const lowestTop = Math.min(...topParts.map((p) => Number(p.stack_bottom)));
+        if (lowestTop < v.concrete_y - 1e-6) {
+            baseWarnings.push({
+                code: 'stack_below_concrete',
+                severity: 'warning',
+                values: { stack_mm: Math.round((v.concrete_y - lowestTop) * 10000) / 10000 },
+            });
+        }
+    }
+    v.warnings = baseWarnings;
+}
+
+function syncProjectionControls(v) {
+    if (!v || !v.ok) return;
+    const activeMm = Number(v.geometry.top_distance_mm) || 0;
+    const catMm = Number(v.geometry.catalog_top_distance_mm) || 0;
+    if (els.projUnitLabel) els.projUnitLabel.textContent = unitMode === 'mm' ? 'mm' : 'in';
+    if (els.projectionInput) {
+        els.projectionInput.step = unitMode === 'mm' ? '1' : '0.0625';
+        els.projectionInput.value = unitMode === 'mm' ? fmt(activeMm) : fmt(activeMm / MM_PER_IN);
+    }
+    if (els.projStatusText) {
+        const embedText = v.concrete_y !== null ? `embedment ${fdim(v.concrete_y)}` : 'exceeds rod length';
+        const srcText = customProjectionMm !== null
+            ? `custom (catalog: ${fdim(catMm)})`
+            : 'catalog default';
+        els.projStatusText.textContent = `${embedText} \u00b7 ${srcText}`;
+    }
+}
+
+function rerenderAll() {
+    if (!view || !view.ok) return;
+    updateAnchorDropdownLabels();
+    updateLengthDropdownLabels(view);
+    syncProjectionControls(view);
+    buildModel(view);
+    renderAnchorPanel(view);
+    renderGeometryPanel(view);
+    renderNotes(view);
+    renderWarnings(view);
+    renderTable(view);
+    updateSheetLink(view);
+    partTargets(els.mode.value === 'exploded');
+}
+
 async function fetchPayload(anchorId, defId) {
     const qs = new URLSearchParams({ anchor_id: anchorId, def_id: defId }).toString();
     const resp = await fetch(`/db/${encodeURIComponent(DATABASE)}/anchor-configurator/payload?${qs}`, {
@@ -650,25 +787,12 @@ async function loadSelection(keepDef = false) {
         const data = await fetchPayload(anchorId, defId);
         if (seq !== loadSeq) return;
 
-        const currentDef = Number(data.selection.def_id);
-        els.length.innerHTML = '';
-        for (const l of data.available_lengths || []) {
-            const opt = document.createElement('option');
-            opt.value = l.def_id;
-            opt.textContent = `${l.part_name || ''} \u00b7 ${fin(l.length_mm)} in`;
-            if (l.def_id === currentDef) opt.selected = true;
-            els.length.appendChild(opt);
-        }
         view = data;
-        buildModel(data);
-        renderAnchorPanel(data);
-        renderGeometryPanel(data);
-        renderNotes(data);
-        renderWarnings(data);
-        renderTable(data);
-        updateSheetLink(data);
+        if (customProjectionMm !== null) {
+            applyProjectionToView(view, customProjectionMm);
+        }
+        rerenderAll();
         els.detail.innerHTML = '<div class="text-muted small">Hover a rendered component to identify its source record.</div>';
-        partTargets(els.mode.value === 'exploded');
     } catch (err) {
         if (seq !== loadSeq) return;
         els.warnings.innerHTML = `<div class="alert alert-danger py-1 px-2 small">${err.message}</div>`;
@@ -680,17 +804,29 @@ async function loadSelection(keepDef = false) {
 
 function updateSheetLink(v) {
     if (!els.sheetLink || !v || !v.ok) return;
-    const qs = new URLSearchParams({
+    const params = {
         anchor_id: v.selection.anchor_id,
         def_id: v.selection.def_id,
-    }).toString();
+    };
+    if (customProjectionMm !== null) {
+        params.projection_mm = String(v.geometry.top_distance_mm);
+    }
+    const qs = new URLSearchParams(params).toString();
     els.sheetLink.href = `/db/${encodeURIComponent(DATABASE)}/fabrication-sheet?${qs}`;
     els.sheetLink.classList.remove('d-none');
+}
+
+function setUnitMode(nextMode) {
+    unitMode = nextMode === 'mm' ? 'mm' : 'in';
+    if (els.unitInBtn) els.unitInBtn.classList.toggle('active', unitMode === 'in');
+    if (els.unitMmBtn) els.unitMmBtn.classList.toggle('active', unitMode === 'mm');
+    rerenderAll();
 }
 
 function wire() {
     els.anchor.addEventListener('change', () => {
         els.length.innerHTML = '';
+        customProjectionMm = null;
         loadSelection(false);
     });
     els.length.addEventListener('change', () => loadSelection(true));
@@ -699,6 +835,31 @@ function wire() {
         fitNeeded = true;
     });
     els.resetView.addEventListener('click', () => frameScene());
+    if (els.projectionInput) {
+        els.projectionInput.addEventListener('change', () => {
+            const raw = parseFloat(els.projectionInput.value);
+            if (Number.isNaN(raw) || raw < 0) return;
+            customProjectionMm = unitMode === 'mm' ? raw : raw * MM_PER_IN;
+            applyProjectionToView(view, customProjectionMm);
+            rerenderAll();
+        });
+    }
+    if (els.projTypical4Btn) {
+        els.projTypical4Btn.addEventListener('click', () => {
+            customProjectionMm = TYPICAL_PROJECTION_MM;
+            applyProjectionToView(view, customProjectionMm);
+            rerenderAll();
+        });
+    }
+    if (els.projResetBtn) {
+        els.projResetBtn.addEventListener('click', () => {
+            customProjectionMm = null;
+            applyProjectionToView(view, null);
+            rerenderAll();
+        });
+    }
+    if (els.unitInBtn) els.unitInBtn.addEventListener('click', () => setUnitMode('in'));
+    if (els.unitMmBtn) els.unitMmBtn.addEventListener('click', () => setUnitMode('mm'));
 }
 
 initScene();
