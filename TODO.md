@@ -17,10 +17,11 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 536 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 541 tests; read-only bolt/anchor/stud/style views,
 the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; writes
-are the bolt diameter clone, raw row CRUD, find & replace, drawing-style
-field/rule edits, and deep-copy `RunName` prefix renaming (issue #16).
+are the bolt/anchor diameter clone and removal (issue #17), raw row CRUD, find
+& replace, drawing-style field/rule edits, and deep-copy `RunName` prefix
+renaming (issue #16).
 
 ---
 
@@ -260,3 +261,6 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   matches `Copy of `, `Copy (n) of ` and `Copy (n) ` across drawing-style
   `RunName` tables, previews before/after and same-table collisions, snapshots
   first, and updates in one transaction (536 tests).
+- [x] Remove diameter (`/db/<db>/remove-diameter`, issue #17): previews and
+  cascades deletion of a bolt or anchor diameter in child-before-parent order
+  inside one transaction after taking a pre-change snapshot (541 tests).

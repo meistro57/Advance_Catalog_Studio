@@ -30,6 +30,7 @@
         {% endif %}
         {% if catalog_type != 'drawing style' and catalog_type != 'shear stud' %}
         <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-primary">{{ icon('add') }} Add / Clone Diameter</a>
+        <a href="/db/{{ database }}/remove-diameter" class="btn btn-sm btn-outline-danger">{{ icon('trash') }} Remove Diameter</a>
         {% endif %}
         <a href="/db/{{ database }}/health" class="btn btn-sm btn-outline-info">{{ icon('health') }} Health Report</a>
         <a href="/db/{{ database }}/find-replace" class="btn btn-sm btn-outline-warning">Find &amp; Replace</a>
@@ -51,20 +52,35 @@
 {% if diameters %}
 <div class="card shadow-sm border-0 mb-4 bg-white">
     <div class="card-body py-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <span class="fw-bold small text-uppercase text-muted">Catalog Diameters ({{ diameters|length }})</span>
-            <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-outline-primary py-0">+ Add Diameter</a>
+            <div class="d-flex gap-2">
+                <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-outline-primary py-0">+ Add Diameter</a>
+                {% if catalog_type in ('bolt', 'anchor') %}
+                <a href="/db/{{ database }}/remove-diameter" class="btn btn-sm btn-outline-danger py-0">- Remove Diameter</a>
+                {% endif %}
+            </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
             {% for d in diameters %}
                 {% if d.is_orphan %}
-                <span class="badge bg-danger p-2" title="Orphan entry: 0 related records in database!">
-                    &#9888; {{ d.key }} mm ({{ d.run_name.strip() }}) &bull; 0 records (miskeyed / orphan)
+                <span class="badge bg-danger p-2 d-inline-flex align-items-center gap-1" title="Orphan entry: 0 related records in database!">
+                    <span>&#9888; {{ d.key }} mm ({{ d.run_name.strip() }}) &bull; 0 records (miskeyed / orphan)</span>
+                    {% if catalog_type in ('bolt', 'anchor') %}
+                    <a href="/db/{{ database }}/remove-diameter?diameter={{ d.key }}"
+                       class="text-white text-decoration-none ms-1 fw-bold"
+                       title="Preview &amp; remove {{ d.key }} mm">&times;</a>
+                    {% endif %}
                 </span>
                 {% else %}
-                <span class="badge bg-light text-dark border p-2">
-                    <strong>{{ d.run_name.strip() }}</strong> ({{ d.key }} mm)
+                <span class="badge bg-light text-dark border p-2 d-inline-flex align-items-center gap-1">
+                    <span><strong>{{ d.run_name.strip() }}</strong> ({{ d.key }} mm)</span>
                     <span class="badge bg-secondary ms-1">{{ d.total_related }} rows</span>
+                    {% if catalog_type in ('bolt', 'anchor') %}
+                    <a href="/db/{{ database }}/remove-diameter?diameter={{ d.key }}"
+                       class="text-danger text-decoration-none ms-1 fw-bold"
+                       title="Preview &amp; remove {{ d.run_name.strip() }} ({{ d.key }} mm)">&times;</a>
+                    {% endif %}
                 </span>
                 {% endif %}
             {% endfor %}

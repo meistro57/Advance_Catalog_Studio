@@ -4,12 +4,15 @@
 {% block content %}
 <p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
         <h4 class="mb-0">{{ icon('add', 18) }} Add / Clone Diameter to <strong>{{ database }}</strong></h4>
         <span class="text-muted small">Cascades a new nominal diameter across all related tables (rules, distances, assemblies, nuts/washers, and bolt lengths).</span>
     </div>
-    <div>
+    <div class="d-flex align-items-center gap-2">
+        {% if catalog_type in ('bolt', 'anchor') %}
+        <a href="/db/{{ database }}/remove-diameter" class="btn btn-sm btn-outline-danger">{{ icon('trash') }} Remove Diameter</a>
+        {% endif %}
         {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
         <span class="badge bg-secondary text-uppercase">{{ catalog_type }} catalog</span>
     </div>

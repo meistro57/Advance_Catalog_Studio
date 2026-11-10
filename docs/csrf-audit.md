@@ -36,6 +36,7 @@ session CSRF token.
 | `/db/<db>/detach` | `detach` | detach + export mdf/ldf | required |
 | `/db/<db>/snapshots/prune` | `prune_snapshots` | deletes old `.bak` snapshots | required |
 | `/db/<db>/add-diameter` (`action=apply`) | `add_diameter` | snapshot + multi-table clone | required |
+| `/db/<db>/remove-diameter` | `remove_diameter` | snapshot + multi-table cascade delete | required |
 | `/db/<db>/find-replace` (`action=apply`) | `find_replace` | snapshot + database-wide replace | required |
 | `/db/<db>/<table>/add` | `add_row` | INSERT | required |
 | `/db/<db>/<table>/<pk>/edit` | `edit_row` | UPDATE | required |

@@ -1517,3 +1517,200 @@ def apply_clone_diameter(
         conn.close()
 
     return inserted_counts
+
+
+def preview_remove_diameter(database: str, diameter: float) -> dict:
+    """Preview all rows across related tables that would be deleted for ``diameter``."""
+    catalog_type = guess_catalog_type(database)
+    if catalog_type not in ("bolt", "anchor"):
+        raise ValueError(
+            f"Remove diameter only supports bolt and anchor catalogs (got '{catalog_type}')."
+        )
+    conn, cur = connect(database)
+    tables = set(list_tables(database))
+    run_name = f"{diameter} mm"
+    tables_out = {}
+    warnings = []
+
+    try:
+        if "BoltsDiameters" in tables:
+            cur.execute(
+                "SELECT [Key], RunName FROM BoltsDiameters WHERE [Key] = %s",
+                (diameter,),
+            )
+            row = cur.fetchone()
+            if row and row.get("RunName"):
+                run_name = row["RunName"]
+
+        if catalog_type == "bolt":
+            for table in ("SetBolts", "SetNutsBolts", "SetOfBolts", "ScrewNew", "BoltsDistances"):
+                if table not in tables:
+                    continue
+                cur.execute(
+                    f"SELECT COUNT(*) AS cnt FROM [{table}] WHERE Diameter = %s",
+                    (diameter,),
+                )
+                cnt = cur.fetchone()["cnt"]
+                samples = []
+                if cnt and table in ("SetBolts", "SetNutsBolts"):
+                    cur.execute(
+                        f"SELECT TOP 5 * FROM [{table}] WHERE Diameter = %s",
+                        (diameter,),
+                    )
+                    samples = cur.fetchall()
+                tables_out[table] = {"count": cnt, "samples": samples}
+
+        elif catalog_type == "anchor":
+            if "AnchorsHoleDefinition" in tables and "AnchorsName" in tables:
+                cur.execute(
+                    "SELECT COUNT(*) AS cnt FROM AnchorsHoleDefinition "
+                    "WHERE AnchorNameID IN (SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                    (diameter,),
+                )
+                tables_out["AnchorsHoleDefinition"] = {
+                    "count": cur.fetchone()["cnt"],
+                    "samples": [],
+                }
+            if "AnchorsDefinition" in tables and "AnchorsName" in tables:
+                cur.execute(
+                    "SELECT COUNT(*) AS cnt FROM AnchorsDefinition "
+                    "WHERE AnchorID IN (SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                    (diameter,),
+                )
+                cnt = cur.fetchone()["cnt"]
+                samples = []
+                if cnt:
+                    cur.execute(
+                        "SELECT TOP 5 ad.* FROM AnchorsDefinition ad "
+                        "JOIN AnchorsName an ON ad.AnchorID = an.ID "
+                        "WHERE an.Diameter = %s",
+                        (diameter,),
+                    )
+                    samples = cur.fetchall()
+                tables_out["AnchorsDefinition"] = {"count": cnt, "samples": samples}
+            if "AnchorsName" in tables:
+                cur.execute(
+                    "SELECT COUNT(*) AS cnt FROM AnchorsName WHERE Diameter = %s",
+                    (diameter,),
+                )
+                cnt = cur.fetchone()["cnt"]
+                samples = []
+                if cnt:
+                    cur.execute(
+                        "SELECT TOP 5 * FROM AnchorsName WHERE Diameter = %s",
+                        (diameter,),
+                    )
+                    samples = cur.fetchall()
+                tables_out["AnchorsName"] = {"count": cnt, "samples": samples}
+            for table in ("SetNutsBolts", "BoltsDistances"):
+                if table not in tables:
+                    continue
+                cur.execute(
+                    f"SELECT COUNT(*) AS cnt FROM [{table}] WHERE Diameter = %s",
+                    (diameter,),
+                )
+                cnt = cur.fetchone()["cnt"]
+                samples = []
+                if cnt and table == "SetNutsBolts":
+                    cur.execute(
+                        "SELECT TOP 5 * FROM SetNutsBolts WHERE Diameter = %s",
+                        (diameter,),
+                    )
+                    samples = cur.fetchall()
+                tables_out[table] = {"count": cnt, "samples": samples}
+
+        if "BoltsDiameters" in tables:
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM BoltsDiameters WHERE [Key] = %s",
+                (diameter,),
+            )
+            tables_out["BoltsDiameters"] = {
+                "count": cur.fetchone()["cnt"],
+                "samples": [],
+            }
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM BoltsDiameters WHERE [Key] <> %s",
+                (diameter,),
+            )
+            if cur.fetchone()["cnt"] == 0:
+                warnings.append(
+                    "This is the only diameter in BoltsDiameters; removing it will leave the catalog with no diameters."
+                )
+    finally:
+        conn.close()
+
+    total_rows = sum(t["count"] for t in tables_out.values())
+    return {
+        "database": database,
+        "catalog_type": catalog_type,
+        "diameter": diameter,
+        "run_name": run_name,
+        "tables": tables_out,
+        "total_rows": total_rows,
+        "warnings": warnings,
+    }
+
+
+def apply_remove_diameter(database: str, diameter: float) -> dict:
+    """Delete ``diameter`` and all its related records across bolt or anchor tables in one transaction."""
+    catalog_type = guess_catalog_type(database)
+    if catalog_type not in ("bolt", "anchor"):
+        raise ValueError(
+            f"Remove diameter only supports bolt and anchor catalogs (got '{catalog_type}')."
+        )
+    conn = _open_connection(database=database, autocommit=False)
+    cur = conn.cursor(as_dict=True)
+    tables = set(list_tables(database))
+    deleted_counts = {}
+
+    try:
+        if catalog_type == "bolt":
+            for table in ("SetBolts", "SetNutsBolts", "SetOfBolts", "ScrewNew", "BoltsDistances"):
+                if table not in tables:
+                    continue
+                cur.execute(f"DELETE FROM [{table}] WHERE Diameter = %s", (diameter,))
+                if cur.rowcount:
+                    deleted_counts[table] = cur.rowcount
+
+        elif catalog_type == "anchor":
+            # Delete children before parents (AnchorsHoleDefinition / AnchorsDefinition -> AnchorsName)
+            if "AnchorsHoleDefinition" in tables and "AnchorsName" in tables:
+                cur.execute(
+                    "DELETE FROM AnchorsHoleDefinition WHERE AnchorNameID IN "
+                    "(SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                    (diameter,),
+                )
+                if cur.rowcount:
+                    deleted_counts["AnchorsHoleDefinition"] = cur.rowcount
+            if "AnchorsDefinition" in tables and "AnchorsName" in tables:
+                cur.execute(
+                    "DELETE FROM AnchorsDefinition WHERE AnchorID IN "
+                    "(SELECT ID FROM AnchorsName WHERE Diameter = %s)",
+                    (diameter,),
+                )
+                if cur.rowcount:
+                    deleted_counts["AnchorsDefinition"] = cur.rowcount
+            if "AnchorsName" in tables:
+                cur.execute("DELETE FROM AnchorsName WHERE Diameter = %s", (diameter,))
+                if cur.rowcount:
+                    deleted_counts["AnchorsName"] = cur.rowcount
+            for table in ("SetNutsBolts", "BoltsDistances"):
+                if table not in tables:
+                    continue
+                cur.execute(f"DELETE FROM [{table}] WHERE Diameter = %s", (diameter,))
+                if cur.rowcount:
+                    deleted_counts[table] = cur.rowcount
+
+        if "BoltsDiameters" in tables:
+            cur.execute("DELETE FROM BoltsDiameters WHERE [Key] = %s", (diameter,))
+            if cur.rowcount:
+                deleted_counts["BoltsDiameters"] = cur.rowcount
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return deleted_counts

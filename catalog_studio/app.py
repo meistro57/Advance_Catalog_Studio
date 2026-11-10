@@ -1042,6 +1042,90 @@ def add_diameter(database):
     )
 
 
+@app.route("/db/<database>/remove-diameter", methods=["GET", "POST"])
+def remove_diameter(database):
+    """Preview and apply removal of an existing diameter across bolt/anchor tables."""
+    catalog_type = db.guess_catalog_type(database)
+    if catalog_type not in ("bolt", "anchor"):
+        flash(
+            f"Diameter removal is only supported for bolt and anchor catalogs "
+            f"(not '{catalog_type}').",
+            "warning",
+        )
+        return redirect(url_for("show_database", database=database))
+
+    existing_diameters = db.get_catalog_diameters(database)
+    meta = metadata.get(database)
+    library_label = metadata.library_label(meta.get("library"))
+    selected_dia = request.values.get("diameter", "").strip()
+    if not selected_dia and existing_diameters:
+        selected_dia = str(existing_diameters[0]["key"])
+
+    preview = None
+    if request.method == "POST":
+        action = request.form.get("action", "preview")
+        try:
+            dia_val = float(selected_dia)
+            if action == "apply":
+                blocked = _blocked_write(database)
+                if blocked:
+                    return blocked
+                try:
+                    snapshot = snapshots.create_snapshot(
+                        database, f"remove diameter {dia_val:g} mm"
+                    )
+                except Exception as e:
+                    flash(
+                        f"Pre-change snapshot failed, so nothing was removed: {e}",
+                        "danger",
+                    )
+                    try:
+                        preview = db.preview_remove_diameter(database, dia_val)
+                    except Exception:
+                        preview = None
+                    return render_template(
+                        "remove_diameter.html",
+                        database=database,
+                        catalog_type=catalog_type,
+                        existing_diameters=existing_diameters,
+                        selected_dia=selected_dia,
+                        preview=preview,
+                        meta=meta,
+                        library_label=library_label,
+                    )
+                counts = db.apply_remove_diameter(database, dia_val)
+                total_deleted = sum(counts.values())
+                non_zero = [f"{t} ({cnt})" for t, cnt in counts.items() if cnt]
+                summary_str = ", ".join(non_zero) if non_zero else "0 rows"
+                flash(
+                    f"Removed diameter {dia_val:g} mm from {database}: "
+                    f"deleted {total_deleted} row(s) ({summary_str}). "
+                    f"Snapshot: {snapshot['filename']}.",
+                    "success",
+                )
+                return redirect(url_for("show_database", database=database))
+            else:
+                preview = db.preview_remove_diameter(database, dia_val)
+        except Exception as e:
+            flash(f"Diameter removal failed: {e}", "danger")
+    elif selected_dia:
+        try:
+            preview = db.preview_remove_diameter(database, float(selected_dia))
+        except Exception as e:
+            flash(f"Could not preview diameter removal: {e}", "danger")
+
+    return render_template(
+        "remove_diameter.html",
+        database=database,
+        catalog_type=catalog_type,
+        existing_diameters=existing_diameters,
+        selected_dia=selected_dia,
+        preview=preview,
+        meta=meta,
+        library_label=library_label,
+    )
+
+
 @app.route("/db/<database>/find-replace", methods=["GET", "POST"])
 def find_replace(database):
     find_text = request.values.get("find", "")

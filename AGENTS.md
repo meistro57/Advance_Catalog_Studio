@@ -25,7 +25,11 @@ presence (see `guess_catalog_type` in `catalog_studio/utils/db.py`):
 The core "diameter clone" engine (`db.preview_clone_diameter` /
 `db.apply_clone_diameter`) copies a working source diameter across all related
 tables to create a new target diameter, with optional geometry/weight scaling
-and display-name token replacement.
+and display-name token replacement; the companion diameter removal engine
+(`db.preview_remove_diameter` / `db.apply_remove_diameter`, route
+`/db/<db>/remove-diameter`, issue #17) previews and cascades deletion of an
+existing bolt or anchor diameter in child-before-parent order inside one
+transaction after taking a pre-change snapshot.
 
 ## Running the project
 

@@ -1,0 +1,220 @@
+<!-- templates/remove_diameter.html -->
+{% extends "base.html" %}
+{% block title %}Remove Diameter &middot; {{ database }}{% endblock %}
+{% block content %}
+<p><a href="/db/{{ database }}">&laquo; {{ database }}</a></p>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+        <h4 class="mb-0">{{ icon('trash', 18) }} Remove Diameter from <strong>{{ database }}</strong></h4>
+        <span class="text-muted small">Cascades deletion of a nominal diameter across all related bolt or anchor tables inside a single transaction after taking a pre-change snapshot.</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/db/{{ database }}/add-diameter" class="btn btn-sm btn-outline-primary">{{ icon('add') }} Add / Clone Diameter</a>
+        {% if meta.get('as_version') %}<span class="badge bg-info text-dark">AS {{ meta.as_version }}</span>{% endif %}
+        <span class="badge bg-secondary text-uppercase">{{ catalog_type }} catalog</span>
+    </div>
+</div>
+
+{% if library_label %}
+<div class="alert alert-warning d-flex justify-content-between align-items-start gap-3">
+    <div>
+        <strong>Read-only copy.</strong>
+        This database was attached from a delivered Advance Steel library
+        ({{ library_label }}). Catalog Studio blocks every write here &mdash;
+        attach a copy under a new name to remove diameters.
+    </div>
+    <span class="badge bg-warning text-dark text-nowrap">read-only</span>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Selection Form -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white fw-bold">
+                1. Select Diameter to Remove
+            </div>
+            <div class="card-body">
+                {% if existing_diameters %}
+                <form method="post" id="removeDiameterForm" action="/db/{{ database }}/remove-diameter">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted" for="diameterSelect">Catalog Diameter</label>
+                        <select name="diameter" id="diameterSelect" class="form-select" required
+                                onchange="window.location.href='/db/{{ database }}/remove-diameter?diameter=' + encodeURIComponent(this.value);">
+                            {% for d in existing_diameters %}
+                            <option value="{{ d.key }}"
+                                    {% if selected_dia|string == d.key|string %}selected{% endif %}>
+                                {{ d.key }} mm ({{ d.run_name.strip() }}) &mdash; {{ d.total_related }} related row(s)
+                                {% if d.is_orphan %}[ORPHAN - 0 RELATED ROWS]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Selecting a diameter previews every row that will be deleted across the catalog.</div>
+                    </div>
+
+                    {% if preview and preview.warnings %}
+                    <div class="alert alert-warning py-2 mb-3 small">
+                        {% for w in preview.warnings %}
+                        <div>{{ icon('warn', 14) }} {{ w }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex gap-2 justify-content-between pt-2">
+                        <button type="submit" name="action" value="preview" class="btn btn-outline-primary">
+                            {{ icon('preview') }} Preview Removal
+                        </button>
+                        {% if preview and preview.total_rows > 0 and not library_label %}
+                        <button type="submit" name="action" value="apply" class="btn btn-danger"
+                                onclick="return confirm('Permanently delete diameter {{ preview.diameter }} mm ({{ preview.run_name.strip() or preview.diameter }}) and all {{ preview.total_rows }} row(s) across {{ database }}? A pre-change backup snapshot will be created first.');">
+                            {{ icon('trash') }} Remove Diameter ({{ preview.total_rows }} rows)
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-secondary mb-0">
+                    No entries found in <code>BoltsDiameters</code> for this catalog.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Column -->
+    <div class="col-lg-7">
+        {% if preview %}
+        <div class="card shadow-sm border-0 mb-4 border-danger">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">{{ icon('trash', 16) }} Removal Preview: {{ preview.total_rows }} Row(s) to Delete</span>
+                <span class="badge bg-light text-dark">
+                    {{ preview.diameter }} mm{% if preview.run_name %} ({{ preview.run_name.strip() }}){% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Deleting in child-before-parent order across <strong>{{ preview.tables|length }}</strong> table(s) for
+                    <strong>{{ preview.diameter }} mm{% if preview.run_name %} ({{ preview.run_name.strip() }}){% endif %}</strong>.
+                </p>
+
+                <div class="list-group mb-3">
+                    {% for table_name, data in preview.tables.items() %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ table_name }}</strong>
+                            <div class="text-muted small">
+                                {% if table_name == 'BoltsDiameters' %}Nominal diameter lookup entry
+                                {% elif table_name == 'BoltsDistances' %}Hole tolerance edge/pitch distances
+                                {% elif table_name == 'ScrewNew' %}Grip length and screw length calculation rules
+                                {% elif table_name == 'SetOfBolts' %}Hardware set compositions (nuts &amp; washers)
+                                {% elif table_name == 'SetNutsBolts' %}Nut and washer component definitions
+                                {% elif table_name == 'SetBolts' %}Bolt definitions across all lengths
+                                {% elif table_name == 'AnchorsName' %}Anchor standard definitions
+                                {% elif table_name == 'AnchorsDefinition' %}Anchor lengths and geometry
+                                {% elif table_name == 'AnchorsHoleDefinition' %}Anchor hole drilling specs
+                                {% endif %}
+                            </div>
+                        </div>
+                        <span class="badge {% if data.count > 0 %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill fs-6">{{ data.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if preview.tables.get('SetBolts') and preview.tables.SetBolts.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Sample Bolt Rows to Delete (SetBolts)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>Name</th><th>Length</th><th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in preview.tables.SetBolts.samples %}
+                            <tr>
+                                <td><code>{{ b.Name }}</code></td>
+                                <td>{{ b.Length }} mm</td>
+                                <td>{{ b.Weight }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if preview.tables.get('AnchorsName') and preview.tables.AnchorsName.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Anchor Series to Delete (AnchorsName)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>ID</th><th>Name</th><th>Standard</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in preview.tables.AnchorsName.samples %}
+                            <tr>
+                                <td>{{ a.ID }}</td>
+                                <td><code>{{ a.Name }}</code></td>
+                                <td>{{ a.Standard }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if preview.tables.get('AnchorsDefinition') and preview.tables.AnchorsDefinition.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Sample Anchor Lengths to Delete (AnchorsDefinition)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>AnchorID</th><th>Name</th><th>Length</th><th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in preview.tables.AnchorsDefinition.samples %}
+                            <tr>
+                                <td>{{ a.AnchorID }}</td>
+                                <td><code>{{ a.Name }}</code></td>
+                                <td>{{ a.Length }} mm</td>
+                                <td>{{ a.Weight }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if preview.tables.get('SetNutsBolts') and preview.tables.SetNutsBolts.samples %}
+                <h6 class="fw-bold small text-uppercase text-muted mt-3 mb-2">Sample Components to Delete (SetNutsBolts)</h6>
+                <div class="table-responsive bg-light p-2 rounded small mb-3 border">
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th>Standard</th><th>Name</th><th>Height</th><th>OD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for n in preview.tables.SetNutsBolts.samples %}
+                            <tr>
+                                <td>{{ n.Standard }}</td>
+                                <td><code>{{ n.Name }}</code></td>
+                                <td>{{ n.Height }}</td>
+                                <td>{{ n.OutsideDiameter }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
