@@ -13,6 +13,17 @@ It replaces fragile, repetitive table-by-table editing with guided workflows tha
 
 <img width="2526" height="1657" alt="image" src="https://github.com/user-attachments/assets/17a5efea-1d41-43a9-bca5-90b9ff0c20df" />
 
+<img width="2539" height="1794" alt="image" src="https://github.com/user-attachments/assets/c0dd1280-9999-4d55-b9a3-fcde8f53617d" />
+
+<img width="2531" height="1796" alt="image" src="https://github.com/user-attachments/assets/c765e100-4cd8-4397-b377-74a5af8ed425" />
+
+<img width="2533" height="1073" alt="image" src="https://github.com/user-attachments/assets/5439f833-fbac-486d-9845-122da9a9dabe" />
+
+<img width="2539" height="1789" alt="image" src="https://github.com/user-attachments/assets/d851e7e1-dfb6-49c3-9519-71d9f72d4d7c" />
+
+<img width="2538" height="1809" alt="image" src="https://github.com/user-attachments/assets/114a33a7-bd24-4e5b-a283-ea1ae90256fe" />
+
+
 
 ## Why this exists
 
