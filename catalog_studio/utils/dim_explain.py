@@ -68,7 +68,8 @@ POINT_KNOWN = {"Key", "RunName", "Objects", "OwnerText"}
 # DetViewDimPointSelection columns -> the DSM field they hold. The column names
 # say it, and the export's InfoTableRelations points each one at its own
 # AstorDetailsBase list (DetViewDimPointtype, DetVwDimGeomRestrictions, ...).
-# The values stay numbers: those lists are not in the export.
+# Values verified across the 373 point rules of delivered AstorDetails.mdf (A5.2)
+# are mapped in POINT_VALUE_TABLES below; unverified numbers stay raw.
 POINT_FIELD_LABELS = {
     "PointType": "Point type",
     "PointGeometricRestrictions": "Position on object",
@@ -83,21 +84,241 @@ POINT_FIELD_LABELS = {
 
 LINEAR_FIELD_LABELS = {"LabelPosition": "Label position"}
 
-# Direction numbers whose meaning has been SEEN in Advance Steel output but not
-# yet read from the DSM list. Each entry names its evidence.
-OBSERVED_DIRECTIONS = {
-    4: ("runs along the main part",
-        "Observed in an AS 2026 railing detail (Marks 6 - Railing, Mp is Handrail): "
-        "the Direction 4 chain was drawn parallel to the sloped handrail, which is the "
-        "main part. Not yet confirmed in the DSM direction list."),
+# Verified from AstorDetailsBase.DetViewDimPointtype and cross-checked across
+# all 373 DetViewDimPointSelection rows in AstorDetails.mdf (A5.2).
+# Values >= 1000 add +1000 for "as reference" ("Ref.").
+POINT_TYPE_LABELS = {
+    0: "All (ANY)",
+    1: "Extreme",
+    2: "Contour",
+    3: "Inside processings",
+    4: "Holes",
+    5: "Attached parts",
+    8: "Inside processings (each)",
+    9: "System",
+    10: "Center",
+    11: "Inside (curved/bent beam)",
+    12: "Outside (curved/bent beam)",
+    14: "Assembly overall",
+    15: "Templates reference point",
+    16: "Development lines",
+    17: "Median",
+    19: "End processings",
+    20: "Helper line points",
+    21: "Environment system",
+    22: "Environment median points",
+    23: "Environment contour points",
+    24: "Camber points",
+    1000: "All as reference",
+    1001: "Ref. Extreme",
+    1002: "Ref. Contour",
+    1003: "Ref. Inside processings",
+    1004: "Ref. Holes",
+    1005: "Ref. Attached parts",
+    1009: "Ref. System",
+    1010: "Ref. Center",
+    1011: "Ref. Inside (curved/bent beam)",
+    1012: "Ref. Outside (curved/bent beam)",
+    1014: "Ref. Assembly overall",
+    1015: "Ref. Template reference point",
+    1017: "Ref. Median",
+    1021: "Ref. Environment system",
+    1022: "Ref. Environment median points",
+    1023: "Ref. Environment contour points",
 }
 
-# DetViewDimStrategyItems.Type -> DetRequestTypes (AstorDetailsBase).
-OBSERVED_REQUEST_TYPES = {
-    2: ("chained (relative) linear dimension",
-        "Observed in the same railing detail: Type 2 chains print each segment "
-        "(3'-11\" spacing) rather than running totals. Not yet confirmed in the DSM list."),
+# Verified from AstorDetailsBase.DetVwDimGeomRestrictions and 186/186 rules in
+# AstorDetails.mdf DetViewDimPointSelection (A5.2).
+POINT_POSITION_LABELS = {
+    0: "Any",
+    1: "Left",
+    2: "Right",
+    4: "Bottom",
+    5: "BottomLeft",
+    6: "BottomRight",
+    8: "Top",
+    9: "TopLeft",
+    10: "TopRight",
+    11: "LeftExtreme (Leftmost)",
+    12: "RightExtreme (Rightmost)",
+    13: "TopExtreme (Topmost)",
+    14: "BottomExtreme (Bottommost)",
+    15: "Left & Right Extremes",
+    16: "Top & Bottom Extremes",
 }
+
+# Verified from AstorDetailsBase.DetailVisibilityStatus (A5.2).
+VISIBILITY_LABELS = {
+    0: "Default",
+    1: "Visible",
+    2: "Visible and hidden",
+    3: "Hidden",
+}
+
+# Verified from AstorDetailsBase.DetailDepthPosition (A5.2).
+DEPTH_POSITION_LABELS = {
+    0: "Any",
+    1: "BothSides-CenterFront",
+    2: "BothSides-CenterRear",
+    3: "Front (entirely)",
+    4: "Rear (entirely)",
+    5: "BothSides-Center",
+    6: "Both Sides",
+    7: "Front (by center)",
+    8: "Rear (by center)",
+}
+
+# Verified from AstorDetailsBase.DetGeometricRestrictions (A5.2).
+GEOM_RESTRICTION_LABELS = {
+    0: "All",
+    1: "Li (Linear)",
+    2: "NLi (Non-linear)",
+    3: "Tv (Top / Transversal)",
+    4: "Fr+Side (Front + Side)",
+    5: "Side (Side/Width)",
+    6: "Tv+Fr (Top+Front/Length)",
+    7: "Fr (Front/Length)",
+    8: "Top+Side/Width",
+    9: "Li+Fr (Linear Front)",
+    10: "Li+Tv (Linear Top)",
+    11: "Linear Side",
+    12: "Non Linear Front",
+    13: "NLi+Tv (Non Linear Top)",
+    14: "Non Linear Side",
+}
+
+# Verified from AstorDetailsBase.DetailReferenceAxis (A5.2).
+REFERENCE_AXIS_LABELS = {
+    0: "Relative to dimensioning line direction",
+    1: "Relative to object direction",
+}
+
+# Verified from AstorDetailsBase.DetVwDimParentRelaPosRestriction (A5.2).
+PARENT_POS_LABELS = {
+    0: "Any",
+    1: "Top Flange",
+    2: "Bottom Flange",
+    3: "Flanges (Both)",
+    4: "Web",
+}
+
+POINT_VALUE_TABLES = {
+    "PointType": POINT_TYPE_LABELS,
+    "PointGeometricRestrictions": POINT_POSITION_LABELS,
+    "MpGeomRestriction": POINT_POSITION_LABELS,
+    "VisibilityStatus": VISIBILITY_LABELS,
+    "DepthPosition": DEPTH_POSITION_LABELS,
+    "GeometricRestrictions": GEOM_RESTRICTION_LABELS,
+    "ReferenceAxis": REFERENCE_AXIS_LABELS,
+    "MPReferenceAxis": REFERENCE_AXIS_LABELS,
+    "ParentRelativePositonRestriction": PARENT_POS_LABELS,
+}
+
+# Verified from AstorDetailsBase.DetRequestLinearDirection (0..19) and
+# cross-checked across 398 requests in AstorDetails.mdf (A5.2).
+DIRECTION_LABELS = {
+    0: ("runs along X", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #0 (viewX): x-orientation of the view."),
+    1: ("runs along Y", "y",
+        "AstorDetailsBase.DetRequestLinearDirection #1 (viewY): y-orientation of the view."),
+    2: ("runs along the object's X axis", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #2 (objectX): x-axis of an object."),
+    3: ("runs along the object's Y axis", "y",
+        "AstorDetailsBase.DetRequestLinearDirection #3 (objectY): y-axis of an object."),
+    4: ("runs along the main part's X axis", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #4 (main part X): x-axis of a main part."),
+    5: ("runs along the main part's Y axis", "y",
+        "AstorDetailsBase.DetRequestLinearDirection #5 (main part Y): y-axis of a main part."),
+    6: ("runs along a bent beam's Y axis", "y",
+        "AstorDetailsBase.DetRequestLinearDirection #6 (Bent Y): y-axis CurvedBeam."),
+    7: ("runs along a bent beam's system X axis", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #7 (Bent X System): x-axis CurvedBeam system."),
+    8: ("runs along a bent beam's inner X axis", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #8 (Bent X Inner): x-axis CurvedBeam inner."),
+    9: ("runs along a bent beam's outer X axis", "x",
+        "AstorDetailsBase.DetRequestLinearDirection #9 (Bent X Outer): x-axis CurvedBeam outer."),
+    10: ("runs along an internal linear / radial direction", None,
+         "AstorDetailsBase.DetRequestLinearDirection #10: Internal direction linear."),
+    11: ("runs along negative X (view)", "x",
+         "AstorDetailsBase.DetRequestLinearDirection #11 (MinusViewX): Negative x-orientation of the view."),
+    12: ("runs along negative Y (view)", "y",
+         "AstorDetailsBase.DetRequestLinearDirection #12 (MinusViewY): Negative y-orientation of the view."),
+    13: ("runs along the object's negative X axis", "x",
+         "AstorDetailsBase.DetRequestLinearDirection #13 (MinusObjectX): Negative x-axis of an object."),
+    14: ("runs along the object's negative Y axis", "y",
+         "AstorDetailsBase.DetRequestLinearDirection #14 (MinusObjectY): Negative y-axis of an object."),
+    15: ("runs along the main part's negative X axis", "x",
+         "AstorDetailsBase.DetRequestLinearDirection #15 (MinusMainpartX): Negative x-axis of a main part."),
+    16: ("runs along the main part's negative Y axis", "y",
+         "AstorDetailsBase.DetRequestLinearDirection #16 (MinusMainpartY): Negative y-axis of a main part."),
+    17: ("measures an internal angle", None,
+         "AstorDetailsBase.DetRequestLinearDirection #17: Internal direction angle."),
+    18: ("runs along the internal bolt/hole X direction", "x",
+         "AstorDetailsBase.DetRequestLinearDirection #18: Internal bolt/hole direction X."),
+    19: ("runs along the internal bolt/hole Y direction", "y",
+         "AstorDetailsBase.DetRequestLinearDirection #19: Internal bolt/hole direction Y."),
+}
+
+DIRECTION_CHOICES = [
+    (0, "0 · X (view)"),
+    (1, "1 · Y (view)"),
+    (2, "2 · X of object"),
+    (3, "3 · Y of object"),
+    (4, "4 · X of main part"),
+    (5, "5 · Y of main part"),
+    (6, "6 · Y curved (Bent Y)"),
+    (7, "7 · X curved system (Bent X System)"),
+    (8, "8 · X curved inner (Bent X Inner)"),
+    (9, "9 · X curved outer (Bent X Outer)"),
+    (10, "10 · Internal linear"),
+    (11, "11 · -X (MinusViewX)"),
+    (12, "12 · -Y (MinusViewY)"),
+    (13, "13 · -X of object (MinusObjectX)"),
+    (14, "14 · -Y of object (MinusObjectY)"),
+    (15, "15 · -X of main part (MinusMainpartX)"),
+    (16, "16 · -Y of main part (MinusMainpartY)"),
+    (17, "17 · Internal angle"),
+    (18, "18 · Internal bolt/hole X"),
+    (19, "19 · Internal bolt/hole Y"),
+]
+
+# Direction numbers whose meaning has been SEEN in Advance Steel output but not
+# yet read from the DSM list. Kept for compatibility; verified entries live in
+# DIRECTION_LABELS above.
+OBSERVED_DIRECTIONS = {}
+
+# DetViewDimStrategyItems.Type -> AstorDetailsBase.DetRequestTypes (1..26),
+# verified directly from AstorDetailsBase.mdf (A5.2) and A5.1.
+REQUEST_TYPE_LABELS = {
+    1: ("radial dimension", "AstorDetailsBase.DetRequestTypes #1: Radial."),
+    2: ("chained (relative) linear dimension", "AstorDetailsBase.DetRequestTypes #2: Linear, relative."),
+    3: ("relative arc-length dimension", "AstorDetailsBase.DetRequestTypes #3: Arc length, relative."),
+    4: ("relative and absolute arc-length dimension", "AstorDetailsBase.DetRequestTypes #4: Arc length, relative and absolute."),
+    5: ("absolute arc-length dimension", "AstorDetailsBase.DetRequestTypes #5: Arc length, absolute."),
+    6: ("relative arc-angle dimension", "AstorDetailsBase.DetRequestTypes #6: Arc angle, relative."),
+    7: ("relative and absolute arc-angle dimension", "AstorDetailsBase.DetRequestTypes #7: Arc angle, relative and absolute."),
+    8: ("absolute arc-angle dimension", "AstorDetailsBase.DetRequestTypes #8: Arc angle, absolute."),
+    9: ("relative and absolute linear dimension", "AstorDetailsBase.DetRequestTypes #9: Linear, relative and absolute."),
+    10: ("absolute linear dimension", "AstorDetailsBase.DetRequestTypes #10: Linear, absolute."),
+    11: ("angle dimension", "AstorDetailsBase.DetRequestTypes #11: Angle."),
+    12: ("slope triangle dimension", "AstorDetailsBase.DetRequestTypes #12: Slope triangle."),
+    13: ("relative and absolute arc-length dimension from end", "AstorDetailsBase.DetRequestTypes #13: Arc length, relative and absolute from end."),
+    14: ("absolute arc-length dimension from end", "AstorDetailsBase.DetRequestTypes #14: Arc length, absolute from end."),
+    15: ("relative and absolute arc-angle dimension from end", "AstorDetailsBase.DetRequestTypes #15: Arc angle, relative and absolute from end."),
+    16: ("absolute arc-angle dimension from end", "AstorDetailsBase.DetRequestTypes #16: Arc angle, absolute from end."),
+    17: ("relative and absolute linear dimension from end", "AstorDetailsBase.DetRequestTypes #17: Linear, relative and absolute from end."),
+    18: ("absolute linear dimension from end", "AstorDetailsBase.DetRequestTypes #18: Linear, absolute from end."),
+    19: ("running (cumulative / ordinate) linear dimension", "AstorDetailsBase.DetRequestTypes #19: Linear, ordinate."),
+    20: ("ordinate and relative linear dimension", "AstorDetailsBase.DetRequestTypes #20: Linear, ordinate and relative."),
+    21: ("level / elevation dimension", "AstorDetailsBase.DetRequestTypes #21: Level, absolute."),
+    22: ("absolute and relative level / elevation dimension", "AstorDetailsBase.DetRequestTypes #22: Level, absolute and relative."),
+    23: ("horizontal slope triangle dimension", "AstorDetailsBase.DetRequestTypes #23: Slope triangle, horizontal."),
+    24: ("vertical slope triangle dimension", "AstorDetailsBase.DetRequestTypes #24: Slope triangle, vertical."),
+    25: ("smallest-edge slope triangle dimension", "AstorDetailsBase.DetRequestTypes #25: Slope triangle, smallest edge."),
+    26: ("longest-edge slope triangle dimension", "AstorDetailsBase.DetRequestTypes #26: Slope triangle, longest edge."),
+}
+
+OBSERVED_REQUEST_TYPES = {}
 
 # DSM "Point position on object / on main part" options (guide 2016 p.80),
 # used to read the position part of a rule name such as "... | Bottom-Any".
@@ -309,20 +530,34 @@ def read_point_name(name):
 
 
 def explain_point(point_row, qset_names=None, index=1):
-    """One point selection rule as a sentence plus its raw extras."""
+    """One point selection rule as a sentence plus its stored settings."""
+    has_qset_map = bool(qset_names)
     qset_names = qset_names or {}
     row = point_row or {}
     name = row.get("RunName") or f"point rule #{row.get('Key')}"
     parsed = read_point_name(name)
+    pt_num = _int(row.get("PointType"))
+    is_ref_code = pt_num is not None and pt_num >= 1000
+    reference = parsed["reference"] or is_ref_code
+
     objects_key = row.get("Objects")
     objects_name = None
+    dangling_objects = None
     if objects_key not in NULL_REFS:
+        if has_qset_map and objects_key not in qset_names:
+            dangling_objects = objects_key
         objects_name = clean_name(qset_names.get(objects_key, f"object set #{objects_key}"))
         if objects_name.lower() in {"mp", "main part", "mainpart"}:
             objects_name = "the main part"
 
     target = objects_name or parsed["subject"] or parsed["subject_text"]
     meaning = parsed["meaning"]
+    if not meaning and pt_num is not None:
+        base_pt = pt_num - 1000 if pt_num >= 1000 else pt_num
+        pt_label = POINT_TYPE_LABELS.get(base_pt)
+        if pt_label:
+            pt_parsed = read_point_name(pt_label)
+            meaning = pt_parsed["meaning"] or f"the {pt_label.lower()} points"
     if meaning in STANDALONE_MEANINGS:
         sentence = meaning
     elif meaning and target and not (meaning == "the hole centers" and target.lower() in {"holes", "hole"}):
@@ -332,16 +567,33 @@ def explain_point(point_row, qset_names=None, index=1):
     else:
         sentence = f"points from {target or 'the selected objects'} ({parsed['detail_text'] or name})"
 
-    if parsed["position"]:
-        phrase = position_phrase(*parsed["position"])
+    pos_tuple = parsed["position"]
+    if not pos_tuple:
+        obj_pos = POINT_POSITION_LABELS.get(_int(row.get("PointGeometricRestrictions")))
+        mp_pos = POINT_POSITION_LABELS.get(_int(row.get("MpGeomRestriction")))
+        if (obj_pos and obj_pos != "Any") or (mp_pos and mp_pos != "Any"):
+            pos_tuple = (
+                obj_pos.split(" (")[0] if obj_pos else "Any",
+                mp_pos.split(" (")[0] if mp_pos else "Any",
+            )
+    if pos_tuple:
+        phrase = position_phrase(*pos_tuple)
         if phrase:
             sentence = f"{sentence} ({phrase})"
 
-    extras = [
-        {"column": c, "label": POINT_FIELD_LABELS.get(c, c), "value": v}
-        for c, v in row.items()
-        if c not in POINT_KNOWN and v not in (None, "")
-    ]
+    extras = []
+    for c, v in row.items():
+        if c in POINT_KNOWN or v in (None, ""):
+            continue
+        v_int = _int(v)
+        val_label = POINT_VALUE_TABLES.get(c, {}).get(v_int)
+        extras.append({
+            "column": c,
+            "label": POINT_FIELD_LABELS.get(c, c),
+            "value": v,
+            "value_label": val_label,
+            "basis": "data" if val_label is not None else "raw",
+        })
     return {
         "index": index,
         "name": name,
@@ -349,9 +601,10 @@ def explain_point(point_row, qset_names=None, index=1):
         "key": row.get("Key"),
         "sentence": sentence,
         "hint": parsed["hint"],
-        "reference": parsed["reference"],
+        "reference": reference,
         "objects": objects_name,
         "objects_basis": "data" if objects_name else None,
+        "dangling_objects": dangling_objects,
         "basis": "name",
         "extras": extras,
     }
@@ -360,14 +613,12 @@ def explain_point(point_row, qset_names=None, index=1):
 def direction_text(linear):
     """Chain direction as words, keeping the stored number visible."""
     value = _int((linear or {}).get("Direction"))
-    if value == 0:
-        return {"text": "runs along X", "axis": "x", "value": 0, "basis": "data",
-                "note": "This app draws Direction 0 as X; the full DSM list has ~20 options."}
-    if value == 1:
-        return {"text": "runs along Y", "axis": "y", "value": 1, "basis": "data",
-                "note": "This app draws Direction 1 as Y; the full DSM list has ~20 options."}
     if value is None:
         return {"text": "direction not set", "axis": None, "value": None, "basis": "raw", "note": ""}
+    if value in DIRECTION_LABELS:
+        text, axis, note = DIRECTION_LABELS[value]
+        shown = text if value in (0, 1) else f"{text} (direction #{value})"
+        return {"text": shown, "axis": axis, "value": value, "basis": "data", "note": note}
     if value in OBSERVED_DIRECTIONS:
         text, note = OBSERVED_DIRECTIONS[value]
         return {"text": f"{text} (direction #{value})", "axis": None, "value": value,
@@ -441,6 +692,9 @@ def request_type_text(value):
     num = _int(value)
     if num is None:
         return None
+    if num in REQUEST_TYPE_LABELS:
+        text, note = REQUEST_TYPE_LABELS[num]
+        return {"value": num, "text": f"{text} (type #{num})", "basis": "data", "note": note}
     if num in OBSERVED_REQUEST_TYPES:
         text, note = OBSERVED_REQUEST_TYPES[num]
         return {"value": num, "text": f"{text} (type #{num})", "basis": "observed", "note": note}
@@ -477,6 +731,12 @@ def explain_request(linear, point_rows=(), qset_names=None, order=None,
         warnings.append("No point selection rules: this request has nothing to measure.")
     elif not measured:
         warnings.append("Every point rule is 'as reference', so this chain is never drawn on its own.")
+    for p in points:
+        if p.get("dangling_objects") is not None:
+            warnings.append(
+                f"Point rule '{p['display_name']}' references object set "
+                f"#{p['dangling_objects']}, which is not in this file."
+            )
     check = name_code_check(name, lin)
     if check and check["disagree"]:
         letters = ", ".join(f"{d['letter']} ({d['column']})" for d in check["disagree"])

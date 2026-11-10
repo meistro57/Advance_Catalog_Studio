@@ -415,3 +415,23 @@ def test_drawing_style_rename_copies_route_preview_and_apply(monkeypatch):
     assert ok_resp.status_code == 302
     assert ok_resp.headers["Location"].endswith("/db/Marks_Railing/drawing-style")
     assert len(applied) == 1
+
+
+def test_validate_dim_request_points_checks_count_and_objects():
+    pts = {
+        22001: {"Key": 22001, "RunName": "Posts | System", "Objects": 22029},
+        22002: {"Key": 22002, "RunName": "Orphan objects", "Objects": 99999},
+    }
+    qsets = {22029}
+    ok_row = {"Key": 1, "RunName": "X view - Posts", "Number of Points": 1, "Point1": 22001}
+    for i in range(2, 16):
+        ok_row[f"Point{i}"] = 0
+    assert ds.validate_dim_request_points(ok_row, pts, qsets) == []
+
+    bad_count = dict(ok_row, **{"Number of Points": 2})
+    problems = ds.validate_dim_request_points(bad_count, pts, qsets)
+    assert any("'Number of Points' = 2 but 1 Point1..15" in p for p in problems)
+
+    bad_obj = dict(ok_row, Point1=22002)
+    problems_obj = ds.validate_dim_request_points(bad_obj, pts, qsets)
+    assert any("DetObjQualifierSet #99999" in p for p in problems_obj)

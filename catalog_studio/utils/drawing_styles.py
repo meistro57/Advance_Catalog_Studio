@@ -501,6 +501,61 @@ def find_dangling(relations, column_values, target_keys):
     return out
 
 
+def validate_dim_request_points(linear_row, point_rows_by_key=None, valid_qset_keys=None):
+    """Validate DetViewDimRequestLinear point count, Point1..15, and Objects links.
+
+    Pure helper (no database). Checks that:
+    - ``Number of Points`` (or ``NumberOfPoints``) matches the count of populated
+      ``Point1..15`` columns;
+    - every populated ``Point1..15`` resolves in ``point_rows_by_key`` (when given);
+    - every referenced ``DetViewDimPointSelection.Objects`` (when not in
+      ``NULL_REFS``) resolves in ``valid_qset_keys`` (when given).
+    Returns a list of human-readable problem strings.
+    """
+    lin = linear_row or {}
+    label = lin.get("RunName") or f"#{lin.get('Key')}"
+    raw_cnt = lin.get("Number of Points", lin.get("NumberOfPoints"))
+    try:
+        stored_count = int(float(raw_cnt)) if raw_cnt is not None else None
+    except (TypeError, ValueError):
+        stored_count = None
+
+    populated = [
+        (i, lin.get(f"Point{i}"))
+        for i in range(1, 16)
+        if lin.get(f"Point{i}") not in NULL_REFS
+    ]
+    problems = []
+    if stored_count is not None and stored_count != len(populated):
+        problems.append(
+            f"DetViewDimRequestLinear '{label}': 'Number of Points' = {stored_count} "
+            f"but {len(populated)} Point1..15 column(s) are set."
+        )
+    if point_rows_by_key is not None:
+        qset_s = {str(k) for k in valid_qset_keys} if valid_qset_keys is not None else None
+        for idx, pkey in populated:
+            prow = point_rows_by_key.get(pkey)
+            if prow is None:
+                for k, v in point_rows_by_key.items():
+                    if str(k) == str(pkey):
+                        prow = v
+                        break
+            if prow is None:
+                problems.append(
+                    f"DetViewDimRequestLinear '{label}': Point{idx} references "
+                    f"DetViewDimPointSelection #{pkey}, which is not in this file."
+                )
+                continue
+            obj_key = prow.get("Objects")
+            if qset_s is not None and obj_key not in NULL_REFS and str(obj_key) not in qset_s:
+                pname = prow.get("RunName") or f"#{pkey}"
+                problems.append(
+                    f"DetViewDimPointSelection '{pname}': Objects references "
+                    f"DetObjQualifierSet #{obj_key}, which is not in this file."
+                )
+    return problems
+
+
 # ---------------------------------------------------------------------------
 # Database-bound
 # ---------------------------------------------------------------------------
@@ -853,6 +908,23 @@ def apply_field_edits(database, edits, relations=None):
                     errors.append(f"{table}.{col}: {val} isn't a valid {rel['table']} entry")
                     continue
             updates[col] = val
+        if updates and table == "DetViewDimRequestLinear" and any(
+            c in updates for c in ({"Number of Points", "NumberOfPoints"} | {f"Point{i}" for i in range(1, 16)})
+        ):
+            cur_row = db.get_row(database, table, pk) or {}
+            merged = {**cur_row, **updates}
+            pt_rows = (
+                _by_key(_rows(database, "SELECT * FROM DetViewDimPointSelection"))
+                if "DetViewDimPointSelection" in tables else None
+            )
+            qset_keys = (
+                {r["Key"] for r in _rows(database, "SELECT [Key] FROM DetObjQualifierSet")}
+                if "DetObjQualifierSet" in tables else None
+            )
+            dim_problems = validate_dim_request_points(merged, pt_rows, qset_keys)
+            if dim_problems:
+                errors.extend(dim_problems)
+                continue
         if updates:
             try:
                 db.update_row(database, table, pk, updates)
@@ -989,6 +1061,9 @@ def integrity_report(database, relations=None):
                     f"Representation map {r['Key']}: rule order isn't 0..{r['n'] - 1} "
                     f"(found {r['lo']}..{r['hi']}). Use 'Renumber' to compact it."
                 )
+    if "DetViewDimRequestLinear" in tables:
+        for lin in _rows(database, "SELECT * FROM DetViewDimRequestLinear"):
+            notes.extend(validate_dim_request_points(lin))
     return {"dangling": problems, "notes": notes,
             "checked": sum(1 for r in relations.values() if r.get("local"))}
 

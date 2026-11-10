@@ -136,10 +136,16 @@ transaction after taking a pre-change snapshot.
   previews and applies batch renames of `Copy of ` / `Copy (n) ` `RunName`
   prefixes left by Advance Steel's Deep copy (`plan_deep_copy_rename` /
   `preview_deep_copy_rename` / `apply_deep_copy_rename`, route
-  `/db/<db>/drawing-style/rename-copies`, issue #16), and runs
+  `/db/<db>/drawing-style/rename-copies`, issue #16), validates
+  `DetViewDimRequestLinear` `Number of Points` / `Point1..15` / `Objects`
+  (`validate_dim_request_points`), and runs
   `integrity_report`. Pure helpers are unit-tested in
   `tests/test_drawing_styles.py`; schema notes in `docs/drawing-style-schema.md`.
-  Never invent labels for AstorBase/AstorDetailsBase enums — they aren't in the export.
+  Never invent labels for AstorBase/AstorDetailsBase enums — only values
+  verified in `docs/verification-log.md` (such as the `AstorDetails.mdf`
+  dimension point-selection, direction, and request-type tables in
+  `utils/dim_explain.py`, issue #11 / A5.2) are mapped; unverified values stay
+  raw.
   Do not reimplement compaction: the Style Manager's own **Compact database**
   merges equal records and rewires references; the tool only reports.
   Feature requests sometimes name `DetStyle`, `DetStyleViews`, `DetView`,

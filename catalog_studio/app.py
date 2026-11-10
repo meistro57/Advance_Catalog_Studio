@@ -1587,6 +1587,7 @@ def drawing_style(database):
         label_escapes=list(drawing_styles.SYMBOL_ESCAPES),
         label_commands=["#Newline", "#Height(6.40)", "#Bold(1)", "#Underline(1)",
                         "#Color(2)", "#Italic(1)", "#Rounded", "#End"],
+        direction_choices=drawing_styles.dim_explain.DIRECTION_CHOICES,
     )
 
 

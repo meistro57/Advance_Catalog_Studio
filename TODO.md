@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 553 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 557 tests; read-only bolt/anchor/stud/style views,
 the health report and the DXF hand-edit diff (issue #15 Phase 1) exist; the
 home dashboard is split into Fastener Management and Drawing Style Management
 realms with distinct colour palettes (issue #20); both the Bolt-Set Viewer and
@@ -25,8 +25,9 @@ Anchor Configurator include fractional-inch / `mm` dimension toggles (issue #18)
 and the Anchor Configurator has an interactive Bolt projection from concrete
 control with a 4" typical preset (issues #19, #21); writes are the bolt/anchor
 diameter clone and removal (issue #17), raw row CRUD, find & replace,
-drawing-style field/rule edits, and deep-copy `RunName` prefix renaming
-(issue #16).
+drawing-style field/rule edits (including `Point1..15` / `Number of Points` and
+verified `AstorDetails.mdf` dimension enum labels, issue #11), and deep-copy
+`RunName` prefix renaming (issue #16).
 
 ---
 
@@ -128,15 +129,18 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 
 ## E. Drawing styles
 
-- [ ] **E1 — Dimension point selection editing.** Edit
-  `DetViewDimRequestLinear.Point1..15` (and `NumberOfPoints`) with the existing
+- [x] **E1 — Dimension point selection editing.** Edit
+  `DetViewDimRequestLinear.Point1..15` (and `Number of Points`) with the existing
   relation dropdowns; validate that the point count matches the populated
-  points and that `DetViewDimPointSelection.Objects` resolves.
-- [ ] **E1b — Decode point-selection enums.** With a live AS 2026 DSM open
-  next to an export, record which `DetViewDimPointSelection` column/value is
-  each "Point type", "Point position on object/main part" and "Visibility"
-  option, and which `Direction` values are which chain directions. Only then
-  replace the raw columns on the dimension cards with labels (feeds A5).
+  points and that `DetViewDimPointSelection.Objects` resolves
+  (`validate_dim_request_points`).
+- [x] **E1b — Decode point-selection enums (issue #11).** Decoded
+  `DetViewDimPointSelection` (`PointType` including `+1000` for `Ref.` /
+  `"as reference"`, `PointGeometricRestrictions`, `MpGeomRestriction`,
+  `VisibilityStatus`, `GeometricRestrictions`, `ParentRelativePositonRestriction`),
+  `DetViewDimRequestLinear.Direction`, and `DetViewDimStrategyItems.Type` across
+  delivered `AstorDetails.mdf` (`A5.2` in `docs/verification-log.md`) and wired
+  verified label tables into `dim_explain.py`.
 - [ ] **E2 — Arranger strategy editing.** Expose `ArrangerStrategy`,
   `ArrangerControl` and the merge distance on annotation strategies, with the
   same shared-record warning as other library edits.
@@ -293,3 +297,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   `SetBolts` row links) and deeper validation (`duplicate_stud_name`,
   `weight_implausible`, `weight_non_monotonic`, `invalid_distance_rule`,
   `orphan_distance`, issue #4 D3/D4, 553 tests).
+- [x] Decoded `DetViewDimPointSelection` (`PointType` + `+1000` reference code,
+  `PointGeometricRestrictions`, `MpGeomRestriction`, `VisibilityStatus`,
+  `GeometricRestrictions`, `ParentRelativePositonRestriction`),
+  `DetViewDimRequestLinear.Direction`, and `DetViewDimStrategyItems.Type` from
+  delivered `AstorDetails.mdf` (`A5.2`, issue #11 / E1b) and added `Point1..15`
+  + `Number of Points` editing and validation (`E1`, 557 tests).

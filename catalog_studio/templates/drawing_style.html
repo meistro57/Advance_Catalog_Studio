@@ -139,8 +139,8 @@
               <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
               <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
               </div>
-              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
-                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} = {{ x.value }}">{{ x.label }}: {% if x.value_label %}{{ x.value_label }} (#{{ x.value }}) {{ basis(x.basis) }}{% else %}{{ x.value }} {{ basis('raw') }}{% endif %}</span>{% endfor %}
               </details>{% endif %}
             </span>
           </div>
@@ -156,8 +156,8 @@
               <span {% if p.hint %}title="{{ p.hint }}"{% endif %}>{{ p.sentence[:1]|upper }}{{ p.sentence[1:] }}</span> {{ basis('name') }}
               <div class="ds-hint">Rule <strong title="{{ p.name }}">{{ p.display_name }}</strong>{% if p.objects %} &middot; objects: {{ p.objects }} {{ basis('data') }}{% endif %}
               </div>
-              {% if p.extras %}<details class="ds-hint"><summary>Stored settings (AS numbers)</summary>
-                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} — label lives in Advance Steel's built-in list">{{ x.label }} {{ x.value }}</span>{% endfor %}
+              {% if p.extras %}<details class="ds-hint"><summary>Stored settings</summary>
+                {% for x in p.extras %}<span class="badge bg-light text-dark border me-1" title="{{ x.column }} = {{ x.value }}">{{ x.label }}: {% if x.value_label %}{{ x.value_label }} (#{{ x.value }}) {{ basis(x.basis) }}{% else %}{{ x.value }} {{ basis('raw') }}{% endif %}</span>{% endfor %}
               </details>{% endif %}
             </span>
           </div>
@@ -208,12 +208,24 @@
           </div>
         </div>
         <div class="col-xl-6">
+          {% set dir_opts = direction_choices if direction_choices is defined and direction_choices else [(0,'0 · X (view)'),(1,'1 · Y (view)'),(2,'2 · X of object'),(3,'3 · Y of object'),(4,'4 · X of main part'),(5,'5 · Y of main part'),(6,'6 · Y curved (bent beam)'),(9,'9 · X curved outer (bent beam)'),(10,'10 · Internal linear / radial'),(17,'17 · Internal angle'),(18,'18 · Internal bolt/hole X'),(19,'19 · Internal bolt/hole Y')] %}
           <div class="dx-section">Edit</div>
           <div class="ds-grid">
             {{ fld('DetViewDimRequestLinear', d.linear.token, 'RunName', d.linear.row.RunName, label='Request name') }}
-            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', [(0,'0 · X'),(1,'1 · Y'),(4,'4 · along main part (observed)')], label='Direction') }}
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Direction', d.linear.row.Direction, 'select', dir_opts, label='Direction') }}
             {{ fld('DetViewDimRequestLinear', d.linear.token, 'ArrangeAbove', d.linear.row.ArrangeAbove, 'bool', label='Above (left if vertical)') }}
+            {{ fld('DetViewDimRequestLinear', d.linear.token, 'Number of Points', d.linear.row['Number of Points'], label='Number of points') }}
           </div>
+          <details class="mt-2 dx-point-slots">
+            <summary class="ds-hint">Point selection rules (Point1..15)</summary>
+            <div class="ds-grid mt-1">
+              {% for i in range(1, 16) %}
+                {% set pcol = 'Point' ~ i %}
+                {% set popts = [(0, '0 — none')] + (options.DetViewDimRequestLinear[pcol] if options.DetViewDimRequestLinear is defined and pcol in options.DetViewDimRequestLinear else []) %}
+                {{ fld('DetViewDimRequestLinear', d.linear.token, pcol, d.linear.row[pcol], 'select', popts, label='Point ' ~ i) }}
+              {% endfor %}
+            </div>
+          </details>
           <div class="ds-hint mt-2">
             Shared: editing this request changes every view that uses it.
             <a href="/db/{{ database }}/DetViewDimRequestLinear/{{ d.linear.token }}/edit?return_to=/db/{{ database }}/drawing-style%23pane-dims-{{ r.row.Key }}">all fields &rarr;</a>

@@ -3,6 +3,12 @@
 All notable changes to **Advance Steel Catalog Studio** are documented in this file.
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`); the canonical version string lives in [`VERSION`](VERSION) and is exposed in the application via `config.APP_VERSION`.
 
+## [0.6.0] - 2026-11-10
+
+### Added
+- **Decoded Dimension Point-Selection, Direction, and Request-Type Enums (`#11` — `E1b` / `A5.2`)**: Decoded `DetViewDimPointSelection` (`PointType` including `+1000` for `"as reference"`, `PointGeometricRestrictions`, `MpGeomRestriction`, `VisibilityStatus`, `GeometricRestrictions`, `ParentRelativePositonRestriction`), `DetViewDimRequestLinear.Direction`, and `DetViewDimStrategyItems.Type` across delivered `AstorDetails.mdf` (`docs/verification-log.md` `A5.2`) and wired verified label tables into `utils/dim_explain.py` and `templates/drawing_style.html`.
+- **Dimension Point Selection Editing & Validation (`E1`)**: Added inline `Number of Points` and `Point1..15` dropdowns on each dimension chain card in `/db/<db>/drawing-style` along with `drawing_styles.validate_dim_request_points()` to validate point counts and `DetViewDimPointSelection.Objects` references on save and in `integrity_report()`.
+
 ## [0.5.1] - 2026-11-10
 
 ### Added

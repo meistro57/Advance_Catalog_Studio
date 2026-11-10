@@ -37,7 +37,7 @@ Each entry records:
 | A2 | Anchor `Position` semantics | not started |
 | A3 | Shear-stud clone round trip and `ConnectorRelations.Key` | not started |
 | A4 | Drawing-style edit round trip (same-name import) | not started |
-| A5 | `AstorDetailsBase` enum labels in the AS UI | in progress — one drawing observation (A5.1), DSM list not read yet |
+| A5 | `AstorDetailsBase` enum labels in the AS UI | **pass** for dimension point selection, direction, and strategy types via `AstorDetails.mdf` (A5.2) |
 | A6 | Exported `.mdf` / `.ldf` pair imports cleanly | **pass** with Windows-form file paths (A6.10); confirm with an edited export through the app |
 | A7 | DXF hand-edit diff against a real before/after pair | not started; parser and diff are covered by synthetic fixtures only |
 
@@ -79,6 +79,111 @@ report instead of applying.
   unexplained; why its chain printed nothing is open.
 - Unblocks: nothing yet. Next step for A5: open these requests in the DSM and
   record the direction and dimension-type names shown for 4, 5 and 2.
+
+### A5.2 — Dimension point-selection, direction, and request-type enums from `AstorDetailsBase.mdf` & `AstorDetails.mdf`
+
+- Date / operator: 2026-11-10 / Mark Hubrich (`samples/AstorDetailsBase.mdf`
+  and `samples/AstorDetails.mdf` from Advance Steel 2026).
+- AS build: Advance Steel 2026 (file version 904).
+- File(s): `samples/AstorDetailsBase.mdf` (lookup tables) and
+  `samples/AstorDetails.mdf` (48 tables; 373 `DetViewDimPointSelection` rows,
+  398 `DetViewDimRequestLinear` rows, 778 `DetViewDimStrategyItems` rows).
+- Operation: attached working copies of `AstorDetailsBase.mdf` and
+  `AstorDetails.mdf` in the SQL Server 2019 scratch container, read the
+  authoritative lookup tables from `AstorDetailsBase.mdf`, and cross-tabulated
+  them against the 373 `DetViewDimPointSelection`, 398 `DetViewDimRequestLinear`,
+  and 778 `DetViewDimStrategyItems` rows in `AstorDetails.mdf`.
+- Observed:
+  - **`PointGeometricRestrictions` & `MpGeomRestriction` (`AstorDetailsBase.DetVwDimGeomRestrictions`):**
+    `0` = ANY (`Any`), `1` = Left, `2` = Right, `4` = Below (`Bottom`),
+    `5` = BelowLeft (`BottomLeft`), `6` = BelowRight (`BottomRight`),
+    `8` = Above (`Top`), `9` = AboveLeft (`TopLeft`),
+    `10` = AboveRight (`TopRight`), `11` = Left Extreme (`Leftmost`),
+    `12` = Right Extreme (`Rightmost`), `13` = Top Extreme (`Topmost`),
+    `14` = Bottom Extreme (`Bottommost`), `15` = LeftRightExtremes
+    (`Left & Right Extremes`), `16` = TopBottomExtremes
+    (`Top & Bottom Extremes`) — 186 / 186 two-part position suffixes in
+    `AstorDetails.DetViewDimPointSelection` match with 0 contradictions.
+  - **`PointType` (`AstorDetailsBase.DetViewDimPointtype`):**
+    `0` = ANY (`All`), `1` = ObjExtents (`Extreme`), `2` = ObjContour (`Contour`),
+    `3` = ObjNotches (`Inside processings`), `4` = AllHoles (`Holes`),
+    `5` = AllConnParts (`Attached parts`),
+    `8` = ObjNotches as subobjects (`Inside processings (each)`),
+    `9` = System, `10` = Center,
+    `11` = BentBeam Interior (`Inside (curved/bent beam)`),
+    `12` = BentBeam Exterior (`Outside (curved/bent beam)`),
+    `14` = Mainpart CollisionExtents (`Assembly overall`),
+    `15` = StencilPoint (`Templates reference point`),
+    `16` = Development lines, `17` = MedianLine (`Median`),
+    `19` = Beam ends processings (`End processings`),
+    `20` = HelperLine (`Helper line points`),
+    `21` = Environment system points, `22` = Environment median points,
+    `23` = Environment contour points, `24` = Camber points;
+    **`+1000` (`1000..1023`) encodes `"as reference"` (`Ref.`)**.
+  - **`VisibilityStatus` (`AstorDetailsBase.DetailVisibilityStatus`):**
+    `0` = Default, `1` = Visible, `2` = Visible and Hidden, `3` = Hidden.
+  - **`DepthPosition` (`AstorDetailsBase.DetailDepthPosition`):**
+    `0` = Any, `1` = BothSides-CenterFront, `2` = BothSides-CenterRear,
+    `3` = Front (entirely), `4` = Rear (entirely), `5` = BothSides-Center,
+    `6` = Both Sides, `7` = Front (by center), `8` = Rear (by center).
+  - **`GeometricRestrictions` (`AstorDetailsBase.DetGeometricRestrictions`):**
+    `0` = All, `1` = Linear (`Li`), `2` = NotLinear (`NLi`),
+    `3` = Top (`Tv`), `4` = Front+Side/Front (`Fr+Side`),
+    `5` = Side/Width (`Side`), `6` = Top+Front/Length (`Tv+Fr`),
+    `7` = Front/Length (`Fr`), `8` = Top+Side/Width,
+    `9` = Linear Front (`Li+Fr`), `10` = Linear Top (`Li+Tv`),
+    `11` = Linear Side, `12` = Non Linear Front,
+    `13` = Non Linear Top (`NLi+Tv`), `14` = Non Linear Side.
+  - **`ReferenceAxis` & `MPReferenceAxis` (`AstorDetailsBase.DetailReferenceAxis`):**
+    `0` = Relative to dimensioning line direction,
+    `1` = Relative to object direction.
+  - **`ParentRelativePositonRestriction` (`AstorDetailsBase.DetVwDimParentRelaPosRestriction`):**
+    `0` = No restriction (`Any`), `1` = Object attached to top flange (`Top Flange`),
+    `2` = Object attached to bottom flange (`Bottom Flange`),
+    `3` = Object attached to flanges (`Flanges (Both)`),
+    `4` = Object attached to web (`Web`).
+  - **`DetViewDimRequestLinear.Direction` (`AstorDetailsBase.DetRequestLinearDirection`):**
+    `0` = `viewX` (`x-orientation of the view`),
+    `1` = `viewY` (`y-orientation of the view`),
+    `2` = `objectX` (`x-axis of an object`),
+    `3` = `objectY` (`y-axis of an object`),
+    `4` = `main part X` (`x-axis of a main part` — confirms A5.1),
+    `5` = `main part Y` (`y-axis of a main part` — resolves A5.1's Direction 5),
+    `6` = `Bent Y` (`y-axis CurvedBeam`),
+    `7` = `Bent X System` (`x-axis CurvedBeam system`),
+    `8` = `Bent X Inner` (`x-axis CurvedBeam inner`),
+    `9` = `Bent X Outer` (`x-axis CurvedBeam outer`),
+    `10` = `Internal direction linear`,
+    `11` = `MinusViewX` (`Negative x-orientation of the view`),
+    `12` = `MinusViewY` (`Negative y-orientation of the view`),
+    `13` = `MinusObjectX` (`Negative x-axis of an object`),
+    `14` = `MinusObjectY` (`Negative y-axis of an object`),
+    `15` = `MinusMainpartX` (`Negative x-axis of a main part`),
+    `16` = `MinusMainpartY` (`Negative y-axis of a main part`),
+    `17` = `Internal direction angle`,
+    `18` = `Internal bolt/hole direction X`,
+    `19` = `Internal bolt/hole direction Y`.
+  - **`DetViewDimStrategyItems.Type` (`AstorDetailsBase.DetRequestTypes`):**
+    `1` = Radial, `2` = Linear, relative (confirms A5.1),
+    `3` = Arc length, relative, `4` = Arc length, relative and absolute,
+    `5` = Arc length, absolute, `6` = Arc angle, relative,
+    `7` = Arc angle, relative and absolute, `8` = Arc angle, absolute,
+    `9` = Linear, relative and absolute, `10` = Linear, absolute,
+    `11` = Angle, `12` = Slope triangle,
+    `13` = Arc length, relative and absolute from end,
+    `14` = Arc length, absolute from end,
+    `15` = Arc angle, relative and absolute from end,
+    `16` = Arc angle, absolute from end,
+    `17` = Linear, relative and absolute from end,
+    `18` = Linear, absolute from end, `19` = Linear, ordinate,
+    `20` = Linear, ordinate and relative, `21` = Level, absolute,
+    `22` = Level, absolute and relative,
+    `23` = Slope triangle, horizontal, `24` = Slope triangle, vertical,
+    `25` = Slope triangle, smallest edge, `26` = Slope triangle, longest edge.
+- Verdict: **pass** for all values above.
+- Unblocks: **Issue #11 (`TODO` E1b & E1)** — verified label tables wired into
+  `catalog_studio/utils/dim_explain.py` (`basis = 'data'`), plus `Number of Points`
+  and `Point1..15` dropdown editing and validation on `DetViewDimRequestLinear`.
 
 ### A6.1 — Export from a SQL Server 2022 scratch container fails to import
 

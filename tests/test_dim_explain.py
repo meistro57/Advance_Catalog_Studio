@@ -105,9 +105,47 @@ def test_unrecognised_rule_name_falls_back_to_the_name():
     assert "Weird thing" in p["sentence"]
 
 
-def test_unexplained_point_columns_are_kept_raw():
-    p = dx.explain_point({"Key": 1, "RunName": "Holes - All", "Objects": 0, "PointType": 12, "Empty": None})
-    assert p["extras"] == [{"column": "PointType", "label": "Point type", "value": 12}]
+def test_point_columns_resolve_verified_labels_and_keep_unknowns_raw():
+    p = dx.explain_point(
+        {
+            "Key": 1,
+            "RunName": "Holes - All",
+            "Objects": 0,
+            "PointType": 12,
+            "DepthPosition": 7,
+            "VisibilityStatus": 99,
+            "Empty": None,
+        }
+    )
+    assert p["extras"] == [
+        {
+            "column": "PointType",
+            "label": "Point type",
+            "value": 12,
+            "value_label": "Outside (curved/bent beam)",
+            "basis": "data",
+        },
+        {
+            "column": "DepthPosition",
+            "label": "Depth position",
+            "value": 7,
+            "value_label": "Front (by center)",
+            "basis": "data",
+        },
+        {
+            "column": "VisibilityStatus",
+            "label": "Visibility",
+            "value": 99,
+            "value_label": None,
+            "basis": "raw",
+        },
+    ]
+
+
+def test_point_type_1000_marks_reference_point_even_without_name_hint():
+    p = dx.explain_point({"Key": 10, "RunName": "Custom rule", "Objects": 0, "PointType": 1001})
+    assert p["reference"] is True
+    assert "overall size" in p["sentence"]
 
 
 # --- direction and placement --------------------------------------------------
@@ -115,8 +153,10 @@ def test_unexplained_point_columns_are_kept_raw():
 def test_direction_words_keep_the_number():
     assert dx.direction_text({"Direction": 0})["text"] == "runs along X"
     assert dx.direction_text({"Direction": 1})["axis"] == "y"
-    other = dx.direction_text({"Direction": 7})
-    assert other["basis"] == "raw" and other["value"] == 7 and "#7" in other["text"]
+    d7 = dx.direction_text({"Direction": 7})
+    assert d7["basis"] == "data" and "bent beam's system X axis" in d7["text"]
+    other = dx.direction_text({"Direction": 99})
+    assert other["basis"] == "raw" and other["value"] == 99 and "#99" in other["text"]
     assert dx.direction_text({})["text"] == "direction not set"
 
 
@@ -249,16 +289,24 @@ def test_assembly_overall_and_main_part_extremes():
     assert dx.explain_point(RAIL_MP_EXTREME, RAIL_QSETS)["sentence"] == "the overall size of the main part"
 
 
-def test_point_settings_get_dsm_field_names_but_keep_numbers():
-    labels = {x["label"]: x["value"] for x in dx.explain_point(RAIL_POSTS, RAIL_QSETS)["extras"]}
-    assert labels["Point type"] == 9 and labels["Position on object"] == 4
-    assert labels["Position on main part"] == 0 and "OwnerText" not in labels
+def test_point_settings_get_dsm_field_names_and_verified_labels():
+    extras_by_label = {x["label"]: x for x in dx.explain_point(RAIL_POSTS, RAIL_QSETS)["extras"]}
+    assert extras_by_label["Point type"]["value"] == 9
+    assert extras_by_label["Point type"]["value_label"] == "System"
+    assert extras_by_label["Point type"]["basis"] == "data"
+    assert extras_by_label["Position on object"]["value"] == 4
+    assert extras_by_label["Position on object"]["value_label"] == "Bottom"
+    assert extras_by_label["Position on main part"]["value"] == 0
+    assert extras_by_label["Position on main part"]["value_label"] == "Any"
+    assert "OwnerText" not in extras_by_label
 
 
-def test_direction_four_is_marked_observed_not_verified():
-    d = dx.direction_text({"Direction": 4})
-    assert d["basis"] == "observed" and "main part" in d["text"] and "#4" in d["text"]
-    assert dx.direction_text({"Direction": 5})["basis"] == "raw"
+def test_verified_directions_and_unknown_directions():
+    d4 = dx.direction_text({"Direction": 4})
+    assert d4["basis"] == "data" and "main part's X axis" in d4["text"] and "#4" in d4["text"]
+    d5 = dx.direction_text({"Direction": 5})
+    assert d5["basis"] == "data" and "main part's Y axis" in d5["text"] and "#5" in d5["text"]
+    assert dx.direction_text({"Direction": 99})["basis"] == "raw"
 
 
 def test_railing_front_chains_read_like_the_drawing():
@@ -275,13 +323,22 @@ def test_railing_front_chains_read_like_the_drawing():
     assert e["summary"] == ("Measures the system line of Railing - Post Landing (bottom points only); "
                             "the overall extents of the assembly. The chain runs along X, placed below the view.")
     assert e["group_name"] == "Railings"
-    assert e["dim_type"]["basis"] == "observed" and "relative" in e["dim_type"]["text"]
+    assert e["dim_type"]["basis"] == "data" and "relative" in e["dim_type"]["text"]
     assert e["label"] is None  # "-" means no label text
     assert {"column": "LabelPosition", "label": "Label position", "value": 0} in e["extras"]
     assert e["warnings"] == []
 
 
+def test_dangling_point_objects_is_warned_when_qset_map_supplied():
+    bad_pt = {"Key": 22199, "RunName": "Orphan rule", "Objects": 99999, "PointType": 4}
+    e = dx.explain_request(linear(Point1=22199, Point2=0, **{"Number of Points": 1}), [bad_pt], QSETS)
+    assert any("references object set #99999" in w for w in e["warnings"])
+
+
 def test_unknown_request_type_stays_a_number():
-    t = dx.request_type_text(7)
-    assert t["basis"] == "raw" and "#7" in t["text"]
+    t = dx.request_type_text(99)
+    assert t["basis"] == "raw" and "#99" in t["text"]
+    assert dx.request_type_text(7)["basis"] == "data"
+    assert dx.request_type_text(19)["basis"] == "data"
+    assert "running" in dx.request_type_text(19)["text"]
     assert dx.request_type_text(None) is None

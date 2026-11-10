@@ -316,13 +316,53 @@ Real exports (the railing style, A5.1) also showed:
   (→ `DetViewDimRequestLinearGroup`, the DSM folder: Mp / Railings / Others);
 - `DetViewDimStrategyNew.Items`, which names the strategy's item list (equal to
   its own `Key` in every export seen; the tree follows `Items` when set);
-- `Direction` values 4 and 5 in addition to 0/1.
+- `Direction` values 0..19 (`AstorDetailsBase.DetRequestLinearDirection`).
 
-Not decoded: the point type, position-on-object and visibility columns of
-`DetViewDimPointSelection`, and `Direction` values other than 0/1. The guide
-lists the options (≈20 directions, 27 point types, 15 positions, 3 visibility
-states) but the number → option table is in `AstorDetailsBase`. Those columns
-are listed raw on each card.
+Verified directly against delivered `AstorDetailsBase.mdf` and cross-checked
+across the 373 `DetViewDimPointSelection` rules, 398 `DetViewDimRequestLinear`
+requests, and 778 `DetViewDimStrategyItems` rows in delivered `AstorDetails.mdf`
+(verification log A5.2, issue #11):
+
+- **`PointType` (`DetViewDimPointtype`, `0..24` + `1000..1023`)** (`0` All/ANY,
+  `1` Extreme, `2` Contour, `3` Inside processings, `4` Holes, `5` Attached parts,
+  `8` Inside processings (each), `9` System, `10` Center, `11` Inside curved/bent
+  beam, `12` Outside curved/bent beam, `14` Assembly overall, `15` Templates
+  reference point, `16` Development lines, `17` Median, `19` End processings,
+  `20` Helper line points, `21` Environment system, `22` Environment median
+  points, `23` Environment contour points, `24` Camber points, plus **`+1000`**
+  for `"as reference"` / `Ref.`);
+- **`PointGeometricRestrictions` & `MpGeomRestriction`
+  (`DetVwDimGeomRestrictions`)** (`0` Any, `1` Left, `2` Right, `4` Bottom,
+  `5` BottomLeft, `6` BottomRight, `8` Top, `9` TopLeft, `10` TopRight,
+  `11` Leftmost, `12` Rightmost, `13` Topmost, `14` Bottommost,
+  `15` Left & Right Extremes, `16` Top & Bottom Extremes — 186/186 exact
+  agreement);
+- **`VisibilityStatus` (`DetailVisibilityStatus`, `0..3`)** (`0` Default,
+  `1` Visible, `2` Visible and hidden, `3` Hidden),
+  **`DepthPosition` (`DetailDepthPosition`, `0..8`)** (`0` Any,
+  `1` BothSides-CenterFront, `2` BothSides-CenterRear, `3` Front (entirely),
+  `4` Rear (entirely), `5` BothSides-Center, `6` Both Sides,
+  `7` Front (by center), `8` Rear (by center)),
+  **`GeometricRestrictions` (`DetGeometricRestrictions`, `0..14`)**,
+  **`ReferenceAxis` / `MPReferenceAxis` (`DetailReferenceAxis`, `0..1`)**, and
+  **`ParentRelativePositonRestriction` (`DetVwDimParentRelaPosRestriction`, `0..4`)**
+  (`0` Any, `1` Top Flange, `2` Bottom Flange, `3` Flanges, `4` Web);
+- **`DetViewDimRequestLinear.Direction` (`DetRequestLinearDirection`, `0..19`)**
+  (`0` viewX, `1` viewY, `2` objectX, `3` objectY, `4` main part X,
+  `5` main part Y, `6` Bent Y, `7` Bent X System, `8` Bent X Inner,
+  `9` Bent X Outer, `10` Internal direction linear, `11..16` MinusViewX/Y,
+  MinusObjectX/Y, MinusMainpartX/Y, `17` Internal direction angle,
+  `18` Internal bolt/hole direction X, `19` Internal bolt/hole direction Y) and
+  **`DetViewDimStrategyItems.Type` (`DetRequestTypes`, `1..26`)** (`1` Radial,
+  `2` Linear relative, `3..5` Arc length, `6..8` Arc angle,
+  `9` Linear relative and absolute, `10` Linear absolute, `11` Angle,
+  `12` Slope triangle, `13..18` from-end variants, `19..20` Linear ordinate
+  variants, `21..22` Level absolute/relative, `23..26` Slope triangle
+  horizontal/vertical/smallest/longest edge).
+
+Any value not in those verified tables stays raw (`AS number`). Each chain card
+also exposes `Number of Points` and `Point1..15` dropdowns (with `(0, '0 — none')`
+to clear a slot), validated by `drawing_styles.validate_dim_request_points()`.
 
 ## Editor layout
 

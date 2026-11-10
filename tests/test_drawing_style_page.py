@@ -221,3 +221,12 @@ def test_view_pane_shows_its_placement_numbers():
     for column in ("ArrangeDir", "CompassLocation", "CompassLocationInOverviews"):
         assert f"::req-tok::{column}" in html, column
     assert "Placement in this view" in html
+
+
+def test_dimension_chain_exposes_point_slots_and_verified_directions():
+    html = _render()
+    assert 'name="f::DetViewDimRequestLinear::lin-400::Number of Points"' in html
+    assert 'name="f::DetViewDimRequestLinear::lin-400::Point1"' in html
+    assert 'name="f::DetViewDimRequestLinear::lin-400::Point15"' in html
+    assert "4 · X of main part" in html
+    assert "5 · Y of main part" in html
