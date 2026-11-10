@@ -11,7 +11,8 @@
 
 It replaces fragile, repetitive table-by-table editing with guided workflows that understand the relationships behind bolt diameters, bolt lengths, nuts, washers, assembly sets, grip rules, and edge distances, and behind drawing styles: view requests, representation rules, label formulas, and dimension strategies.
 
-![Catalog Studio dashboard](docs/images/catalog-studio-dashboard.png)
+<img width="2526" height="1657" alt="image" src="https://github.com/user-attachments/assets/17a5efea-1d41-43a9-bca5-90b9ff0c20df" />
+
 
 ## Why this exists
 
