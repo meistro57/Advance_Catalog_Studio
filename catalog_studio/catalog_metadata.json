@@ -14,5 +14,73 @@
   "US_Headed_Anchors_mark": {
     "catalog_type": "anchor",
     "as_version": 2026
+  },
+  "Mark_Column": {
+    "catalog_type": "drawing style",
+    "as_version": 2026
+  },
+  "HILTI_HY_200": {
+    "catalog_type": "anchor",
+    "as_version": 2026
+  },
+  "marks_railing": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "marks_rail": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "mark_rail": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "Beam": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "Marks_Ladder": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "Marks_Railing": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
+  },
+  "A325": {
+    "catalog_type": "bolt",
+    "as_version": 2026,
+    "library": ""
+  },
+  "HIT_RE_500_V3": {
+    "catalog_type": "anchor",
+    "as_version": 2026,
+    "library": ""
+  },
+  "NELSON_STUDS": {
+    "catalog_type": "shear stud",
+    "as_version": 2026,
+    "library": ""
+  },
+  "AstorDetails": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": "astordetails"
+  },
+  "AstorDetailsBase": {
+    "catalog_type": "unknown",
+    "as_version": 2026,
+    "library": "astordetailsbase"
+  },
+  "Marks_Elevation_View": {
+    "catalog_type": "drawing style",
+    "as_version": 2026,
+    "library": ""
   }
 }

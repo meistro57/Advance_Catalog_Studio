@@ -112,10 +112,10 @@ transaction after taking a pre-change snapshot.
   `as_version`, stored in a local JSON sidecar
   (`catalog_studio/catalog_metadata.json`), deliberately **not** written into
   the mdf (extra tables would break Advance Steel import). `library_kind()`
-  recognises an attachment made from `AstorDetails` / `AstorAddIn` /
-  `AstorBase` / `AstorSettings` and the attach route stores it; `app._blocked_write()`
-  then refuses every write route for that database (delivered libraries are
-  read-only). Detach/export and all reads stay allowed.
+  recognises an attachment made from `AstorDetails` / `AstorDetailsBase` /
+  `AstorAddIn` / `AstorBase` / `AstorSettings` and the attach route stores it;
+  `app._blocked_write()` then refuses every write route for that database
+  (delivered libraries are read-only). Detach/export and all reads stay allowed.
 - `catalog_studio/utils/staging.py` — pairs `.mdf` with `_log.ldf` in uploads/,
   suggests DB names from filenames, lists exports/.
 - `catalog_studio/utils/staging_cleanup.py` — safe cleanup of the two runtime
@@ -649,8 +649,10 @@ dimension logic of its own.
   encode the verified schema knowledge and the test suite.
 - **Database roles (documented by Autodesk, not re-verified here):**
   `AstorDetails.mdf` = delivered templates/styles (treat as read-only),
-  `AstorAddIn.mdf` = user overrides and cloned styles, `AstorBase.mdf` =
-  fasteners/bolts/anchors/studs/materials, `AstorSettings.mdf` = global defaults.
+  `AstorDetailsBase.mdf` = delivered drawing-style lookup/enum tables (treat as
+  read-only), `AstorAddIn.mdf` = user overrides and cloned styles,
+  `AstorBase.mdf` = fasteners/bolts/anchors/studs/materials,
+  `AstorSettings.mdf` = global defaults.
   The tool only ever sees copies attached to the scratch container; record
   provenance per file (`catalog_metadata.json`), never write to a delivered
   library, and prefer authoring into a copy of the user library.

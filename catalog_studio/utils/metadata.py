@@ -16,6 +16,7 @@ _lock = threading.Lock()
 # "Database roles").
 LIBRARY_FILES = {
     "astordetails": "delivered templates/styles library",
+    "astordetailsbase": "delivered drawing-style lookup library",
     "astoraddin": "user overrides library",
     "astorbase": "delivered fasteners library",
     "astorsettings": "delivered global defaults library",

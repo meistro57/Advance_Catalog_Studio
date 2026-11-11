@@ -3,6 +3,11 @@
 All notable changes to **Advance Steel Catalog Studio** are documented in this file.
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`); the canonical version string lives in [`VERSION`](VERSION) and is exposed in the application via `config.APP_VERSION`.
 
+## [0.7.1] - 2026-11-11
+
+### Fixed
+- **Delivered `AstorDetailsBase.mdf` attachments stayed writable**: `library_kind()` did not recognise the filename, so the attach route recorded no library and `_blocked_write()` allowed edits on a delivered Advance Steel lookup library. It is now treated as read-only like the other `Astor*` libraries, and the existing metadata entry is repaired.
+
 ## [0.7.0] - 2026-11-10
 
 ### Added

@@ -66,10 +66,14 @@ def test_read_only_previews_stay_token_free(monkeypatch):
 
 def test_library_kind_recognises_the_astor_files():
     assert metadata.library_kind("AstorDetails.mdf") == "astordetails"
+    assert metadata.library_kind("AstorDetailsBase.mdf") == "astordetailsbase"
     assert metadata.library_kind("/tmp/uploads/AstorBase.mdf") == "astorbase"
+    assert metadata.library_kind("AstorAddIn.mdf") == "astoraddin"
+    assert metadata.library_kind("AstorSettings.mdf") == "astorsettings"
     assert metadata.library_kind("A325TC.mdf") is None
     assert metadata.library_kind("") is None
     assert metadata.library_label("astordetails").startswith("delivered")
+    assert metadata.library_label("astordetailsbase").startswith("delivered")
 
 
 def test_attach_records_library_provenance(monkeypatch):

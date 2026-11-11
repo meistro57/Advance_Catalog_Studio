@@ -19,3 +19,8 @@ docs/references/
 
 # Pre-change database snapshots (runtime only)
 catalog_studio/snapshots/
+
+# Delivered Astor library samples stay local (large binaries, not for
+# distribution); only the curated sample pairs are tracked.
+samples/Astor*.mdf
+samples/Astor*_log.ldf

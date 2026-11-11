@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/actions/workflows/ci.yml"><img alt="CI workflow status" src="https://img.shields.io/github/actions/workflow/status/meistro57/Advance_Catalog_Studio/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white" /></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-2B82A7?style=flat-square&logo=git&logoColor=white" /></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.7.1" src="https://img.shields.io/badge/version-0.7.1-2B82A7?style=flat-square&logo=git&logoColor=white" /></a>
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=457D9F" /></a>
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=278D89" /></a>
   <a href="LICENSE"><img alt="MIT licensed" src="https://img.shields.io/badge/license-MIT-B59A4B?style=flat-square" /></a>
