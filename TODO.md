@@ -3,7 +3,15 @@
 Working backlog for this repository. Keep it current: move finished items to the
 "Done" log at the bottom and delete nothing else without a reason.
 
-Status key: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
+Status key: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked ·
+`[·]` parked (writing off the plan, see below)
+
+Scope decision (2026-11-19): **writing back to an Advance Steel database is off
+the plan for now.** The delivered write features stay supported and tested
+(diameter clone/removal, shear-stud clone/new catalog, row CRUD, find & replace,
+style field/rule edits, deep-copy rename); items below that would add a new
+write path are marked `[·]` and are not scheduled. Prefer read-only reports,
+previews and verification work. Revisit only with an explicit decision.
 
 Rules that apply to every item:
 
@@ -49,10 +57,10 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   2019 clone & create round trip (`A3.1` in `docs/verification-log.md`);
   confirmed `ConnectorRelations.Key` (`INT NOT NULL`, non-identity, sequential
   `max(Key)+1`) and `SetBolts.Type = 2`. Unblocks #4 write path (`D1`, `D2`, `D5`).
-- [ ] **A4 — Drawing-style round trip.** Edit a rule and a field, export,
+- [·] **A4 — Drawing-style round trip.** Edit a rule and a field, export,
   import through Drawing Style Manager; confirm the style still loads, how a
-  same-name style is handled, and whether `Copy of` naming matters. Unblocks
-  selective deep copy, batch replacement, and any purge.
+  same-name style is handled, and whether `Copy of` naming matters. Parked with
+  the write paths it unblocks (selective deep copy, batch replacement, purge).
 - [ ] **A5 — Enum labels.** Check whether any AS 2026 UI surface lists
   `AstorDetailsBase` values (geometric restrictions, object qualifiers, box
   modes, display types) with numbers. Only document a mapping that is read
@@ -64,12 +72,14 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   style, export DXF, hand-edit a copy, export again, and run both through
   `/detail-diff` with the style export. Confirm the AS layer/XData rule, the
   added hand dimensions, the chains and the sides match the edits; record the
-  result in `docs/verification-log.md`. Unblocks issue #15 Phase 2.
+  result in `docs/verification-log.md`. Validates issue #15 Phase 1; its
+  Phase 2 apply path is parked.
 
 ## B. Bolt-set viewer/editor (issue #1)
 
-- [ ] **B1 (`[!]` A1) — Phase 3 preview + transaction.** Server-side
-  `preview_assembly_change()` / `apply_assembly_change()` that map a draft
+- [·] **B1 (parked: write path off plan; `[!]` A1 if revived) — Phase 3
+  preview + transaction.** Server-side `preview_assembly_change()` /
+  `apply_assembly_change()` that map a draft
   (component per slot, side, order, grip) to `SetOfBolts` / `SetBolts` /
   `SetNutsBolts` deltas; table-by-table preview, explicit confirm, one
   transaction, rollback on any mismatch. Tests with synthetic rows.
@@ -91,8 +101,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 
 ## C. Anchor configurator and fabrication sheets
 
-- [ ] **C1 (`[!]` A2) — Purpose-built anchor editing.** Guided fields for
-  identity/material/geometry/holes/hardware with relationship checks and a
+- [·] **C1 (parked: write path off plan; `[!]` A2 if revived) — Purpose-built
+  anchor editing.** Guided fields for identity/material/geometry/holes/hardware
+  with relationship checks and a
   "what AS receives" preview; depends on verified `Position` semantics.
 - [ ] **C2 — Fabrication sheet coverage.** Validate the sheet against
   `US_Headed_Anchors` and `US_Threaded_Anchors` (current mapping is verified for
@@ -146,8 +157,9 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   `DetViewDimRequestLinear.Direction`, and `DetViewDimStrategyItems.Type` across
   delivered `AstorDetails.mdf` (`A5.2` in `docs/verification-log.md`) and wired
   verified label tables into `dim_explain.py`.
-- [ ] **E2 — Arranger strategy editing.** Expose `ArrangerStrategy`,
-  `ArrangerControl` and the merge distance on annotation strategies, with the
+- [·] **E2 (parked: write path off plan) — Arranger strategy editing.**
+  Expose `ArrangerStrategy`, `ArrangerControl` and the merge distance on
+  annotation strategies, with the
   same shared-record warning as other library edits.
 - [ ] **E3 — Usage page polish.** Record search/filter, deep links to raw rows,
   and a "used by N styles" badge in the editor next to shared sub-style fields
@@ -155,13 +167,14 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 - [ ] **E4 — Multi-style fixture.** Add a sanitised synthetic export with two
   styles sharing one appearance to prove the usage walk reports both and the
   orphan scan stays empty.
-- [ ] **E5 (`[!]` A4) — Selective deep copy.** Preview which branches would be
-  duplicated per checkbox (view definitions, object presentation, dimension
-  strategy, label strategy), propose new keys and names (no `Copy of`
-  prefixing), then apply in one transaction.
-- [ ] **E6 (`[!]` A4) — Batch presentation replace.** Criteria builder
-  (object set / model role / geometric restriction) → preview diff by style and
-  view → apply; block or auto-branch shared targets using the usage graph.
+- [·] **E5 (parked: write path off plan) — Selective deep copy.**
+  Preview which branches would be duplicated per checkbox (view definitions,
+  object presentation, dimension strategy, label strategy), propose new keys and
+  names (no `Copy of` prefixing), then apply in one transaction.
+- [·] **E6 (parked: write path off plan) — Batch presentation replace.**
+  Criteria builder (object set / model role / geometric restriction) → preview
+  diff by style and view → apply; block or auto-branch shared targets using the
+  usage graph.
 - [ ] **E7 — Token palette grouping.** Group tokens by object type (label,
   dimension, title) and keep the escape buttons.
 - [ ] **E8 — Health rows for styles.** When an export has more than one style,
@@ -180,18 +193,19 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   text height, colours and the AutoCAD dimension style are reported as not a
   style change. Pure parser/diff/style matcher unit-tested; assumptions and the
   A7 procedure in `docs/dxf-diff.md`.
-- [!] **E9b (blocked by A4, A7) — Apply the hand-edit plan.** Turn the Phase 1
-  report into a reviewable table that writes a copy of the style (snapshot
-  first), regenerates the detail, diffs it against the hand-edited target and
-  repeats until only "style can't" edits remain.
+- [·] **E9b (parked: write path off plan) — Apply the hand-edit plan.**
+  Turn the Phase 1 report into a reviewable table that writes a copy of the
+  style (snapshot first), regenerates the detail, diffs it against the
+  hand-edited target and repeats until only "style can't" edits remain.
 
 ## F. Data safety (prompted by the co-developer brief)
 
 - [x] **F0 — Pre-change snapshots.** `copy_only` `.bak` + manifest for the bolt
   diameter clone and find & replace, fail-closed.
-- [ ] **F0a — Snapshot the remaining batch paths.** Wire `create_snapshot()`
-  into selective deep copy, batch presentation replace and any future purge, and
-  decide whether single-row style edits need one (probably not, but state it).
+- [·] **F0a (parked: depends on parked batch writes) — Snapshot the remaining
+  batch paths.** Wire `create_snapshot()` into selective deep copy, batch
+  presentation replace and any future purge, and decide whether single-row
+  style edits need one (probably not, but state it).
 - [x] **F0b — Snapshot retention.** `snapshot_files()` / `prune_snapshots()` and
   the database page's **Prune older** button keep the newest N (default 5);
   deletion is only ever an explicit, CSRF-checked action.

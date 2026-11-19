@@ -9,6 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATC
 - **Object sets library ran off the pane (`#22`)**: in the drawing-style editor the Object sets table now scrolls inside its pane, the `RunName` field keeps a readable width, and the member badges wrap between entries instead of being clipped at the right edge. A rendered-page regression test pins the scroll container, field width and wrap point.
 
 ### Changed
+- **Write-back is off the current plan**: new write paths that would add data to an Advance Steel database are parked in `TODO.md` (`[·]`): bolt-set Phase 3, anchor editing, arranger strategy editing, selective deep copy, batch presentation replacement, applying the hand-edit plan and the snapshots for those future batch writes. Delivered writes remain supported and tested. Roadmap docs, issue comments and the verification notes now say so.
 - **Issue status review**: recorded the delivered Phase 1-2 bolt-set viewer scope and the remaining Phase 3 work on issue #1, and the shipped Phase 1 detail-diff scope with the outstanding A4/A7 prerequisites on issue #15. Fixed the duplicated `G` labels in the TODO housekeeping section.
 
 ## [0.7.1] - 2026-11-11
