@@ -17,7 +17,7 @@ Rules that apply to every item:
 - Any behavioural change needs pytest coverage; docs (`README.md`, `AGENTS.md`,
   `docs/*.md`) are updated in the same commit.
 
-Baseline: `main` green at 564 tests; read-only bolt/anchor/stud/style views,
+Baseline: `main` green at 565 tests; read-only bolt/anchor/stud/style views,
 the health report (with `#exportChecklist`) and the DXF hand-edit diff
 (issue #15 Phase 1) exist; the home dashboard is split into Fastener Management
 and Drawing Style Management realms with distinct colour palettes (issue #20);
@@ -226,17 +226,17 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
 
 ## H. Housekeeping
 
-- [ ] **G1 — Metadata sidecar.** `catalog_studio/catalog_metadata.json` is dirty
+- [ ] **H1 — Metadata sidecar.** `catalog_studio/catalog_metadata.json` is dirty
   from live attaches (`Mark_Column`, `HILTI_HY_200`); decide whether the file is
   runtime state (git-ignore it) or committed examples. It now also carries the
   `library` flag that makes delivered Astor* attachments read-only, so a stale
   entry can silently block (or unblock) writes — worth settling.
-- [ ] **G2 — Reference PDFs.** `docs/references/` holds the Autodesk guides and
+- [ ] **H2 — Reference PDFs.** `docs/references/` holds the Autodesk guides and
   is git-ignored; keep a one-line note in the docs on what each is used for.
-- [ ] **G3 — Test gaps.** No automated coverage for: `add-diameter` apply,
+- [ ] **H3 — Test gaps.** No automated coverage for: `add-diameter` apply,
   detach/export, staging purge confirmation, drawing-style save/rule POST
   permutations, JS layout.
-- [ ] **G4 — Sample data.** A multi-style drawing-style export and a second
+- [ ] **H4 — Sample data.** A multi-style drawing-style export and a second
   shear-stud catalog would strengthen the read-only features; only add files that
   are safe to publish.
 
@@ -315,3 +315,6 @@ catalog file, operation, expected vs observed, screenshot/log, verdict.
   snapshot), added `"shear stud"` to `CATALOG_TEMPLATES` in `schema_templates.py`,
   added imperial `RunName` / `SetBolts.Name` support, and added `#exportChecklist`
   on `/db/<db>/health` (564 tests).
+- [x] Object sets library (issue #22): the table scrolls inside its pane, the
+  name field keeps a readable width, and member badges wrap instead of running
+  off the page (565 tests).

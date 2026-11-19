@@ -75,6 +75,10 @@
   .ds-crumb { font-size:.75rem; color:var(--cs-muted, #6c757d); }
   .ds-pager { display:flex; justify-content:space-between; gap:.5rem; margin:1rem 0; }
 
+  /* object sets: keep the name readable and let long member lists wrap */
+  #pane-lib-sets .ds-in { min-width: 12rem; }
+  #pane-lib-sets .ds-objectset-members { white-space: normal; min-width: 22rem; }
+
   /* dimension explainer */
   .dx-chain { border:1px solid var(--cs-border, #dee2e6); border-radius:.45rem; margin-bottom:.75rem; background:var(--cs-surface, #fff); }
   .dx-chain > summary { list-style:none; cursor:pointer; padding:.55rem .75rem; display:flex; gap:.6rem; align-items:flex-start; }
@@ -673,18 +677,20 @@
   <div class="card-header">{{ icon('library') }} Object sets</div>
   <div class="card-body">
     <div class="ds-hint mb-2">Object sets select what a rule (or a dimension point rule) applies to: AS object-type numbers plus optional model roles.</div>
-    <table class="table table-sm small">
+    <div class="table-responsive">
+    <table class="table table-sm small align-middle">
       <thead class="table-light"><tr><th>#</th><th>Name</th><th>Members (object type · model role)</th></tr></thead>
       <tbody>
       {% for e in tree.libraries.get('DetObjQualifierSet', []) %}
         <tr>
           <td>{{ e.row.Key }}</td>
           <td>{{ fld('DetObjQualifierSet', e.token, 'RunName', e.row.RunName) }}</td>
-          <td>{% for it in tree.qset_items.get(e.row.Key, []) %}<span class="badge bg-light text-dark border me-1">{{ it.ObjQualifier }}{% if it.ModelRole %} · {{ it.ModelRole }}{% endif %}</span>{% endfor %}</td>
+          <td class="ds-objectset-members">{% for it in tree.qset_items.get(e.row.Key, []) %}<span class="badge bg-light text-dark border me-1">{{ it.ObjQualifier }}{% if it.ModelRole %} · {{ it.ModelRole }}{% endif %}</span>{% if not loop.last %} {% endif %}{% endfor %}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 </section>

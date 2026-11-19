@@ -230,3 +230,31 @@ def test_dimension_chain_exposes_point_slots_and_verified_directions():
     assert 'name="f::DetViewDimRequestLinear::lin-400::Point15"' in html
     assert "4 · X of main part" in html
     assert "5 · Y of main part" in html
+
+
+def _tree_with_object_sets(members):
+    tree = _tree()
+    tree["libraries"]["DetObjQualifierSet"] = [
+        {"row": {"Key": 22001, "RunName": "Main"}, "token": "qs-tok"}
+    ]
+    tree["qset_items"][22001] = [
+        {"ObjQualifier": q, "ModelRole": role} for q, role in members
+    ]
+    return tree
+
+
+def test_object_set_members_wrap_inside_a_scrollable_table():
+    """Issue #22: the name field collapsed to a few characters and the member
+    badges ran off the pane. The table scrolls, the field keeps its width and
+    the member list wraps between badges."""
+    members = [(73, "Plant3D.Equipment"), (73, "Plant3D.Pipe"),
+               (3, "Railing_Handrail_Stair"), (4, "Rail")]
+    html = _render(_tree_with_object_sets(members))
+    pane = html[html.index('id="pane-lib-sets"'):]
+    pane = pane[:pane.index("</section>")]
+    assert '<div class="table-responsive">' in pane
+    assert 'class="ds-objectset-members"' in pane
+    assert 'name="f::DetObjQualifierSet::qs-tok::RunName"' in pane
+    assert 'value="Main"' in pane
+    # Adjacent badges are separated by a space, so the list has a wrap point.
+    assert "</span> <span" in pane
