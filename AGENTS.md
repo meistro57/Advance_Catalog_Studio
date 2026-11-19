@@ -185,7 +185,11 @@ transaction after taking a pre-change snapshot.
   the redirect targets and the single save form. Panes are hidden in the
   browser, never server-gated: every screen stays in the one form so one POST
   saves the whole style. The old library tab strip is gone; do not reintroduce
-  `data-bs-toggle="tab"` or a second scroll container.
+  `data-bs-toggle="tab"` or a second scroll container. `theme.css` sets
+  `td { white-space: nowrap }` globally, so any library cell that must wrap
+  needs its own rule; the Object sets table (issue #22) sets
+  `.ds-objectset-members` to normal white-space, keeps a readable field width
+  and sits in `.table-responsive`.
 - Placement in a style export is **rules, not coordinates**: there is no x/y on
   `DetViewRequest`/`DetailStyle`, and `DetArrangerControl` is empty in every
   sample. `DetailStyle.ViewArrangeStrategy` -> `DetViewArrangeStrategy`
