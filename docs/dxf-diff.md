@@ -16,9 +16,10 @@ a POST, so it needs the session `csrf_token` (get the page first and send the
 token with the two files).
 
 Nothing here writes. There is no apply route, no database change and no export.
-Phase 2 (apply the plan to a copy, regenerate, diff again) stays blocked until
-verification A4 in `docs/verification-log.md` passes and a real before/after
-pair has been checked under A7.
+Phase 2 (apply the plan to a copy, regenerate, diff again) is parked with the
+write-back scope decision; reviving it requires verification A4 in
+`docs/verification-log.md` and a real before/after pair checked under A7, which
+also validates the Phase 1 report.
 
 ## Inputs
 

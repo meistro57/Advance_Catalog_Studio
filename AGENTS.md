@@ -57,7 +57,14 @@ transaction after taking a pre-change snapshot.
   dependency and no formatting policy is applied.
 - The backlog is `TODO.md`; live-Advance-Steel evidence goes in
   `docs/verification-log.md`. Write paths stay blocked until their verification
-  entry passes.
+  entry passes. **Scope decision (2026-11-19): writing back to an Advance Steel
+  database is off the plan for now.** Delivered writes stay supported and
+  tested; items that would add a new write path are marked `[·]` parked in
+  `TODO.md` and must not be revived without an explicit decision. Prefer
+  read-only reports, previews and verification work.
+- **Updates land on `main`, always.** Work on a short-lived branch if that helps,
+  but merge it to `main` as part of the change (PR or fast-forward); do not
+  leave finished work only on a feature branch.
 - The scratch container must run **SQL Server 2019**
   (`mcr.microsoft.com/mssql/server:2019-latest`). Advance Steel 2026 files are
   internal version 904; attaching to 2022 (957) upgrades them permanently and
@@ -185,7 +192,11 @@ transaction after taking a pre-change snapshot.
   the redirect targets and the single save form. Panes are hidden in the
   browser, never server-gated: every screen stays in the one form so one POST
   saves the whole style. The old library tab strip is gone; do not reintroduce
-  `data-bs-toggle="tab"` or a second scroll container.
+  `data-bs-toggle="tab"` or a second scroll container. `theme.css` sets
+  `td { white-space: nowrap }` globally, so any library cell that must wrap
+  needs its own rule; the Object sets table (issue #22) sets
+  `.ds-objectset-members` to normal white-space, keeps a readable field width
+  and sits in `.table-responsive`.
 - Placement in a style export is **rules, not coordinates**: there is no x/y on
   `DetViewRequest`/`DetailStyle`, and `DetArrangerControl` is empty in every
   sample. `DetailStyle.ViewArrangeStrategy` -> `DetViewArrangeStrategy`
@@ -446,8 +457,8 @@ position, move components between head/nut sides, reorder the stack, and
 override the schematic grip thickness. Drafts are laid out in the browser by
 `static/js/bolt-set-layout.js`, which **mirrors `build_layout()` in
 bolt_sets.py** (grip override included) — keep the two files in sync. The
-editor never writes SQL; Phase 3 will hand proposals to a server-side
-preview/transaction flow.
+editor never writes SQL; Phase 3 (server-side preview/transaction) is parked
+with the write-back scope decision.
 
 Display units: the viewer/editor shows **all dimensions in inches** (`fin()`
 in bolt-set-viewer.js converts mm→in at display time; `in2()` formats layout
@@ -542,10 +553,11 @@ a connector catalog.
 name, duplicate or non-numeric lengths, incomplete or missing source, tight
 spacing). Geometry, weight and the hole rule scale by `target/source` only
 when asked, are labelled as estimates, and weight is left empty when no source
-stud of that length exists. There is deliberately no apply route — the
-proposal is the review artifact for the unverified write path, and
-`ConnectorRelations.Key` is proposed as `max(Key)+1` (not an identity column
-in the export).
+stud of that length exists. The preview is the review artifact;
+`/db/<db>/shear-stud-browser/clone-apply` re-validates the same plan, takes a
+fail-closed pre-change snapshot and inserts the rows in one transaction
+(`A3.1` verified). `ConnectorRelations.Key` is proposed as `max(Key)+1` (not an
+identity column in the export).
 
 ## Fabrication detail sheet (issue #2)
 

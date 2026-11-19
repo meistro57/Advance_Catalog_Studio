@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/actions/workflows/ci.yml"><img alt="CI workflow status" src="https://img.shields.io/github/actions/workflow/status/meistro57/Advance_Catalog_Studio/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white" /></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.7.1" src="https://img.shields.io/badge/version-0.7.1-2B82A7?style=flat-square&logo=git&logoColor=white" /></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.7.2" src="https://img.shields.io/badge/version-0.7.2-2B82A7?style=flat-square&logo=git&logoColor=white" /></a>
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=457D9F" /></a>
   <a href="https://github.com/meistro57/Advance_Catalog_Studio/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/meistro57/Advance_Catalog_Studio?style=flat-square&logo=github&logoColor=white&color=278D89" /></a>
   <a href="LICENSE"><img alt="MIT licensed" src="https://img.shields.io/badge/license-MIT-B59A4B?style=flat-square" /></a>
@@ -85,13 +85,13 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Table editor raw row operations | Implemented |
 | Guided bolt/anchor diameter cloning & removal | Implemented (`/db/<db>/add-diameter`, `/db/<db>/remove-diameter`) |
 | Bolt-set visualizer (read-only) | 3D schematic + dimensioned 2D profile implemented (with fractional-inch / `mm` dimension toggle) |
-| Bolt-set assembly editor (client preview) | Phase 2 implemented, Phase 3 write-back pending |
+| Bolt-set assembly editor (client preview) | Phase 2 implemented; Phase 3 write-back parked (writing to Advance Steel is off the current plan) |
 | Anchor configurator (graphical viewer) | Implemented (read-only, with fractional-inch / `mm` toggle and interactive **Bolt projection from concrete** control + `4″ Typical` preset) |
 | Anchor fabrication detail sheets | First vertical slice implemented (SVG + print) |
 | Shear-stud (connector) catalogs | Auto-detected; family/diameter/length browser with metric & imperial (`Nelson H4L` / `Nelson H4L-Inch`) conventions, per-record detail panel & 2D SVG elevation, source table/column traceability, completeness/weight/distance validation, transactional diameter clone (`POST /db/<db>/shear-stud-browser/clone-apply` with fail-closed pre-change snapshot), and **Shear Stud Catalog** scaffolding (`CATALOG_TEMPLATES['shear stud']`, issue #4) |
 | Catalog health report | Implemented (read-only, per detected catalog type: bolt, anchor, shear stud, drawing style) with JSON/CSV downloads |
 | Catalog comparison (`/compare`) | Implemented (read-only: table presence, row counts, diameter coverage) |
-| Detail diff (`/detail-diff`, issue #15) | Phase 1 implemented (read-only: two DXF exports + optional style export become a hand-edit report and JSON; apply path blocked on verification) |
+| Detail diff (`/detail-diff`, issue #15) | Phase 1 implemented (read-only: two DXF exports + optional style export become a hand-edit report and JSON; apply path parked with the write-back scope) |
 | Pre-change snapshots | Implemented for the batch writes: `COPY_ONLY` backup + manifest, explicit prune (newest N), documented manual restore |
 | Delivered-library protection | Implemented (databases attached from `Astor*.mdf` are read-only) |
 | Staged upload cleanup | Implemented (per-pair remove, flush, staging trash + purge) |
@@ -103,6 +103,8 @@ Catalog Studio is an active, early-stage workshop tool built from real Advance S
 | Interface theme | Light and dark, remembered per browser; drawings stay on light paper |
 | Interface assets | Bootstrap 5.3.3, htmx and Three.js vendored under `static/vendor/` (works offline); icons are inline SVG, not emoji |
 | Multi-user or internet deployment | Not supported |
+
+**Scope:** writing back to an Advance Steel database is off the current plan. The delivered write features listed above stay supported and tested; new write paths (bolt-set Phase 3, anchor editing, style branch clone, batch presentation replacement, apply the hand-edit plan) are parked.
 
 > [!CAUTION]
 > Use copies of catalog databases and keep an untouched backup. This tool can make destructive database changes by design. It is intended for local use on a trusted machine or LAN—not exposure to the public internet.
@@ -401,7 +403,7 @@ The profile is redrawn from the browser's unsaved preview through `POST /db/<db>
 
 ### Assembly editor (Phase 2 — client-side preview)
 
-The assembly editor at the bottom of the same page lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only — handing them to the server-side preview/transaction flow is Phase 3, once the `Position`-field semantics are verified.
+The assembly editor at the bottom of the same page lets you experiment with a bolt set without touching the database: swap the component installed in each assembly position from the matching `SetNutsBolts` records, move components between the head side and the nut side, reorder the stack, and override the schematic clamped-material thickness. The preview re-lays out the hardware instantly and re-checks warnings (impossible stacks, missing records, grip limited by bolt length). These are local draft changes only. Handing them to a server-side preview/transaction flow (Phase 3) is parked with the rest of the write-back work; the `Position`-field semantics stay unverified.
 
 ### Anchor configurator (graphical)
 
@@ -423,7 +425,7 @@ Exports from the **Drawing Style Manager** (also `.mdf` / `.ldf`) are detected a
 - **In-place rule edits** — move / copy / delete / renumber swap only that view's rules block (htmx, vendored locally) instead of reloading the page, so a long style keeps its scroll position. The block is scoped to the view, so two views that share one representation map edit independently; saving fields posts in the background and reports through the page's flash area. Both paths still work without JavaScript, and the no-JS fallback returns to the rules screen of the view that sent the action.
 - **Pictures of the numbers** — a style-level overview comparing how large each view prints, then per view a print-scale ruler, a view-box plan/section showing X/Y reach and front/behind depth, a length-clipping diagram naming each distance, and a dimension section with a "how to read a chain" explainer, a plan of every chain in the view (X chains above/below the part, Y chains beside it, numbered into a legend), and a chain sketch per request (collapsed behind a summary once a view has more than six). Each chain keeps one colour across the page: the number on its card is the colour of its lane in the plan and of its legend swatch, so the card and the picture are obviously the same chain. They redraw as you edit and each one states which readings are still unverified; they are schematics built from the row values, not Advance Steel's own output.
 - **Representation rules** — a precedence ladder (first matching rule wins) above the editable rows, with dropdowns for object set, appearance, label strategy and linetype, the label each rule prints, and move up / move down / copy below / delete.
-- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. Each library is its own menu screen rather than a tab strip, so it is reachable directly by hash and never pushes the style content down the page.
+- **Libraries** — label formulas (live preview plus a click-to-insert token palette, with the token set and the `%%c` / `%%d` / `%%p` symbol escapes documented by Autodesk's style guide), label strategies, appearances with hatch swatches drawn at the preset's angle, object sets and their model roles. Long object-set member lists wrap inside a horizontally scrollable table, and the name field keeps a readable width. Each library is its own menu screen rather than a tab strip, so it is reachable directly by hash and never pushes the style content down the page.
 - **Integrity check** — every in-file reference is checked before you export.
 - **Rename Deep Copies (`/db/<db>/drawing-style/rename-copies`, issue #16)** — Advance Steel's **Deep copy** duplicates every sub-style level and prefixes `RunName` with `Copy of ` or `Copy (n) `. This tool scans all drawing-style `RunName` tables (`DetailStyle`, `DetViewRequest`, `DetViewDimStrategy`, `DetObjReprMap`, `DetObjQualifierSet`, `DetViewLabelStrategy`, `DetObjAppearance`), previews before/after names with optional strip, custom prefix/suffix, or find/replace, blocks same-table `RunName` collisions, takes a pre-change snapshot, and updates all selected rows in one transaction.
 - **Sub-style usage** — a read-only "used by" page lists every drawing style that depends on a shared record (appearance, label formula, qualifier set, dimension setup) with the chain that connects them, plus the rows no style reaches.
@@ -470,9 +472,9 @@ Catalogs that carry the `Connector*` tables (currently the Nelson H4L export) ar
 - **Validation** — the documented minimum record set is checked per (family, grade, diameter): lookup rows, `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations`, and at least one stud length. Orphan lookups, duplicate relations or stud rows, head diameter not larger than the shank, broken names and non-canonical diameter display strings are reported as error / warning / note rather than repaired.
 - **Traceability** — every friendly value links back to its raw table, filtered to the matching record (for example `SetBolts` by diameter, or `ConnectorRelations` by connector diameter).
 - **Units** — a `mm` / `inch` toggle switches every displayed dimension (diameters, lengths, hole rules, head geometry) without touching the stored millimetre values; inches reuse the fabrication-sheet convention (nearest 1/16 in, reduced fraction, `≈` when the millimetre value is not exactly representable). Filter links and the clone form carry the choice, while the clone proposal table keeps showing the values as they would be stored.
-- **Clone proposal (preview only)** — a "Plan a clone" form takes a source family/grade/diameter plus a target diameter and free-form length list, then renders the INSERT-shaped rows it *would* need in `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations` and `SetBolts`. Optionally it scales head geometry, weight and the hole rule by the diameter ratio and says so; blank along/across fields fall back to the (scaled) source rule. Duplicate diameters, lengths, names and relation keys, incomplete sources, non-numeric input and tight spacing are reported as issues that block the plan. There is **no apply action** — the proposal is a review artifact for the eventual write path.
+- **Clone proposal (preview only)** — a "Plan a clone" form takes a source family/grade/diameter plus a target diameter and free-form length list, then renders the INSERT-shaped rows it *would* need in `ConnectorDiameters`, `ConnectorDistances`, `ConnectorRelations` and `SetBolts`. Optionally it scales head geometry, weight and the hole rule by the diameter ratio and says so; blank along/across fields fall back to the (scaled) source rule. Duplicate diameters, lengths, names and relation keys, incomplete sources, non-numeric input and tight spacing are reported as issues that block the plan. The proposal is the review artifact; the separate **clone apply** action re-validates the same plan, takes a pre-change snapshot and inserts the rows in one transaction.
 
-The page never writes to the catalog. Field meanings are **observed** from a single export and not yet round-trip verified through Advance Steel 2026, so editing, cloning and the relation-key rule stay out of scope until that verification is done. Schema notes: [`docs/shear-stud-schema.md`](docs/shear-stud-schema.md).
+The page itself never writes. Field meanings are **observed** from the exports; the clone round trip is verified (`A3.1`), and the only write path is the explicit clone-apply action above. Schema notes: [`docs/shear-stud-schema.md`](docs/shear-stud-schema.md).
 
 ## Why bolt diameters are difficult
 
@@ -619,15 +621,15 @@ Advance_Catalog_Studio/
 
 ## Planned features
 
-The long-term goal is to make catalog editing resemble the hardware being configured—not the SQL schema hiding underneath it.
+The long-term goal is to make catalog editing resemble the hardware being configured—not the SQL schema hiding underneath it. Writing to an Advance Steel database is off the current plan, so the work below is read-only unless explicitly noted.
 
 ### Graphical bolt-set builder
 
-> Status: the read-only visualizer (Phase 1) and the client-side assembly editor (Phase 2) described in the sections above are implemented. Remaining work under issue #1 is verifying the `Position`-field semantics against a live catalog and wiring draft proposals into the server-side preview and transaction flow (Phase 3). The list below is the roadmap for that final phase.
+> Status: the read-only visualizer (Phase 1) and the client-side assembly editor (Phase 2) described in the sections above are implemented. Phase 3 (server-side preview and transaction) is **parked** with the write-back scope decision; verifying the `Position`-field semantics still improves the read-only viewer. The list below describes the longer-term idea, not scheduled work.
 
-A visual assembly editor is planned for adjusting complete bolt sets without manually tracing `SetOfBolts`, `SetNutsBolts`, `SetBolts`, and `ScrewNew` records.
+A visual assembly editor was planned for adjusting complete bolt sets without manually tracing `SetOfBolts`, `SetNutsBolts`, `SetBolts`, and `ScrewNew` records.
 
-Planned capabilities include:
+Longer-term capabilities include:
 
 - an exploded bolt-stack view showing the bolt head, connected parts, nut, and each washer;
 - clear control over component order, side, orientation, and assembly position;
@@ -640,11 +642,11 @@ The aim is simple: select and adjust the physical bolt assembly on screen, then 
 
 ### Anchor configuration that makes sense
 
-> Status: a graphical, read-only anchor viewer is implemented (see the Anchor configurator section above) and exercises the same rendering patterns as the bolt viewer. The purpose-built *editing* interface described below remains planned; it depends on verifying the anchor `Position` semantics against a live catalog first, in the same way the bolt-set editor does.
+> Status: a graphical, read-only anchor viewer is implemented (see the Anchor configurator section above) and exercises the same rendering patterns as the bolt viewer. The purpose-built *editing* interface described below is parked with the write-back scope; it also depends on verifying the anchor `Position` semantics against a live catalog.
 
-Anchor catalogs need a purpose-built interface rather than a generic form containing dozens of disconnected fields. The planned anchor configurator will organise data around the actual anchor and its installation geometry.
+Anchor catalogs need a purpose-built interface rather than a generic form containing dozens of disconnected fields. The longer-term anchor configurator would organise data around the actual anchor and its installation geometry.
 
-Planned views include:
+Such a configurator would include:
 
 - a labelled anchor diagram with diameter, overall length, thread length, embedment, top distance, and other relevant dimensions;
 - logical sections for anchor identity, material and strength, geometry, holes, nuts, washers, and installation rules;
@@ -655,11 +657,11 @@ Planned views include:
 
 ### Drawing styles
 
-Next steps for the drawing-style editor:
+Next steps for the drawing-style editor. Writing back to Advance Steel is off the current plan, so the write items below are parked rather than scheduled:
 
 - confirm that an edited style imports cleanly through the Drawing Style Manager, and how same-name styles are handled;
 - clone a whole style inside one export, so several variants can ship in one file;
-- edit dimension point selections and arranger strategies with the same dropdowns;
+- edit arranger strategies with the same dropdowns (point selections are done; arranger editing is a write path and is parked);
 - label the Advance Steel built-in values (geometric restrictions, object qualifiers, box modes) once they are verified against a live install;
 - styles that use detail processes (`DetailProcess*` tables, empty in the first sample);
 - selective deep-copy of a style branch: the guide confirms DSM's two modes (Copy shares sub-styles, Deep copy duplicates every level and prefixes each with `Copy of`), so a selective branch is a third mode whose keys and import behaviour still need a verified round trip;

@@ -63,15 +63,17 @@ in Advance Steel is therefore believed to be:
 - Units are millimetres throughout; weights in kg (`SetBolts.Weight`,
   `ConnectorMaterial.weight`).
 
-## Open verification items (before any write path)
+## Verification status
 
-- Confirm `SetBolts.Type` semantics and that shear studs are distinguishable
-  from bolts by schema/tables rather than by `Type`.
-- Confirm the `ConnectorRelations` role and whether its `Key` must be
-  identity-managed when adding a diameter.
-- Confirm which tables are required for a new stud family/diameter to appear
-  in AS 2026 Management Tools (record the dependency graph from a successful
-  round trip).
+Resolved by `A3.1` (2026-11-10): `SetBolts.Type` is `2` on all 106 stud rows
+across both exports, `ConnectorRelations.Key` is non-identity and allocated as
+`max(Key)+1` across connector standards, and a multi-table clone round trip
+passed against SQL Server 2019 at file version 904.
+
+Still open, but not needed while write-back is parked:
+
+- Confirm the full table dependency graph from a successful Advance Steel 2026
+  Management Tools import of a newly created family/diameter.
 - ISO 13918-style studs previously observed in `SetBolts` in other catalogs
   may share this `Connector*` shape or differ; do not assume.
 
